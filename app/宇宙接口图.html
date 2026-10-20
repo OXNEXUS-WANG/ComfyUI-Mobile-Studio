@@ -5863,7 +5863,7 @@ function drawBlackHole(){
 }
 
 /* ---------- KERR WebGL 黑洞（MIT，右下角背景） ---------- */
-const bhGLCanvas = document.getElementById('bhGL');
+let bhGLCanvas = document.getElementById('bhGL');
 let bhGLActive = false, bhGL = null, bhGLSteps = 100;
 let bhVisible = true;
 try{ bhVisible = localStorage.getItem('nexusBhV1') !== '0'; }catch(e){}
@@ -5878,11 +5878,20 @@ function bhCompile(gl, type, src){
   return sh;
 }
 function initBlackHoleGL(){
+  if(bhGLActive && bhGL) return true;
   const gl = bhGLCanvas.getContext('webgl', {
     alpha:true, antialias:false, depth:false, stencil:false,
     premultipliedAlpha:false, powerPreference:'high-performance'
   });
   if(!gl) return false;
+  if(gl.isContextLost()){
+    // 之前为了省显存主动 loseContext；恢复事件会再调用一次本函数。
+    try{
+      const ext = gl.getExtension('WEBGL_lose_context');
+      if(ext) ext.restoreContext();
+    }catch(e){}
+    return false;
+  }
   const vs = bhCompile(gl, gl.VERTEX_SHADER, document.getElementById('bhVert').textContent);
   const fs = bhCompile(gl, gl.FRAGMENT_SHADER, document.getElementById('bhFrag').textContent);
   if(!vs || !fs) return false;
@@ -6038,21 +6047,39 @@ function bhGLFrame(now){
 }
 /* 移动端 GPU 可能回收 WebGL 上下文：丢失时立刻退回稳定的 2D 黑洞，
    避免画布一黑一亮地闪；恢复后再重新初始化。 */
-bhGLCanvas.addEventListener('webglcontextlost', e => {
-  e.preventDefault();
-  bhGLActive = false;
-  bhGL = null;
-  if(bhVisible){
-    bhCanvas.style.display = '';
-    drawBlackHole();
-  }else{
-    bhCanvas.style.display = 'none';
+function bindBHContextEvents(canvas){
+  canvas.addEventListener('webglcontextlost', e => {
+    if(canvas !== bhGLCanvas) return;
+    e.preventDefault();
+    bhGLActive = false;
+    bhGL = null;
+    if(bhVisible){
+      bhCanvas.style.display = '';
+      drawBlackHole();
+    }else{
+      bhCanvas.style.display = 'none';
+    }
+  });
+  canvas.addEventListener('webglcontextrestored', () => {
+    if(canvas !== bhGLCanvas) return;
+    bhGL = null;
+    if(bhVisible) initBlackHoleGL();
+  });
+}
+bindBHContextEvents(bhGLCanvas);
+function recreateBHCanvas(){
+  const old = bhGLCanvas;
+  const c = document.createElement('canvas');
+  c.id = 'bhGL';
+  c.setAttribute('aria-hidden', 'true');
+  if(old && old.parentNode) old.parentNode.replaceChild(c, old);
+  if(old){
+    try{ old.width = 0; old.height = 0; }catch(e){}
   }
-});
-bhGLCanvas.addEventListener('webglcontextrestored', () => {
-  bhGL = null;
-  if(bhVisible) initBlackHoleGL();
-});
+  bhGLCanvas = c;
+  bindBHContextEvents(c);
+  return c;
+}
 
 function updateBlackHoleButton(){
   const btn = document.getElementById('bhBtn');
@@ -6074,11 +6101,24 @@ function setBlackHoleVisible(on, persist){
   const scrim = document.getElementById('bhScrim');
   if(scrim) scrim.style.display = bhVisible ? '' : 'none';
   if(!bhVisible){
-    // 停止 WebGL 循环并隐藏两块画布；不销毁 context，重新打开更快。
+    // 停止 WebGL 循环并释放上下文/显存；重新打开时重建（多几百毫秒）。
     bhGLActive = false;
+    if(bhGL && bhGL.gl){
+      let lost = false;
+      try{
+        const ext = bhGL.gl.getExtension('WEBGL_lose_context');
+        if(ext){ ext.loseContext(); lost = true; }
+      }catch(e){}
+      if(lost) bhGL = null;
+    }
     bhGLCanvas.style.display = 'none';
     bhCanvas.style.display = 'none';
     return;
+  }
+  if(!bhGL){
+    // 旧上下文已经丢失/主动释放，换一块新 canvas 重新拿 WebGL，
+    // 比 wait restoreContext 更稳，也能真正释放旧画布的 GPU 资源。
+    bhGLCanvas = recreateBHCanvas();
   }
   bhGLCanvas.style.display = '';
   if(bhGL){
