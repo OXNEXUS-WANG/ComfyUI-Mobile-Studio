@@ -1364,7 +1364,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/models":
-            activity_request("/api/models", "GET", throttle=6.0)
+            activity_request("/api/models", "GET", throttle=6.0, silent=True)
             user = self._current_user()
             models = list_models()
             if not is_admin(user):
@@ -1394,7 +1394,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/stats":
-            activity_request("/api/stats", "GET", throttle=2.0)
+            activity_request("/api/stats", "GET", throttle=2.0, silent=True)
             self._json(gallery_stats(self._current_user()))
             return
 
@@ -1624,7 +1624,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"error": "只有管理员可以管理账号"}, 403)
                 return
             # 后台刷新只定向推给管理员自己，普通账号的星图不应看到。
-            activity_request("/api/users", "GET", throttle=1.0,
+            activity_request("/api/users", "GET", throttle=1.0, silent=True,
                              private_user_id=(user or {}).get("id"))
             self._json({"users": admin_users_payload(),
                         "me": public_user(user)})
@@ -1649,7 +1649,7 @@ class Handler(BaseHTTPRequestHandler):
                       route="/api/admin/queue", method="GET")
                 self._json({"error": "只有管理员可以管理队列"}, 403)
                 return
-            activity_request("/api/admin/queue", "GET", throttle=1.0,
+            activity_request("/api/admin/queue", "GET", throttle=1.0, silent=True,
                              private_user_id=(user or {}).get("id"))
             counts = {}
             with JOBS_LOCK:
@@ -1928,7 +1928,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/gallery":
-            activity_request("/api/gallery", "GET", throttle=0.7)
+            activity_request("/api/gallery", "GET", throttle=0.7, silent=True)
             try:
                 offset = max(0, int(q.get("offset", 0)))
             except Exception:
@@ -1990,7 +1990,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/jobs":
-            activity_request("/api/jobs", "GET", throttle=2.0)
+            activity_request("/api/jobs", "GET", throttle=2.0, silent=True)
             user = self._current_user()
             admin = is_admin(user)
             uid = (user or {}).get("id") or ""

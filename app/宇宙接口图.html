@@ -1986,6 +1986,8 @@ const liveActivity = {
   failures: 0, polling: false, timer: 0, ticker: '', tickerType: '',
   lastPaint: 0, lastKey: '', lastTickerAt: 0, tickerHoldUntil: 0,
   progressPending: new Map(), etaPending: new Map(),
+  // 页面打开之前的请求/完成事件只用于历史，不再回放点亮星球。
+  startedAt: Date.now() / 1000,
   finishedJobs: new Map(), online: []
 };
 const liveMonitor = {
@@ -6678,20 +6680,12 @@ function handleRequest(ev){
   let feat = ROUTE_FEATURE[route] || null;
   if(!feat && route.indexOf('/api/admin/nodes') === 0) feat = 'node_health';
   if(!feat && route.indexOf('/api/admin/workflows') === 0) feat = 'workflow_health';
-  const cat = feat ? featureCategory(feat) : (ROUTE_CATEGORY[route] || null);
   const isErr = route === '/api/login' && ev.ok === false;
   const type = isErr ? 'error' : 'quick';
   const ms = isErr ? 2600 : 1600;
+  // 普通接口调用只闪接口星，不再点亮功能/分类/核心。
+  // 只有真正的任务事件（job start/progress/done）才点亮功能星和进度环。
   if(ep) markLive(ep, {type, ms, reveal: true, primary: true});
-  if(feat) markLive(feat, {type, ms, reveal: true, primary: true, badge: isErr,
-    label: isErr ? '登录失败' : ''});
-  if(cat) markLive(cat, {type, ms, reveal: true});
-  if(route === '/api/translate') markLive('preview', {type: 'quick', ms: 1400});
-  if(route === '/thumb' || route === '/img'){
-    markLive('gallery', {type: 'quick', ms: 1400});
-    markLive('grid', {type: 'quick', ms: 1400});
-  }
-  markLive('core', {type: 'quick', ms: 900});
   const label = ROUTE_LABEL[route] ||
     (feat && byId[feat] ? byId[feat].name : '');
   if(label) setTicker(label + (isErr ? ' · 失败' : ' · 调用中'),
@@ -6702,6 +6696,9 @@ function handleActivityEvent(ev){
   if(!ev || !ev.event) return;
   // 敏感操作静默；后台私有事件只允许对应账号处理
   if(ev.silent) return;
+  // since=0 首次请求会带回最近 45 秒的历史；页面打开前的事件不再重新点亮。
+  // 正在运行的任务不依赖这里，由 j.running -> syncRunningJob() 恢复。
+  if(ev.t && Number(ev.t) < liveActivity.startedAt - 0.5) return;
   if(ev.private_user_id &&
      (!currentUser || ev.private_user_id !== currentUser.id)) return;
   if(ev.event === 'request'){ handleRequest(ev); return; }
