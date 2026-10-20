@@ -98,20 +98,8 @@ body::after{content:'';position:fixed;inset:0;z-index:9;pointer-events:none;opac
   box-shadow:inset 0 0 24px rgba(0,0,0,.48),
              inset 0 0 0 1px rgba(255,255,255,.05)}
 .planet .tex{position:absolute;inset:-2%;border-radius:50%;
-  background-image:var(--tex);background-size:160% 100%;background-position:0 50%;
-  filter:saturate(1.18) contrast(1.10) brightness(1.22)}
-.planet[data-type="ocean"] .tex{filter:saturate(1.18) contrast(1.10) brightness(1.02)}
-.planet[data-type="gas"] .tex{filter:saturate(1.18) contrast(1.08) brightness(1.14)}
-.planet[data-type="ice"] .tex{filter:saturate(1.08) contrast(1.08) brightness(1.08)}
-.planet[data-type="rock"] .tex{filter:saturate(1.10) contrast(1.10) brightness(1.10)}
-.planet[data-type="lava"] .tex{filter:saturate(1.22) contrast(1.10) brightness(1.10)}
-.planet .sphere{position:absolute;inset:-2%;width:104%;height:104%;border-radius:50%;
-  filter:saturate(1.18) contrast(1.10) brightness(1.18)}
-.planet[data-type="ocean"] .sphere{filter:saturate(1.18) contrast(1.10) brightness(1.02)}
-.planet[data-type="gas"] .sphere{filter:saturate(1.18) contrast(1.08) brightness(1.14)}
-.planet[data-type="ice"] .sphere{filter:saturate(1.08) contrast(1.08) brightness(1.08)}
-.planet[data-type="rock"] .sphere{filter:saturate(1.10) contrast(1.10) brightness(1.10)}
-.planet[data-type="lava"] .sphere{filter:saturate(1.22) contrast(1.10) brightness(1.10)}
+  background-image:var(--tex);background-size:160% 100%;background-position:0 50%}
+.planet .sphere{position:absolute;inset:-2%;width:104%;height:104%;border-radius:50%}
 /* 贴图滚动由 JS 驱动：跟随相机旋转 + 星球自转 */
 .planet .shade{position:absolute;inset:0;border-radius:50%;pointer-events:none;
   background:
@@ -166,13 +154,16 @@ body::after{content:'';position:fixed;inset:0;z-index:9;pointer-events:none;opac
   animation-delay:var(--mdl,-3s)}
 .planet .moon.gold{background:radial-gradient(circle at 35% 30%, #fff,
   #ffdda0 35%, #b06a20 75%, #3a1a06);box-shadow:0 0 7px rgba(255,200,120,.8)}
+/* 分类卫星固定在轨道上，只有核心金色尘埃继续绕行；减少大量合成器动画 */
+.planet.cat .moon{animation:none;offset-distance:var(--mdo,30%)}
 @keyframes moonorbit{to{offset-distance:100%}}
 .planet .label{position:absolute;left:50%;top:calc(100% + 8px);
   transform:translateX(-50%) scale(var(--lsk,1));transform-origin:50% 0;
   white-space:nowrap;font:11px/1.2 ui-monospace,SFMono-Regular,Consolas,monospace;
   letter-spacing:.6px;color:var(--c);
   text-shadow:0 0 5px rgba(0,0,0,1),0 0 12px rgba(0,0,0,.9),0 0 2px rgba(0,0,0,1);
-  opacity:0;transition:opacity .25s;pointer-events:none}
+  opacity:0;transition:opacity .25s;pointer-events:none;display:none}
+.planet.showlabel .label,.planet.sel .label,.planet.hov .label{display:block}
 .planet.cat .label{font-size:12px;font-weight:600;letter-spacing:1.2px;
   padding:2px 7px;border-radius:5px;background:rgba(3,8,16,.52);
   border:1px solid rgba(127,200,255,.10)}
@@ -190,10 +181,11 @@ body::after{content:'';position:fixed;inset:0;z-index:9;pointer-events:none;opac
   border:1px dashed var(--c);opacity:.58;
   animation:spinSlow 16s linear infinite}
 @keyframes spinSlow{to{transform:rotate(360deg)}}
-.planet.far .tex{filter:saturate(.82) contrast(1.02) brightness(.80)}
+.planet.far .tex{opacity:.80}
 .planet.far .rim,.planet.far .glow{opacity:.2}
 .planet.far .spec{opacity:.16}
-.planet.dim{opacity:.10;filter:saturate(.35) brightness(.75)}
+/* 不用 filter：选中分类时会让上百个星球每帧重新降饱和/栅格化 */
+.planet.dim{opacity:.10}
 .planet.near{opacity:1}
 .planet.core .glow{opacity:.55;filter:blur(38px)}
 .planet.core .shade{opacity:.48}
@@ -226,12 +218,40 @@ body::after{content:'';position:fixed;inset:0;z-index:9;pointer-events:none;opac
 .planet.ep .rim{inset:-22%;opacity:.42;background:none;border:1px solid rgba(150,225,255,.40);
   box-shadow:0 0 8px rgba(127,220,255,.45)}
 .planet.ep .rim::after{display:none}
+/* 总览低细节模式：功能星只留彩色光点，进入/放大后再恢复贴图和光晕 */
+#planets.lod-dot .planet.feat .tex,
+#planets.lod-dot .planet.feat .shade,
+#planets.lod-dot .planet.feat .spec,
+#planets.lod-dot .planet.feat .rim,
+#planets.lod-dot .planet.feat .halo,
+#planets.lod-dot .planet.feat .glow,
+#planets.lod-dot .planet.feat .moons,
+#planets.lod-dot .planet.feat .progring,
+#planets.lod-dot .planet.feat .livepulse,
+#planets.lod-dot .planet.feat .livebadge{display:none}
+#planets.lod-dot .planet.feat .ball{
+  background:radial-gradient(circle at 35% 28%, #fff 0%, var(--c) 28%,
+    rgba(10,22,38,.92) 72%, #050a12 100%);
+  box-shadow:0 0 9px var(--c)}
+#planets.lod-dot .planet.feat .label{display:none}
+#planets.lod-dot .planet.feat.hov .label,
+#planets.lod-dot .planet.feat.sel .label,
+#planets.lod-dot .planet.feat.live .label{display:block}
+/* 低细节模式下，正在运行或选中的功能星仍要恢复光晕/进度环 */
+#planets.lod-dot .planet.feat.live .glow,
+#planets.lod-dot .planet.feat.sel .glow,
+#planets.lod-dot .planet.feat.live .rim,
+#planets.lod-dot .planet.feat.sel .rim{display:block}
+#planets.lod-dot .planet.feat.live .livepulse{display:block}
+#planets.lod-dot .planet.feat.live.support .livepulse{display:none}
+#planets.lod-dot .planet.feat.live.badge .livebadge{display:block}
+#planets.lod-dot .planet.feat.live.progress .progring{display:block}
 
 /* ---------- 实时运行状态 ---------- */
 .planet .livepulse{position:absolute;left:50%;top:50%;width:100%;height:100%;
   border-radius:50%;border:1.5px solid var(--lc,var(--c));opacity:0;
-  transform:translate(-50%,-50%) scale(.92);pointer-events:none}
-.planet.live .livepulse{animation:liveRipple 1.9s ease-out infinite}
+  transform:translate(-50%,-50%) scale(.92);pointer-events:none;display:none}
+.planet.live .livepulse{display:block;animation:liveRipple 1.9s ease-out infinite}
 .planet.live .glow{opacity:.95;filter:blur(24px) brightness(1.55)}
 .planet.live .rim{opacity:.98;box-shadow:0 0 26px var(--lc,var(--c)),
   inset 0 0 12px rgba(255,255,255,.65)}
@@ -251,8 +271,8 @@ body::after{content:'';position:fixed;inset:0;z-index:9;pointer-events:none;opac
   font:8.5px/1.5 ui-monospace,Consolas,monospace;letter-spacing:.5px;
   color:#fff;white-space:nowrap;background:rgba(3,9,16,.84);
   border:1px solid var(--lc,var(--c));box-shadow:0 0 12px var(--lc,var(--c));
-  opacity:0;transition:opacity .18s;pointer-events:none;z-index:6}
-.planet.live.badge .livebadge{opacity:1}
+  opacity:0;transition:opacity .18s;pointer-events:none;z-index:6;display:none}
+.planet.live.badge .livebadge{display:block;opacity:1}
 @keyframes liveRipple{
   0%{opacity:.8;transform:translate(-50%,-50%) scale(.94)}
   65%{opacity:0;transform:translate(-50%,-50%) scale(1.55)}
@@ -260,9 +280,9 @@ body::after{content:'';position:fixed;inset:0;z-index:9;pointer-events:none;opac
 }
 .link-base.live{stroke-opacity:.78;stroke-width:2;filter:url(#glow)}
 .link-flow.live{stroke-opacity:.95;stroke-dasharray:3 9;
-  animation-duration:1.05s}
+  animation:flow 1.05s linear infinite}
 .planet .progring{position:absolute;inset:-15%;border-radius:50%;opacity:0;
-  pointer-events:none;transition:opacity .2s;
+  pointer-events:none;transition:opacity .2s;display:none;
   background:conic-gradient(from -90deg,
     var(--lc,var(--c)) calc(var(--pp,0) * 1%),
     rgba(130,210,255,.18) 0);
@@ -271,7 +291,7 @@ body::after{content:'';position:fixed;inset:0;z-index:9;pointer-events:none;opac
   mask:radial-gradient(farthest-side,transparent calc(100% - 3.5px),
     #000 calc(100% - 3px));
 }
-.planet.live.progress .progring{opacity:1;
+.planet.live.progress .progring{display:block;opacity:1;
   box-shadow:0 0 14px var(--lc,var(--c))}
 
 /* ---------- 生成舱 ---------- */
@@ -502,12 +522,14 @@ body::after{content:'';position:fixed;inset:0;z-index:9;pointer-events:none;opac
 /* ---------- 连线 ---------- */
 .link-base{fill:none;stroke-linecap:round;transition:opacity .25s, stroke-width .2s}
 .link-flow{fill:none;stroke-linecap:round;stroke-dasharray:2 16;
-  animation:flow 2.8s linear infinite;pointer-events:none;transition:opacity .25s}
+  animation:none;pointer-events:none;transition:opacity .25s;display:none}
+.link-flow.flowlink,.link-flow.wflink,
+.link-flow.lit,.link-flow.live{display:block}
 @keyframes flow{to{stroke-dashoffset:-180}}
 .link-base.flowlink{stroke-width:1.5;stroke-opacity:.55}
-.link-flow.flowlink{stroke-dasharray:3 9;animation-duration:1.7s;stroke-opacity:.85}
+.link-flow.flowlink{stroke-dasharray:3 9;animation:flow 1.7s linear infinite;stroke-opacity:.85}
 .link-base.wflink{stroke-width:1.3}
-.link-flow.wflink{stroke-dasharray:2 11;animation-duration:2.0s}
+.link-flow.wflink{stroke-dasharray:2 11;animation:flow 2.0s linear infinite}
 .link.lit .link-base{stroke-width:1.8;filter:url(#glow)}
 .link.lit .link-flow{opacity:1}
 .link.dim{opacity:.05}
@@ -2484,6 +2506,29 @@ function makeTexture(seed, type, pal, w, h){
   return c;
 }
 
+// 把亮度/饱和度直接烘进贴图，避免每颗星球都用 CSS filter 让合成器
+// 每帧重新栅格化。只在建立星图时执行一次。
+const TEX_TINT = {
+  ocean: 'saturate(1.18) contrast(1.10) brightness(1.02)',
+  gas: 'saturate(1.18) contrast(1.08) brightness(1.14)',
+  ice: 'saturate(1.08) contrast(1.08) brightness(1.08)',
+  rock: 'saturate(1.10) contrast(1.10) brightness(1.10)',
+  lava: 'saturate(1.22) contrast(1.10) brightness(1.10)',
+  sun: 'saturate(1.15) contrast(1.06) brightness(1.20)',
+};
+function tintTexture(c, type){
+  const filter = TEX_TINT[type];
+  if(!filter) return c;
+  try{
+    const out = document.createElement('canvas');
+    out.width = c.width; out.height = c.height;
+    const g = out.getContext('2d');
+    g.filter = filter;
+    g.drawImage(c, 0, 0);
+    return out;
+  }catch(e){ return c; }
+}
+
 /* ---------- 真正的球面贴图（正交投影，经纬度采样） ---------- */
 const sphereMaps = {};
 function getSphereMap(S){
@@ -2863,8 +2908,10 @@ function buildDom(){
     const isSphere = n.kind === 'cat' || n.kind === 'core';
     let texCanvas = null;
     if(tw){
-      texCanvas = makeTexture(n.seed || hashStr(n.id), n.texType || 'rock',
-                              n.palette || PALETTES.ep, tw, tw/2);
+      texCanvas = tintTexture(
+        makeTexture(n.seed || hashStr(n.id), n.texType || 'rock',
+                    n.palette || PALETTES.ep, tw, tw/2),
+        n.texType || 'rock');
       if(texCanvas && !isSphere){
         el.style.setProperty('--tex', `url("${texCanvas.toDataURL()}")`);
       }
@@ -2877,8 +2924,9 @@ function buildDom(){
       : `<div class="ball">${surface}<div class="shade"></div><div class="spec"></div></div>`;
     // 星球周围加卫星 + 轨道虚线：核心是金色尘埃，分类 3~4 颗，大功能 1 颗
     let moons = '';
-    const wantMoons = n.kind === 'core' || n.kind === 'cat' ||
-                      (n.kind === 'feat' && n.size > 26);
+    // 功能节点数量多，卫星只是装饰；只给核心和分类保留，避免上百个
+    // offset-path 动画一直占用合成器。
+    const wantMoons = n.kind === 'core' || n.kind === 'cat';
     if(wantMoons && MOONS_OK){
       const mr = mulberry32(hashStr(n.id + 'moons'));
       const count = n.kind === 'core' ? 5 : n.kind === 'cat' ? 3 + (n.size > 88 ? 1 : 0) : 1;
@@ -2898,6 +2946,7 @@ function buildDom(){
                  : (18 + mr()*10).toFixed(0);
         const mdly = (-mr()*Number(md)).toFixed(1);
         moons += `<i class="moon${gold ? ' gold' : ''}" style="--ms:${ms}px;--md:${md}s;--mdl:${mdly}s;` +
+                 `--mdo:${(mr()*100).toFixed(1)}%;` +
                  `offset-path:ellipse(${rx}% ${ry}% at 50% 50%)"></i>`;
       }
     }
@@ -3435,13 +3484,22 @@ function project(n){
 }
 
 let frameCount = 0, lastFpsT = performance.now(), fpsCount = 0;
-let lastZoomRefresh = 1, lastFrameT = 0, lastSizeK = 0;
+let lastZoomRefresh = 1, lastFrameT = 0, lastSizeK = 0, lastLod = null;
 function loop(now){
   if(document.hidden){ requestAnimationFrame(loop); return; }
-  if(now - lastFrameT < 15){ requestAnimationFrame(loop); return; }
-  lastFrameT = now;
   const panelOn = document.getElementById('panel').classList.contains('on') ? 1 : 0;
-  const compactView = Math.min(vw, vh) < 560;
+  // 只有用户操作/相机飞行/面板动画才用 60fps；缓慢自转降到约 30fps。
+  const movingNow = state.dragging || !!planetDrag ||
+    Math.abs(state.zoom - state.targetZoom) > 0.0004 ||
+    Math.abs(state.focus.x - state.targetFocus.x) > 0.2 ||
+    Math.abs(state.focus.y - state.targetFocus.y) > 0.2 ||
+    Math.abs(state.focus.z - state.targetFocus.z) > 0.2 ||
+    Math.abs(panelOn - state.panelShift) > 0.01;
+  const compactScreen = Math.min(vw, vh) < 560;
+  const frameMs = movingNow ? 15 : (compactScreen ? 25 : 20);
+  if(now - lastFrameT < frameMs){ requestAnimationFrame(loop); return; }
+  lastFrameT = now;
+  const compactView = compactScreen;
   state.panelShift += (panelOn - state.panelShift) * 0.12;
   if(state.auto && !state.dragging) state.targetYaw += 0.0014;
   state.yaw += (state.targetYaw - state.yaw) * 0.085;
@@ -3460,12 +3518,21 @@ function loop(now){
   const coreP = byId.core && byId.core._p;
   const lightCx = coreP && coreP.visible ? coreP.x : vw/2;
   const lightCy = coreP && coreP.visible ? coreP.y : vh/2 + 22;
-  const lightTick = (frameCount & 3) === 0;
+  const lightEvery = movingNow ? 4 : 8;
+  const lightTick = (frameCount % lightEvery) === 0;
   // 缩小时整体同步缩小星体，避免挤成一团；标签反向补偿保持清晰
   const sizeK = clamp(0.46 + 0.48*state.zoom, 0.44, 1.26);
   if(Math.abs(sizeK - lastSizeK) > 0.01){
     lastSizeK = sizeK;
     planetsEl.style.setProperty('--lsk', (1/sizeK).toFixed(3));
+  }
+  const activeNode = state.active ? byId[state.active] : null;
+  const lodDot = state.zoom < 0.82 && !state.expanded && !state.search &&
+                 state.filter === 'all' &&
+                 (!activeNode || activeNode.kind === 'cat');
+  if(lodDot !== lastLod){
+    lastLod = lodDot;
+    planetsEl.classList.toggle('lod-dot', lodDot);
   }
   nodes.forEach(n => {
     const p = project(n);
@@ -3480,8 +3547,15 @@ function loop(now){
     if(lightTick && n.kind !== 'core'){
       const dx = p.x - lightCx, dy = p.y - lightCy;
       const dl = Math.hypot(dx,dy) || 1;
-      n.el.style.setProperty('--lx', (50 - dx/dl*30).toFixed(1) + '%');
-      n.el.style.setProperty('--ly', (50 - dy/dl*30).toFixed(1) + '%');
+      // 量化到 2%，避免每帧都改继承给整个星球子树的 CSS 变量。
+      const lx = Math.round((50 - dx/dl*30) / 2) * 2;
+      const ly = Math.round((50 - dy/dl*30) / 2) * 2;
+      const lk = lx + ',' + ly;
+      if(n._lightKey !== lk){
+        n._lightKey = lk;
+        n.el.style.setProperty('--lx', lx + '%');
+        n.el.style.setProperty('--ly', ly + '%');
+      }
     }
     let scale = Math.max(0.30, Math.min(3.0, p.f*sizeK));
     if(n.kind === 'ep') scale = Math.min(scale, 1.45);
@@ -3496,10 +3570,17 @@ function loop(now){
       n._far = isFar;
       n.el.classList.toggle('far', isFar);
     }
-    n.el.style.transform =
-      `translate(-50%,-50%) translate3d(${p.x}px,${p.y}px,0) scale(${scale})`;
+    const px = Math.round(p.x * 2) / 2;
+    const py = Math.round(p.y * 2) / 2;
+    const sq = Math.round(scale * 100) / 100;
+    const tf = `translate(-50%,-50%) translate3d(${px}px,${py}px,0) scale(${sq})`;
+    if(n._tf !== tf){
+      n._tf = tf;
+      n.el.style.transform = tf;
+    }
     // 让贴图随相机转动 + 缓慢自转，避免“怎么转都是一个面”
-    if(n.texEl && !n.hidden && (frameCount & 1) === (n.seed & 1)){
+    const texEvery = movingNow ? 2 : 3;
+    if(n.texEl && !n.hidden && (frameCount % texEvery) === (n.seed % texEvery)){
       const imgW = n.size * 1.66;
       const phase = n.texPhase + state.yaw * 0.90 +
                     now * 0.000020 * n.texSpin;
@@ -3507,11 +3588,13 @@ function loop(now){
       n.texEl.style.backgroundPosition = `${(-frac * imgW).toFixed(1)}px 50%`;
     }
     // 分类 / 核心用真正的球面采样，转动视角时经纬度贴图会变
-    if(n.sphereCanvas && !n.hidden && (frameCount & 1) === (n.seed & 1)){
+    const sphereEvery = movingNow ? 2 : 3;
+    if(n.sphereCanvas && !n.hidden &&
+       (frameCount % sphereEvery) === (n.seed % sphereEvery)){
       drawPlanetSphere(n, sphereAngle(n, now));
     }
     // 正在工作的节点提到最上层，避免被核心或其它大球挡住
-    const z = isLiveNode(n.id) ? 3200 : Math.round(2000 - p.z);
+    const z = isLiveNode(n.id) ? 3200 : Math.round((2000 - p.z) / 12) * 12;
     if(n._z !== z){
       n._z = z;
       n.el.style.zIndex = String(z);
@@ -3525,15 +3608,8 @@ function loop(now){
     }
   });
 
-  // 相机在动 / 拖拽时连线逐帧更新；只有慢速自转时降到 30fps，视觉几乎无差别
-  const cameraMoving = state.dragging || !!planetDrag ||
-    Math.abs(state.yaw - state.targetYaw) > 0.0004 ||
-    Math.abs(state.pitch - state.targetPitch) > 0.0004 ||
-    Math.abs(state.zoom - state.targetZoom) > 0.0004 ||
-    Math.abs(state.focus.x - state.targetFocus.x) > 0.2 ||
-    Math.abs(state.focus.y - state.targetFocus.y) > 0.2 ||
-    Math.abs(state.focus.z - state.targetFocus.z) > 0.2 ||
-    Math.abs(panelOn - state.panelShift) > 0.01;
+  // 相机在动 / 拖拽时连线逐帧更新；缓慢自转时降到约 15fps，视觉几乎无差别
+  const cameraMoving = movingNow;
   const linkTick = cameraMoving || (state.auto
     ? (frameCount & 1) === 0
     : frameCount % 3 === 0);
@@ -3553,7 +3629,13 @@ function loop(now){
         d = `M${p1.x.toFixed(1)},${p1.y.toFixed(1)} Q${mx.toFixed(1)},${my.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
       }
       l.elBase.setAttribute('d', d);
-      l.elFlow.setAttribute('d', d);
+      // 普通连线只画实线底图；动态流光只给流程主线、动态节点和选中链路，
+      // 避免 408 条 SVG 虚线每帧全部重算路径。
+      if(l.kind === 'flow' || l.kind === 'flowbranch' || l.kind === 'wf' ||
+         l.elFlow.classList.contains('lit') ||
+         l.elFlow.classList.contains('live')){
+        l.elFlow.setAttribute('d', d);
+      }
     });
     updateOrbits();
   }
@@ -6738,16 +6820,29 @@ function paintActivity(force){
     if(s.until <= now) liveActivity.live.delete(id);
   });
   const keys = [];
+  const paintKeys = [];
   liveActivity.live.forEach((s, id) => {
     keys.push(id + ':' + s.type + ':' + (s.reveal ? 1 : 0) +
               ':' + (s.badge ? 1 : 0) + ':' + (s.primary ? 1 : 0));
+    paintKeys.push(id + ':' + s.type + ':' + (s.badge ? 1 : 0) +
+                   ':' + (s.label || '') + ':' +
+                   Math.round((s.progress || 0) * 100));
   });
   keys.sort();
+  paintKeys.sort();
   const key = keys.join('|');
   if(key !== liveActivity.lastKey){
     liveActivity.lastKey = key;
     refreshStates();
   }
+  // 没有活动时不要每帧遍历 600 个星球/连线去 toggle 同样的 class。
+  const paintKey = paintKeys.join('|');
+  if(paintKey === (liveActivity.lastPaintKey || '')){
+    if(!liveActivity.live.size && liveActivity.ticker &&
+       liveActivity.tickerHoldUntil <= performance.now()) setTicker('', 'idle');
+    return;
+  }
+  liveActivity.lastPaintKey = paintKey;
   nodes.forEach(n => {
     if(!n.el) return;
     const s = liveActivity.live.get(n.id);
