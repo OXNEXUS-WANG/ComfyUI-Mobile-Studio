@@ -72,6 +72,8 @@ if ($Edition -eq "commercial") {
         Remove-Item (Join-Path $Stage "安装.bat") -Force
     }
     Copy-Item (Join-Path $Root "安装_商业版.bat") (Join-Path $Stage "安装.bat") -Force
+    # 英文入口也必须进入商业清洁模式，不能复用分享版的 install.bat。
+    Copy-Item (Join-Path $Root "安装_商业版.bat") (Join-Path $Stage "install.bat") -Force
     # Commercial build is installer-only: no test suite or CI files.
     Remove-Staged "tests"
     Remove-Staged "运行测试.bat"

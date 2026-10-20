@@ -13,6 +13,14 @@
     [switch]$NoShortcut
 )
 
+$PkgRoot = Split-Path -Parent $PSScriptRoot
+# 商用包即使被直接运行 install.ps1 或英文 install.bat，也强制清洁模式，
+# 避免误下模型/装 GPL 节点。
+$EditionFile = Join-Path $PkgRoot "EDITION"
+if (Test-Path $EditionFile) {
+    $Edition = (Get-Content $EditionFile -Raw -Encoding ASCII).Trim()
+    if ($Edition -eq "commercial") { $CommercialClean = $true }
+}
 if ($CommercialClean) {
     $SkipModels = $true
     $NoCustomNodes = $true

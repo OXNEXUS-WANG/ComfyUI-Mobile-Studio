@@ -2167,7 +2167,10 @@ def ensure_users():
         USERS = {"admin": admin}
         _save_users_locked()
         if not access:
-            print("  [账号] 已创建初始管理员 admin / admin，请尽快改密码。")
+            if os.environ.get("MGS_ADMIN_PASSWORD"):
+                print("  [账号] 已创建初始管理员 admin，安装收尾会设置你输入的密码。")
+            else:
+                print("  [账号] 已创建初始管理员 admin / admin，请尽快改密码。")
         else:
             print("  [账号] 已把旧访问密码迁移为管理员账号 admin")
         return USERS
