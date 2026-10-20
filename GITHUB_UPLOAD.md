@@ -1,6 +1,7 @@
 # 上传到 GitHub
 
-这个目录已经初始化好 Git，并完成第一次提交；**没有配置 remote，也没有上传任何东西**。
+这个目录已经初始化好 Git，并完成第一次公开提交；**没有配置 remote，也没有上传任何东西**。
+公开提交已排除 `license_admin/` 授权签发工具，发布包也不包含账号、证书、日志和模型。
 
 ## 1. 创建空仓库
 
@@ -10,7 +11,8 @@
 ComfyUI-Mobile-Studio
 ```
 
-不要勾选自动创建 README / .gitignore / License，因为本地已经有了。
+- 可见性选 **Public**
+- 不要勾选自动创建 README / .gitignore / License，因为本地已经有了
 
 ## 2. 推送源码
 
@@ -22,6 +24,9 @@ git branch -M main
 git push -u origin main
 ```
 
+第一次推送会弹出 GitHub 登录窗口（Windows 自带的 Git Credential Manager）。
+登录后会自动保存凭据，以后 `git push` 不再询问。
+
 如果本机没有 git，可以使用：
 
 ```text
@@ -29,6 +34,9 @@ D:\AI\ComfyUI_windows_portable\git\cmd\git.exe
 ```
 
 或者直接安装 GitHub Desktop / Git for Windows。
+
+> 只有确认要公开时才推送。`backup-before-public` 分支是本地旧历史备份，
+> **不要**执行 `git push --all` 或推送该分支。
 
 ## 3. 运行测试
 
