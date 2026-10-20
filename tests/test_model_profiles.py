@@ -72,6 +72,21 @@ class ModelProfileTests(unittest.TestCase):
         self.assertEqual(p["steps"], 8)
         self.assertEqual(p["family"], "sdxl_photo")
 
+    def test_size_presets_are_aligned_and_bounded(self):
+        for family, preset in model_profiles.SIZE_PRESETS.items():
+            self.assertTrue(preset["sizes"], family)
+            self.assertGreater(preset["max_side"], 0, family)
+            self.assertGreater(preset["max_pixels"], 0, family)
+            for size in preset["sizes"]:
+                w, h = (int(x) for x in size.split("x"))
+                self.assertEqual(w % 16, 0, (family, size))
+                self.assertEqual(h % 16, 0, (family, size))
+                self.assertLessEqual(max(w, h), preset["max_side"], (family, size))
+            p = model_profiles.profile_for(
+                "probe-" + family + ".safetensors", known={"family": family})
+            self.assertIn(p["recommended_size"], p["sizes"], family)
+            self.assertLessEqual(p["max_side"], 1536, family)
+
     def test_lora_family_detection(self):
         with tempfile.TemporaryDirectory() as td:
             sdxl = fake_safetensors(

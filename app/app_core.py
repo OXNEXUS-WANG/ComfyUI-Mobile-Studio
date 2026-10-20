@@ -226,6 +226,15 @@ NOOB_PREFIX = ("masterpiece, best quality, newest, absurdres, highres, safe, "
 # 单独编码，避免中文提示词经 Argos 翻译时把这些标签弄坏。
 PONY_PREFIX = "score_9, score_8_up, score_7_up, "
 
+# 视频画幅：Wan 2.1 1.3B 的原生档位是 480p，这里给几组像素量接近的
+# 16 倍数画幅；单边/总像素超过上限时后端会等比缩小，防止 8GB 显存爆掉。
+VIDEO_SIZES = ["480x480", "480x832", "832x480",
+               "640x480", "480x640", "640x640"]
+VIDEO_MAX_SIDE = 960
+VIDEO_MAX_PIXELS = 480000
+VIDEO_MIN_SECONDS = 0.5
+VIDEO_MAX_SECONDS = 6.0
+
 # 每个底模的显示名和推荐参数。Lightning 类模型步数少、CFG 低，选错会出糊图。
 CKPT_PRESETS = {
     ANIMA_MODEL: {
@@ -2913,6 +2922,35 @@ def ckpt_kind(name):
     return "anime"
 
 
+def snap_dim(value, lo=256, hi=1536):
+    """把画布尺寸夹到 [lo, hi] 并对齐到 16 的倍数。"""
+    try:
+        v = int(round(float(value)))
+    except (TypeError, ValueError):
+        v = lo
+    v = max(lo, min(hi, v))
+    return max(16, int(round(v / 16.0)) * 16)
+
+
+def fit_size(width, height, min_side=256, max_side=1536, max_pixels=1500000):
+    """规格化画幅：16 像素对齐，并按单边 / 总像素上限等比缩小。
+
+    ComfyUI 的 VAE 下采样要求 8 的倍数；统一用 16 更稳。总像素上限比
+    单边上限更贴近显存实际占用，所以两者都查。
+    """
+    w = snap_dim(width, min_side, max_side)
+    h = snap_dim(height, min_side, max_side)
+    if max_pixels and max_pixels > 0 and w * h > max_pixels:
+        # 这里向下对齐，避免四舍五入后总像素又超回上限。
+        for _ in range(3):
+            if w * h <= max_pixels:
+                break
+            k = (float(max_pixels) / float(w * h)) ** 0.5
+            w = max(min_side, min(max_side, int(w * k) // 16 * 16))
+            h = max(min_side, min(max_side, int(h * k) // 16 * 16))
+    return int(w), int(h)
+
+
 def list_models():
     """扫描 checkpoints 目录，返回可用底模（含推荐步数/CFG）。"""
     names = []
@@ -2944,6 +2982,9 @@ def list_models():
             "tip": p.get("tip", ""),
             "vpred": p.get("vpred", False),
             "recommended_size": p.get("recommended_size", "832x1216"),
+            "sizes": p.get("sizes") or [],
+            "max_side": int(p.get("max_side") or 1536),
+            "max_pixels": int(p.get("max_pixels") or 1500000),
             "beginner": bool(p.get("beginner")),
             "supported": bool(p.get("supported", True)),
             "badges": p.get("badges") or [],

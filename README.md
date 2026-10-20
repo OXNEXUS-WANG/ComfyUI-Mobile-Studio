@@ -27,6 +27,8 @@
 - 配置还原点、一键回滚和系统重置（保留当前管理员和图片）
 - 自动识别 Anima / SDXL / Pony / v-pred / SD1.5 等模型家族，推荐参数并提醒风险
 - 新手引导：★ 推荐模型、推荐画幅/步数、一键「按推荐设置」
+- 模型自适应画幅：每个底模列出擅长尺寸，也支持自定义宽高（16px 对齐，
+  超限自动等比缩小）；视频 6 档画幅、0.5~4 秒，可手填 0.5~6 秒
 - 自带 3D 接口星图（桌面端）、中英文界面、实时任务进度；总览自动低细节，
   按需渲染贴图/流光，桌面约 40+ FPS；黑洞背景可一键隐藏（B）
 - 监控中心：健康评分、告警中心、一键诊断、任务时间线、趋势、容量预测、
@@ -91,8 +93,8 @@ commit、模型 revision 和 7zr 哈希都已锁定，不会自动追最新版�
 
 ## 2. 安装
 
-1. 分享版从 GitHub Releases 下载 `ComfyUI-Mobile-Studio-v1.1.0-Share.zip`；
-   商用客户使用 `ComfyUI-Mobile-Studio-v1.1.0-Commercial.zip`。
+1. 分享版从 GitHub Releases 下载 `ComfyUI-Mobile-Studio-v1.1.1-Share.zip`；
+   商用客户使用 `ComfyUI-Mobile-Studio-v1.1.1-Commercial.zip`。
 2. 解压到一个目录（不要在压缩包里直接运行）。
 3. 双击 `安装.bat`（或 `install.bat`）。
 4. 按提示操作：
@@ -354,7 +356,7 @@ https://192.168.137.1:8800
 | 备份配置/图库元数据 | 双击 `备份数据.bat` |
 | 连图片/视频一起备份 | `python tools\backup.py --images` |
 | 恢复（先停服务） | 双击 `恢复数据.bat`，输入 ZIP 路径 |
-| 单元测试（94 项） | 双击 `运行测试.bat` |
+| 单元测试（97 项） | 双击 `运行测试.bat` |
 | 在线冒烟 | `set MGS_TEST_PASSWORD=...` 后运行 `python tests\run_tests.py` |
 | 无第二台机器的 worker 验收 | `python tests\worker_lan_sim.py` |
 

@@ -137,6 +137,15 @@
     '随机': 'Random',
     '开启': 'On',
     '关闭': 'Off',
+    '自定义': 'Custom',
+    '自定义…': 'Custom…',
+    '4 秒（可能爆显存）': '4s (may run out of VRAM)',
+    '应用尺寸': 'Apply size',
+    '应用时长': 'Apply duration',
+    '宽': 'Width',
+    '高': 'Height',
+    '宽度': 'Width',
+    '高度': 'Height',
 
     /* ---------- 主页面：提示与说明 ---------- */
     '中文直接写就行，会自动翻译成英文标签。首次出图要加载模型，慢一些。':
@@ -158,6 +167,19 @@
     '横 480': 'Landscape 480p',
     '竖图适合人物立绘；横图适合风景；方图适合头像或对称构图。':
       'Portrait suits characters; landscape suits scenery; square suits avatars or symmetrical compositions.',
+    '画幅跟着底模走，也能自己填': 'Sizes follow the model; custom is allowed',
+    '选中底模后，这里会列出它擅长的画幅；手填超过模型上限时会自动等比缩小。':
+      'Sizes suited to the selected model are listed here; custom sizes above the model limit are scaled down automatically.',
+    '按填写的宽高生成；不是 16 的倍数会自动对齐':
+      'Generate at the entered width and height; values snap to multiples of 16.',
+    '这个底模的推荐画幅': 'Recommended size for this model',
+    'Wan 1.3B 原生是 480p，可选多种画幅；像素量太大会自动等比缩小。时长越长约容易爆显存。':
+      'Wan 1.3B is native 480p with several aspect choices; oversized frames are scaled down. Longer clips are more likely to run out of VRAM.',
+    '1~2 秒最稳；4 秒以上可能爆显存':
+      '1–2s is safest; 4s and above may run out of VRAM',
+    'Wan 视频按 8fps 计帧；自定义会向上取到偶数帧。4 秒以上在 8GB 上很可能失败。':
+      'Wan video counts frames at 8 fps; custom durations snap to an even frame count. Above 4s on 8GB is likely to fail.',
+    '0.5~6 秒，按 8fps 换算帧数': '0.5–6s, converted to frames at 8 fps',
     '新手不用纠结：动漫先用 Anima 2B 或 Illustrious，写实先用 RealVis；选中模型后上面会显示推荐画幅、步数和注意事项。':
       'Not sure where to start? Try Anima 2B or Illustrious for anime, RealVis for photoreal. Selecting a model shows its recommended size, steps and cautions above.',
     '选一个模型；不同模型擅长的东西不一样。':
@@ -333,6 +355,14 @@
     '张数 / 批量': 'Count / batch',
     'Wan 模型': 'Wan model',
     '时长 / 画幅': 'Duration / size',
+    '可选画幅跟随底模（如 832×1216、1216×832、1024×1024），也能手填宽高；图生图由参考图决定画幅。':
+      'Available sizes follow the model (e.g. 832×1216, 1216×832, 1024×1024), and custom width/height is supported; img2img uses the reference image size.',
+    '写一句话生成 0.5~4 秒小视频，Wan 2.1 T2V 1.3B，uni_pc / 20 步 / CFG 6。':
+      'Generate a 0.5–4s clip from text with Wan 2.1 T2V 1.3B, uni_pc / 20 steps / CFG 6.',
+    '480p 多档画幅，时长 0.5~4 秒；帧数必须是 4n+1，4 秒在 8GB 上可能爆显存。':
+      'Several 480p aspect choices, 0.5–4s; frame count must be 4n+1, and 4s may run out of VRAM on 8GB.',
+    '视频支持 480p 多画幅 / 0.5–4 秒；2 秒约 3 分钟，4 秒在 8GB 上可能爆显存。':
+      'Video supports several 480p sizes and 0.5–4s; 2s takes about 3 minutes, and 4s may run out of VRAM on 8GB.',
     '视频编码 / 输出': 'Video encoding / output',
     'Anima 2B': 'Anima 2B',
     'NoobAI Vpred': 'NoobAI Vpred',

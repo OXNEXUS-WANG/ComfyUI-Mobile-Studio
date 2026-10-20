@@ -1425,10 +1425,22 @@ void main(){
       </label>
       <label class="gd-field" id="genDurField" hidden><span>时长</span>
         <select id="genDur">
+          <option value="4">0.5 秒</option>
           <option value="8">1 秒</option>
+          <option value="12">1.5 秒</option>
           <option value="16" selected>2 秒</option>
+          <option value="20">2.5 秒</option>
           <option value="24">3 秒</option>
+          <option value="32">4 秒（可能爆显存）</option>
         </select>
+      </label>
+    </div>
+    <div class="gd-row" id="genCustomRow" hidden>
+      <label class="gd-field"><span>宽</span>
+        <input id="genW" type="number" min="256" max="1536" step="16" value="832" inputmode="numeric">
+      </label>
+      <label class="gd-field"><span>高</span>
+        <input id="genH" type="number" min="256" max="1536" step="16" value="1216" inputmode="numeric">
       </label>
     </div>
     <div class="gd-row gd-switches">
@@ -1637,16 +1649,16 @@ const CATEGORIES = [
     {id:'lora', name:'LoRA 叠加', desc:'最多 8 个 SDXL LoRA 串成链，可调强度；Anima 不使用 SDXL LoRA。', api:['ep_generate'], params:'loras=[{ name, strength }]'},
     {id:'turbo', name:'Anima 极速', desc:'官方 Turbo LoRA，8 步 / CFG 1，热跑约 14 秒一张。', api:['ep_generate'], params:'turbo=true\nsteps=8, cfg=1'},
     {id:'sampler', name:'采样参数', desc:'步数、CFG、采样器、种子、出图数量；不同底模有各自的推荐值。', api:['ep_generate'], params:'steps, cfg, sampler, seed, count'},
-    {id:'aspect', name:'画面比例', desc:'竖图 832×1216、横图 1216×832、方图 1024×1024；图生图由参考图决定画幅。', api:['ep_generate'], params:'size=832x1216\n1216x832 / 1024x1024'},
+    {id:'aspect', name:'画面比例', desc:'可选画幅跟随底模（如 832×1216、1216×832、1024×1024），也能手填宽高；图生图由参考图决定画幅。', api:['ep_generate'], params:'size=832x1216\n1216x832 / 1024x1024\n自定义 16px 对齐'},
     {id:'seed', name:'种子 / 复现', desc:'固定种子可以复现同一张图；随机种子每张都不同，适合抽卡。', api:['ep_generate'], params:'seed=0~2^31\nlock / random'},
     {id:'batch', name:'张数 / 批量', desc:'一次提交多张（1~4 张），共用同一段提示词；视频固定 1 条。', api:['ep_generate'], params:'count=1~4'}
    ]},
   {id:'vid', name:'视频工坊', short:'视频', color:'#a78ecb', desc:'Wan 2.1 文生视频与 VACE 图生视频，480p，1~3 秒。',
    features:[
-    {id:'t2v', name:'文生视频', desc:'写一句话生成 1~3 秒小视频，Wan 2.1 T2V 1.3B，uni_pc / 20 步 / CFG 6。', api:['ep_generate'], params:'mode=vid\nprompt, size=480p\nframes=8/16/24'},
+    {id:'t2v', name:'文生视频', desc:'写一句话生成 0.5~4 秒小视频，Wan 2.1 T2V 1.3B，uni_pc / 20 步 / CFG 6。', api:['ep_generate'], params:'mode=vid\nprompt, size=480p\nframes=4/8/12/16/20/24/32'},
     {id:'i2v', name:'图生视频', desc:'上传一张图让它动起来，Wan VACE 1.3B；第一帧贴近原图，之后会漂移。', api:['ep_generate'], params:'mode=i2v\nimage + prompt\nframes'},
     {id:'wan', name:'Wan 模型', desc:'文生视频用 T2V 1.3B，图生视频用 VACE 1.3B，共用 umt5 文本编码器和 Wan VAE。', api:['ep_models'], params:'wan2.1_t2v_1.3B\nwan2.1_vace_1.3B'},
-    {id:'vparam', name:'时长 / 画幅', desc:'只开 480p 三档；帧数必须是 4n+1，4 秒在 8GB 上会爆显存。', api:['ep_generate'], params:'480x480 / 480x832 / 832x480\nframes 8/16/24'},
+    {id:'vparam', name:'时长 / 画幅', desc:'480p 多档画幅，时长 0.5~4 秒；帧数必须是 4n+1，4 秒在 8GB 上可能爆显存。', api:['ep_generate'], params:'480x480 / 480x832 / 832x480\n640x480 / 480x640 / 640x640\nframes 4/8/12/16/20/24/32'},
     {id:'video_out', name:'视频编码 / 输出', desc:'结果存成 mp4（16fps），放在 ComfyUI/output/video；网页通过 /img 读取并支持拖动。', api:['ep_img','ep_gallery'], params:'mp4 / 16fps\n/img/{name} Range'}
    ]},
   {id:'model', name:'模型星系', short:'模型', color:'#d79ab8', desc:'6 个底模、文本编码器 / VAE、放大模型和模型预设。',
@@ -7105,13 +7117,77 @@ const genRevealOpen = document.getElementById('genRevealOpen');
 const genRevealClose = document.getElementById('genRevealClose');
 const GEN_HINT0 = '提交后会自动收起，回到星图看任务流过各个节点；左下角「生成」随时展开实时预览。';
 const GEN_SIZES_TXT = [
-  ['832x1216', '竖 832×1216'], ['1216x832', '横 1216×832'],
-  ['1024x1024', '方 1024×1024'], ['768x1344', '长竖 768×1344'],
-  ['1344x768', '长横 1344×768']
+  '832x1216', '1216x832', '1024x1024', '768x1344', '1344x768'
 ];
 const GEN_SIZES_VID = [
-  ['480x832', '竖 480p'], ['832x480', '横 480p'], ['480x480', '方 480p']
+  '480x480', '480x832', '832x480', '640x480', '480x640', '640x640'
 ];
+const GEN_SHAPE_EN = {'方图':'Square', '竖图':'Portrait', '横图':'Landscape',
+                      '宽屏':'Wide', '竖屏':'Tall'};
+function genSizeShape(sz){
+  const p = String(sz || '').split('x');
+  const w = parseInt(p[0], 10) || 0, h = parseInt(p[1], 10) || 0;
+  if(!w || !h || w === h) return '方图';
+  const r = Math.max(w, h) / Math.min(w, h);
+  if(w > h) return r >= 1.5 ? '宽屏' : '横图';
+  return r >= 1.5 ? '竖屏' : '竖图';
+}
+function genSizeLabel(sz){
+  const p = String(sz || '').split('x');
+  if(p.length !== 2) return String(sz || '');
+  const shape = genSizeShape(sz);
+  const name = (window.MGI18N && MGI18N.isEnglish())
+    ? (GEN_SHAPE_EN[shape] || shape) : shape;
+  return name + ' ' + p[0] + '×' + p[1];
+}
+function genSnap(v, lo, hi){
+  let n = parseInt(v, 10);
+  if(!isFinite(n)) n = lo;
+  n = Math.max(lo, Math.min(hi, n));
+  return Math.max(16, Math.round(n / 16) * 16);
+}
+function genSnapDown(v, lo, hi){
+  const n = Math.floor(Number(v) / 16) * 16;
+  return Math.max(16, Math.max(lo, Math.min(hi, n)));
+}
+function genFitSize(w, h, lo, hi, maxPixels){
+  w = genSnap(w, lo, hi);
+  h = genSnap(h, lo, hi);
+  for(let i = 0; i < 3 && maxPixels && w * h > maxPixels; i++){
+    const k = Math.sqrt(maxPixels / (w * h));
+    w = genSnapDown(w * k, lo, hi);
+    h = genSnapDown(h * k, lo, hi);
+  }
+  return [w, h];
+}
+function syncGenCustomRow(){
+  const row = document.getElementById('genCustomRow');
+  if(!row) return;
+  const custom = genSize.value === 'custom';
+  row.hidden = !custom;
+  if(custom){
+    const vid = genState.mode === 'vid';
+    const m = genModelData();
+    const maxSide = vid ? 960 : ((m && m.max_side) || 1536);
+    const gW = document.getElementById('genW');
+    const gH = document.getElementById('genH');
+    if(gW) gW.max = maxSide;
+    if(gH) gH.max = maxSide;
+  }
+}
+function genSizeValue(){
+  if(genSize.value !== 'custom') return genSize.value;
+  const vid = genState.mode === 'vid';
+  const m = genModelData();
+  const maxSide = vid ? 960 : ((m && m.max_side) || 1536);
+  const maxPixels = vid ? 480000 : ((m && m.max_pixels) || 1500000);
+  const lo = 256;
+  const gW = document.getElementById('genW');
+  const gH = document.getElementById('genH');
+  const fit = genFitSize(gW ? gW.value : 832, gH ? gH.value : 1216,
+                         lo, maxSide, maxPixels);
+  return fit[0] + 'x' + fit[1];
+}
 
 function setGenHint(text, cls){
   if(!genHint) return;
@@ -7135,14 +7211,25 @@ function renderGenStyles(){
 }
 function updateGenSizes(reset){
   const video = genState.mode === 'vid';
-  const opts = video ? GEN_SIZES_VID : GEN_SIZES_TXT;
-  const cur = genSize.value;
-  genSize.innerHTML = opts.map(o =>
-    `<option value="${o[0]}">${o[1]}</option>`).join('');
-  if(!reset && opts.some(o => o[0] === cur)){ genSize.value = cur; return; }
-  if(video){ genSize.value = '480x832'; return; }
   const m = genModelData();
-  genSize.value = (m && m.orientation === 'landscape') ? '1216x832' : '832x1216';
+  const opts = video
+    ? ((genState.videoSizes && genState.videoSizes.length)
+        ? genState.videoSizes : GEN_SIZES_VID)
+    : ((m && m.sizes && m.sizes.length) ? m.sizes : GEN_SIZES_TXT);
+  const cur = genSize.value;
+  genSize.innerHTML = opts.map(sz =>
+    `<option value="${escapeHtml(sz)}">${escapeHtml(genSizeLabel(sz))}</option>`).join('') +
+    '<option value="custom">自定义…</option>';
+  if(!reset && (opts.indexOf(cur) >= 0 || cur === 'custom')){
+    genSize.value = cur;
+    syncGenCustomRow();
+    return;
+  }
+  if(video){ genSize.value = opts[0] || '480x480'; syncGenCustomRow(); return; }
+  const want = (m && m.recommended_size) ||
+    ((m && m.orientation === 'landscape') ? '1216x832' : '832x1216');
+  genSize.value = opts.indexOf(want) >= 0 ? want : (opts[0] || '832x1216');
+  syncGenCustomRow();
 }
 function applyGenModel(resetSize){
   const m = genModelData();
@@ -7163,6 +7250,8 @@ function applyGenMode(){
   const m = genModelData();
   const anima = isGenAnima(m);
   genModelField.style.display = video ? 'none' : '';
+  // 这个 label 初始带 hidden 属性，只改 style.display 是显示不出来的。
+  genDurField.hidden = !video;
   genDurField.style.display = video ? '' : 'none';
   genTurboWrap.style.display = (!video && anima) ? '' : 'none';
   genPagWrap.style.display = (!video && m && !anima) ? '' : 'none';
@@ -7172,7 +7261,7 @@ function applyGenMode(){
   genGo.textContent = video ? '生成视频' : '开始生成';
   updateGenSizes(true);
   setGenHint(video
-    ? '视频只支持 480p / 1–3 秒，2 秒约 3 分钟；提交后自动回星图看流程。'
+    ? '视频支持 480p 多画幅 / 0.5–4 秒；2 秒约 3 分钟，4 秒在 8GB 上可能爆显存。'
     : GEN_HINT0, '');
 }
 async function loadGenModels(){
@@ -7189,6 +7278,7 @@ async function loadGenModels(){
     genState.defaultModel = (genState.models[0] && genState.models[0].name) ||
       j.default || '';
     genState.videoReady = !!j.video_ready;
+    genState.videoSizes = j.video_sizes || [];
     genState.loaded = true;
     genModel.innerHTML = genState.models.map(m =>
       `<option value="${escapeHtml(m.name)}">${escapeHtml(m.label)}</option>`).join('');
@@ -7421,7 +7511,7 @@ async function submitGen(){
   const body = {
     prompt: full,
     mode: mode,
-    size: genSize.value,
+    size: genSizeValue(),
     count: mode === 'txt' ? (parseInt(genCountSel.value, 10) || 1) : 1,
     turbo: mode === 'txt' ? !!genTurbo.checked : false,
     pag: mode === 'txt' ? !!genPag.checked : false
@@ -7441,7 +7531,8 @@ async function submitGen(){
     body.frames = frames;
     body.steps = 20;
     body.cfg = 6;
-    genState.eta = ({8: 90, 16: 180, 24: 270})[frames] || 180;
+    genState.eta = ({4: 60, 8: 90, 12: 135, 16: 180,
+                     20: 225, 24: 270, 32: 360})[frames] || 180;
   }
   genState.error = '';
   genState.result = null;
@@ -7738,6 +7829,11 @@ function initGenDeck(){
   genModel.addEventListener('change', () => {
     applyGenModel(true);
     applyGenMode();
+  });
+  genSize.addEventListener('change', () => { syncGenCustomRow(); });
+  ['genW', 'genH'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('change', () => { syncGenCustomRow(); });
   });
   genMoreBtn.addEventListener('click', () => {
     genAdvanced.hidden = !genAdvanced.hidden;
@@ -8045,6 +8141,7 @@ initWorkflowWatch();
 initSessionUser();
 document.addEventListener('mg-lang', function(){
   updateBlackHoleButton();
+  try{ if(genState.loaded) updateGenSizes(false); }catch(e){}
   if(state.active) select(state.active);
 });
 setTimeout(() => document.getElementById('boot').classList.add('gone'), 850);

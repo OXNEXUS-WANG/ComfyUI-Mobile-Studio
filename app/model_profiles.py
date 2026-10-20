@@ -119,6 +119,60 @@ PROFILES = {
     },
 }
 
+# 每个家族可选的画幅（WxH，全部是 16 的倍数）和安全上限。
+# 上限不是“理论最大值”，而是按 8GB 显存保守估的：超过时后端会等比缩小，
+# 避免用户手填一个 2048×2048 把任务直接跑爆。
+SIZE_PRESETS = {
+    "anima": {
+        "sizes": ["832x1216", "1216x832", "1024x1024", "768x1344",
+                  "1344x768", "1536x864", "864x1536", "512x512"],
+        "max_side": 1536, "max_pixels": 1500000,
+    },
+    "noob": {
+        "sizes": ["832x1216", "1216x832", "1024x1024", "768x1344",
+                  "1344x768", "1152x896", "896x1152", "512x512"],
+        "max_side": 1536, "max_pixels": 1500000,
+    },
+    "sdxl_anime": {
+        "sizes": ["832x1216", "1216x832", "1024x1024", "768x1344",
+                  "1344x768", "1152x896", "896x1152", "512x512"],
+        "max_side": 1536, "max_pixels": 1500000,
+    },
+    "sdxl_photo": {
+        "sizes": ["1216x832", "832x1216", "1024x1024", "1344x768",
+                  "768x1344", "1536x864", "864x1536", "512x512"],
+        "max_side": 1536, "max_pixels": 1500000,
+    },
+    "pony": {
+        "sizes": ["1024x1024", "832x1216", "1216x832", "768x1344",
+                  "1344x768", "1152x896", "896x1152", "512x512"],
+        "max_side": 1536, "max_pixels": 1500000,
+    },
+    "sd15_anime": {
+        "sizes": ["512x768", "768x512", "512x512", "640x640",
+                  "768x768", "640x448", "448x640"],
+        "max_side": 1024, "max_pixels": 600000,
+    },
+    "sd15": {
+        "sizes": ["512x768", "768x512", "512x512", "640x640",
+                  "768x768", "640x448", "448x640"],
+        "max_side": 1024, "max_pixels": 600000,
+    },
+    "flux": {
+        "sizes": ["1024x1024", "832x1216", "1216x832", "1344x768", "768x1344"],
+        "max_side": 1536, "max_pixels": 2000000,
+    },
+    "qwen_image": {
+        "sizes": ["1024x1024", "832x1216", "1216x832", "1344x768", "768x1344"],
+        "max_side": 1536, "max_pixels": 2000000,
+    },
+    "unknown": {
+        "sizes": ["832x1216", "1216x832", "1024x1024", "768x1344",
+                  "1344x768", "1152x896", "896x1152", "512x512"],
+        "max_side": 1536, "max_pixels": 1500000,
+    },
+}
+
 KIND_ZH = {"anime": "动漫", "photo": "写实", "general": "通用"}
 KIND_EN = {"anime": "Anime", "photo": "Photo", "general": "General"}
 
@@ -369,9 +423,22 @@ def profile_for(name, path=None, known=None, refresh=False):
     # 人工参数优先（例如 Anima / NoobAI 的精确步数和提示）
     for key in ("label", "steps", "cfg", "sampler", "kind", "orientation",
                 "tip", "vpred", "pag", "supports_lora", "supports_negative",
-                "supports_hires", "beginner", "recommended_size"):
+                "supports_hires", "beginner", "recommended_size",
+                "sizes", "max_side", "max_pixels"):
         if key in known and known[key] is not None:
             base[key] = known[key]
+    # 画幅候选跟随模型家族；人工 preset 也可以覆盖。
+    size_preset = SIZE_PRESETS.get(family) or SIZE_PRESETS["unknown"]
+    if not base.get("sizes"):
+        base["sizes"] = list(size_preset["sizes"])
+    if not base.get("max_side"):
+        base["max_side"] = size_preset["max_side"]
+    if not base.get("max_pixels"):
+        base["max_pixels"] = size_preset["max_pixels"]
+    # 推荐画幅必须出现在候选里，前端默认就能选中它。
+    rec = base.get("recommended_size") or "832x1216"
+    if rec not in base["sizes"]:
+        base["sizes"] = [rec] + list(base["sizes"])
     # 加速模型自动降步数。不同加速方案的推荐值不一样，不能一律 6 步。
     low = str(name or "").lower()
     fast = any(x in low for x in ("turbo", "lightning", "lcm", "hyper"))

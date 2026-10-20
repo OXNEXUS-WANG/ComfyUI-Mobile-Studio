@@ -330,10 +330,14 @@ button.go:disabled { background: rgba(255,255,255,.07); color: var(--tx3);
 /* 窄屏一行一个，宽一点两列；标签完整显示，不再省略成「动漫 · Ani...」 */
 #models { display: grid; grid-template-columns: 1fr; gap: 8px; }
 #models .chip { min-height: 46px; font-size: 13.5px; padding: 10px 8px; }
-#sizes .chip { white-space: nowrap; word-break: normal; }
+#sizes .chip, #vidSizes .chip {
+  flex: 0 0 auto; white-space: nowrap; word-break: normal;
+}
 @media (max-width: 600px) {
-  #sizes .chip { flex: 1 1 calc(33.333% - 8px); max-width: calc(33.333% - 8px);
-    font-size: 12.5px; padding-left: 6px; padding-right: 6px; }
+  #sizes .chip, #vidSizes .chip {
+    flex: 1 1 calc(50% - 8px); max-width: calc(50% - 8px);
+    font-size: 12.5px; padding-left: 6px; padding-right: 6px;
+  }
 }
 #models .chip.beginner { border-color: rgba(127,227,255,.36); }
 #models .chip.beginner::after { content:"★"; float:right; margin-left:6px;
@@ -479,6 +483,16 @@ a.img:active { filter: brightness(.94); }
   border-radius: 13px; background: rgba(0,0,0,.4); display: block; margin-bottom: 10px; }
 .qhint { font-size: 12px; color: var(--tx3); margin: 4px 3px 14px; line-height: 1.7; }
 .qhint b { color: var(--ac2); }
+/* 自定义画幅 / 时长：两个小数字框 + 应用 */
+.size-custom { align-items: center; gap: 7px; margin: 2px 0 0; }
+.size-custom .mini { font-size: 12px; color: var(--tx3); flex: 0 0 auto; }
+.size-custom .size-in {
+  width: 78px; padding: 9px 6px; text-align: center; font-size: 14px;
+  flex: 0 0 auto;
+}
+.size-custom .chip { flex: 0 0 auto; min-height: 38px; }
+.chip.warn { color: #ffc48a; border-color: rgba(255,160,80,.35); }
+.chip.warn.on { background: rgba(255,150,70,.16); border-color: rgba(255,170,90,.6); }
 
 /* ---------- 当前配置徽章 ---------- */
 .modebadge {
@@ -1382,7 +1396,7 @@ img.result, video.result {
   }
 }
 </style>
-<script src="/i18n.js?v=20261020r"></script>
+<script src="/i18n.js?v=20261021a"></script>
 </head>
 <body>
 <button id="langBtn" type="button" data-lang-toggle>EN</button>
@@ -1556,23 +1570,21 @@ img.result, video.result {
 <textarea id="p" placeholder="用中文描述你想画的画面...">杰作，最高画质，一个女孩，独自一人，银色的长头发，红色的眼睛，黑色的哥特连衣裙，微笑，站在夜晚的城堡前，月光，精细的背景</textarea>
 <div class="qhint">内置 6700+ 角色名 + 3800+ 作品名：写「初音未来」「雷电将军」「芙莉莲」会自动换成模型认识的英文标签，画指定角色时很有用。</div>
 
-<div class="seclabel">画面比例 <span>决定画布长什么样</span></div>
-<div class="row tight" id="sizes">
-  <div class="chip on" data-wh="832x1216">竖图</div>
-  <div class="chip" data-wh="1216x832">横图</div>
-  <div class="chip" data-wh="1024x1024">方图</div>
-  <div class="chip" data-wh="512x768">小竖</div>
-  <div class="chip" data-wh="768x512">小横</div>
-  <div class="chip" data-wh="512x512">小方</div>
+<div class="seclabel">画面比例 <span>画幅跟着底模走，也能自己填</span></div>
+<div class="row tight" id="sizes"></div>
+<div class="row tight size-custom" id="sizeCustom">
+  <span class="mini">自定义</span>
+  <input class="input size-in" id="cw" type="number" min="256" max="1536"
+         step="16" value="832" inputmode="numeric" aria-label="宽度">
+  <span class="mini">×</span>
+  <input class="input size-in" id="ch" type="number" min="256" max="1536"
+         step="16" value="1216" inputmode="numeric" aria-label="高度">
+  <div class="chip" id="sizeApply" title="按填写的宽高生成；不是 16 的倍数会自动对齐">应用尺寸</div>
 </div>
-<div class="qhint">竖图适合人物立绘；横图适合风景；方图适合头像或对称构图。</div>
+<div class="qhint" id="sizeHint">选中底模后，这里会列出它擅长的画幅；手填超过模型上限时会自动等比缩小。</div>
 
-<div class="row tight" id="vidSizes" style="display:none">
-  <div class="chip on" data-wh="480x480">方 480</div>
-  <div class="chip" data-wh="480x832">竖 480</div>
-  <div class="chip" data-wh="832x480">横 480</div>
-</div>
-<div class="qhint" id="vidHint" style="display:none">视频只有 480p 三档：显存小，画面别贪大；1~3 秒最稳。</div>
+<div class="row tight" id="vidSizes" style="display:none"></div>
+<div class="qhint" id="vidHint" style="display:none">Wan 1.3B 原生是 480p，可选多种画幅；像素量太大会自动等比缩小。时长越长约容易爆显存。</div>
 
 <div class="seclabel">底模 <span>用哪个模型来画</span></div>
 <div class="row tight" id="models"></div>
@@ -1638,12 +1650,24 @@ img.result, video.result {
   <div id="vidSec" style="display:none">
     <div class="seclabel">视频 <span>8GB 显存，别贪长</span></div>
     <div class="fld">
-      <div class="lbl">时长 <b id="framesVal">2 秒</b> · 越长越慢，4 秒以上容易爆显存</div>
+      <div class="lbl">时长 <b id="framesVal">2 秒</b> · 1~2 秒最稳；4 秒以上可能爆显存</div>
       <div class="row" id="frames" style="margin:0">
+        <div class="chip" data-f="4">0.5 秒</div>
         <div class="chip" data-f="8">1 秒</div>
+        <div class="chip" data-f="12">1.5 秒</div>
         <div class="chip on" data-f="16">2 秒</div>
         <div class="chip" data-f="24">3 秒</div>
+        <div class="chip warn" data-f="32" title="8GB 显存上很可能失败，只建议试一次">4 秒</div>
       </div>
+      <div class="row tight size-custom" style="margin-top:9px">
+        <span class="mini">自定义</span>
+        <input class="input size-in" id="framesCustom" type="number"
+               min="0.5" max="6" step="0.5" value="2" inputmode="decimal"
+               aria-label="视频时长（秒）">
+        <span class="mini">秒</span>
+        <div class="chip" id="framesApply" title="0.5~6 秒，按 8fps 换算帧数">应用时长</div>
+      </div>
+      <div class="qhint" style="margin-bottom:0">Wan 视频按 8fps 计帧；自定义会向上取到偶数帧。4 秒以上在 8GB 上很可能失败。</div>
     </div>
   </div>
 
@@ -2365,6 +2389,9 @@ img.result, video.result {
 <script>
 /* ================= 基础 ================= */
 let wh = "832x1216";
+let lastImageWh = "832x1216";   // 从视频切回出图时恢复上一次的画幅
+let curVideoSizes = ["480x480", "480x832", "832x480",
+                     "640x480", "480x640", "640x640"];
 let curCount = 1;
 let refImage = null;
 let curModel = null;
@@ -2412,31 +2439,195 @@ function esc(s) {
     .replace(/'/g, "&#39;");
 }
 
-/* ================= 出图界面 ================= */
-document.querySelectorAll("#sizes .chip").forEach(function (c) {
-  c.onclick = function () {
-    document.querySelectorAll("#sizes .chip").forEach(function (x) { x.classList.remove("on"); });
-    c.classList.add("on"); wh = c.dataset.wh;
-    updateModeBadge();
-  };
-});
-document.querySelectorAll("#vidSizes .chip").forEach(function (c) {
-  c.onclick = function () {
-    document.querySelectorAll("#vidSizes .chip").forEach(function (x) { x.classList.remove("on"); });
-    c.classList.add("on"); wh = c.dataset.wh;
-    updateModeBadge();
-  };
-});
+/* ================= 出图界面 · 画幅与时长 ================= */
+const SIZE_SHAPE_EN = {"方图": "Square", "竖图": "Portrait", "横图": "Landscape",
+                       "宽屏": "Wide", "竖屏": "Tall"};
+
+function sizeShape(sz) {
+  const p = String(sz || "").split("x");
+  const w = parseInt(p[0], 10) || 0;
+  const h = parseInt(p[1], 10) || 0;
+  if (!w || !h || w === h) { return "方图"; }
+  const r = Math.max(w, h) / Math.min(w, h);
+  if (w > h) { return r >= 1.5 ? "宽屏" : "横图"; }
+  return r >= 1.5 ? "竖屏" : "竖图";
+}
+
+function sizeLabel(sz) {
+  const p = String(sz || "").split("x");
+  if (p.length !== 2) { return String(sz || ""); }
+  const shape = sizeShape(sz);
+  return (uiEn() ? (SIZE_SHAPE_EN[shape] || shape) : shape) +
+    " " + p[0] + "×" + p[1];
+}
+
+function snapNum(v, lo, hi) {
+  let n = parseInt(v, 10);
+  if (!isFinite(n)) { n = lo; }
+  n = Math.max(lo, Math.min(hi, n));
+  return Math.max(16, Math.round(n / 16) * 16);
+}
+
+function snapDown(v, lo, hi) {
+  let n = Math.floor(Number(v) / 16) * 16;
+  return Math.max(16, Math.max(lo, Math.min(hi, n)));
+}
+
+/* 和 app_core.fit_size 同一套规则，前端先算一遍让用户看到实际画布 */
+function fitSizeJs(w, h, lo, hi, maxPixels) {
+  w = snapNum(w, lo, hi);
+  h = snapNum(h, lo, hi);
+  if (maxPixels) {
+    for (let i = 0; i < 3 && w * h > maxPixels; i++) {
+      const k = Math.sqrt(maxPixels / (w * h));
+      w = snapDown(w * k, lo, hi);
+      h = snapDown(h * k, lo, hi);
+    }
+  }
+  return [w, h];
+}
+
+function setCanvasSize(sz) {
+  if (!/^\d+x\d+$/.test(String(sz || ""))) { return; }
+  wh = sz;
+  if (!isVidMode(curMode)) { lastImageWh = sz; }
+  document.querySelectorAll("#sizes .chip").forEach(function (x) {
+    x.classList.toggle("on", x.dataset.wh === wh);
+  });
+  document.querySelectorAll("#vidSizes .chip").forEach(function (x) {
+    x.classList.toggle("on", x.dataset.wh === wh);
+  });
+  if (!isVidMode(curMode)) {
+    const p = wh.split("x");
+    const cw = document.getElementById("cw");
+    const ch = document.getElementById("ch");
+    if (cw) { cw.value = p[0]; }
+    if (ch) { ch.value = p[1]; }
+  }
+  updateModeBadge();
+}
+
+function renderSizeChips(m) {
+  const box = document.getElementById("sizes");
+  if (!box) { return; }
+  const list = (m && m.sizes && m.sizes.length)
+    ? m.sizes.slice() : ["832x1216"];
+  const rec = (m && m.recommended_size) || list[0];
+  if (list.indexOf(rec) < 0) { list.unshift(rec); }
+  box.innerHTML = "";
+  list.forEach(function (sz) {
+    const c = document.createElement("div");
+    c.className = "chip" + (sz === wh ? " on" : "");
+    c.dataset.wh = sz;
+    c.textContent = sizeLabel(sz);
+    if (sz === rec) {
+      c.title = uiEn() ? "Recommended for this model" : "这个底模的推荐画幅";
+    }
+    c.onclick = function () { setCanvasSize(sz); };
+    box.appendChild(c);
+  });
+  const cw = document.getElementById("cw");
+  const ch = document.getElementById("ch");
+  const maxSide = (m && m.max_side) || 1536;
+  if (cw) { cw.max = maxSide; }
+  if (ch) { ch.max = maxSide; }
+  const hint = document.getElementById("sizeHint");
+  if (hint) {
+    const mp = m && m.max_pixels ? (m.max_pixels / 1000000).toFixed(1) : "1.5";
+    hint.textContent = uiEn()
+      ? "This model allows up to " + maxSide + " px per side and about " +
+        mp + " MP; larger sizes are scaled down automatically."
+      : "当前底模单边最高 " + maxSide + " 像素、约 " + mp +
+        " 百万像素；超出的尺寸会自动等比缩小。";
+  }
+}
+
+function renderVideoSizes() {
+  const box = document.getElementById("vidSizes");
+  if (!box) { return; }
+  const list = (window.__videoSizes && window.__videoSizes.length)
+    ? window.__videoSizes : curVideoSizes;
+  curVideoSizes = list.slice();
+  box.innerHTML = "";
+  list.forEach(function (sz) {
+    const c = document.createElement("div");
+    c.className = "chip" + (sz === wh ? " on" : "");
+    c.dataset.wh = sz;
+    c.textContent = sizeLabel(sz);
+    c.onclick = function () { setCanvasSize(sz); };
+    box.appendChild(c);
+  });
+}
+
+function fmtSeconds(n) {
+  const sec = n / 8;
+  return (Number.isInteger(sec) ? sec : sec.toFixed(1)) + " 秒";
+}
+
+function setFrames(n) {
+  n = Math.round(Number(n) || 16);
+  n = Math.max(4, Math.min(48, n));
+  if (n % 2) { n -= 1; }
+  curFrames = n;
+  document.querySelectorAll("#frames .chip").forEach(function (x) {
+    x.classList.toggle("on", parseInt(x.dataset.f, 10) === n);
+  });
+  const v = document.getElementById("framesVal");
+  if (v) { v.textContent = fmtSeconds(n); }
+  const fc = document.getElementById("framesCustom");
+  if (fc) { fc.value = String(n / 8); }
+  updateModeBadge();
+}
+
+function applyCustomSize() {
+  const m = (window.__models || []).find(function (x) { return x.name === curModel; });
+  const maxSide = (m && m.max_side) || 1536;
+  const maxPixels = (m && m.max_pixels) || 1500000;
+  const cw = document.getElementById("cw");
+  const ch = document.getElementById("ch");
+  if (!cw || !ch) { return; }
+  const rawW = parseInt(cw.value, 10) || 832;
+  const rawH = parseInt(ch.value, 10) || 1216;
+  const fit = fitSizeJs(rawW, rawH, 256, maxSide, maxPixels);
+  setCanvasSize(fit[0] + "x" + fit[1]);
+  const hint = document.getElementById("sizeHint");
+  if (hint && (fit[0] !== rawW || fit[1] !== rawH)) {
+    hint.textContent = uiEn()
+      ? "Adjusted to " + fit[0] + "×" + fit[1] + " to fit this model's limit."
+      : "已按当前底模上限等比调整为 " + fit[0] + "×" + fit[1] + "。";
+  }
+}
+
+function applyCustomFrames() {
+  const fc = document.getElementById("framesCustom");
+  if (!fc) { return; }
+  const sec = Math.max(0.5, Math.min(6, parseFloat(fc.value) || 2));
+  setFrames(Math.round(sec * 8));
+}
+
 document.querySelectorAll("#frames .chip").forEach(function (c) {
-  c.onclick = function () {
-    document.querySelectorAll("#frames .chip").forEach(function (x) { x.classList.remove("on"); });
-    c.classList.add("on");
-    curFrames = parseInt(c.dataset.f, 10) || 16;
-    const v = document.getElementById("framesVal");
-    if (v) { v.textContent = (curFrames / 8) + " 秒"; }
-    updateModeBadge();
-  };
+  c.onclick = function () { setFrames(parseInt(c.dataset.f, 10) || 16); };
 });
+(function wireSizeInputs() {
+  const apply = document.getElementById("sizeApply");
+  if (apply) { apply.onclick = applyCustomSize; }
+  ["cw", "ch"].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); applyCustomSize(); }
+      });
+    }
+  });
+  const fa = document.getElementById("framesApply");
+  if (fa) { fa.onclick = applyCustomFrames; }
+  const fc = document.getElementById("framesCustom");
+  if (fc) {
+    fc.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); applyCustomFrames(); }
+    });
+  }
+})();
 
 /* ================= 随机灵感 · 组合词库 ================= */
 const RANDOM_QUALITY = [
@@ -2690,11 +2881,13 @@ function applyModelDefaults(m) {
       c.classList.toggle("on", c.dataset.k === m.sampler);
     });
   }
-  // 按模型推荐自动切画幅；SD1.5 会自动落到 512×768 之类的小图
-  const wantSize = m.recommended_size || (m.orientation === "landscape" ? "1216x832" : "");
-  if (wantSize) {
-    const c = document.querySelector('#sizes .chip[data-wh="' + wantSize + '"]');
-    if (c && !c.classList.contains("on")) { c.click(); }
+  // 画幅候选跟着模型走；SD1.5 会列 512×768 之类的小图。
+  // 视频模式不改画幅，等切回出图时再恢复上一次的尺寸。
+  renderSizeChips(m);
+  if (!isVidMode(curMode)) {
+    const wantSize = m.recommended_size ||
+      (m.orientation === "landscape" ? "1216x832" : "832x1216");
+    if (wantSize !== wh) { setCanvasSize(wantSize); }
   }
   // 极速模式开着时，切回 Anima 也要显示 8 步 / CFG 1
   if (m.family === "anima" && turboOn) {
@@ -2866,6 +3059,10 @@ async function loadModels() {
       document.getElementById("neg").placeholder = j.negative;
     }
     window.__videoReady = !!j.video_ready;
+    if (j.video_sizes && j.video_sizes.length) {
+      window.__videoSizes = j.video_sizes;
+    }
+    renderVideoSizes();
     // 启用账号系统就显示「退出登录」
     if (j.auth) {
       const sec = document.getElementById("authSec");
@@ -2941,7 +3138,12 @@ document.addEventListener("mg-lang", function () {
     c.title = (uiEn() && m.tip_en) ? m.tip_en : (m.tip || m.label);
   });
   const m = models.find(function (x) { return x.name === curModel; });
-  if (m) { syncModelUI(m); }
+  if (m) {
+    renderSizeChips(m);
+    syncModelUI(m);
+  }
+  renderVideoSizes();
+  setFrames(curFrames);
 });
 
 /* ---------- 退出登录 ---------- */
@@ -8408,6 +8610,8 @@ function updateModeBadge() {
 function isVidMode(m) { return m === "vid" || m === "i2v"; }
 
 function setMode(m) {
+  const wasVid = isVidMode(curMode);
+  const oldWh = wh;
   curMode = m;
   document.querySelectorAll("#modes .mode").forEach(function (x) {
     x.classList.toggle("on", x.dataset.mode === m);
@@ -8417,6 +8621,10 @@ function setMode(m) {
     (m === "img" || m === "i2v") ? "block" : "none";
   /* 图生图模式下画幅由参考图决定，藏掉画幅选择避免误导 */
   document.getElementById("sizes").style.display = (m === "txt") ? "flex" : "none";
+  const sc = document.getElementById("sizeCustom");
+  if (sc) { sc.style.display = (m === "txt") ? "flex" : "none"; }
+  const sh = document.getElementById("sizeHint");
+  if (sh) { sh.style.display = (m === "txt") ? "block" : "none"; }
   document.getElementById("vidSizes").style.display = vid ? "flex" : "none";
   const vh = document.getElementById("vidHint");
   if (vh) { vh.style.display = vid ? "block" : "none"; }
@@ -8425,18 +8633,20 @@ function setMode(m) {
   const goBtn = document.getElementById("go");
   if (goBtn) { goBtn.textContent = vid ? "出视频" : "出 图"; }
 
-  /* 两套画幅互斥，切换时自动换成对方的安全默认值 */
-  if (vid && !/^(480x480|480x832|832x480)$/.test(wh)) {
-    wh = "480x480";
-    document.querySelectorAll("#vidSizes .chip").forEach(function (x) {
-      x.classList.toggle("on", x.dataset.wh === wh);
+  renderVideoSizes();
+  /* 两套画幅互斥：进视频时记住出图画幅，回到出图时恢复。 */
+  if (vid && !wasVid) {
+    if (curVideoSizes.indexOf(oldWh) < 0) { lastImageWh = oldWh; }
+    if (curVideoSizes.indexOf(wh) < 0) { setCanvasSize(curVideoSizes[0] || "480x480"); }
+  } else if (!vid) {
+    const chips = document.querySelectorAll("#sizes .chip");
+    let target = wasVid ? (lastImageWh || "832x1216") : wh;
+    let found = false;
+    chips.forEach(function (x) {
+      if (x.dataset.wh === target) { found = true; }
     });
-  }
-  if (!vid && /^(480x480|480x832|832x480)$/.test(wh)) {
-    wh = "832x1216";
-    document.querySelectorAll("#sizes .chip").forEach(function (x) {
-      x.classList.toggle("on", x.dataset.wh === wh);
-    });
+    if (!found && chips.length) { target = chips[0].dataset.wh; }
+    if (target !== wh || !found) { setCanvasSize(target); }
   }
 
   document.getElementById("p").placeholder = (m === "img")

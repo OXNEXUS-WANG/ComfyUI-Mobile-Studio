@@ -1386,6 +1386,9 @@ class Handler(BaseHTTPRequestHandler):
                         "default_sampler": DEFAULT_SAMPLER,
                         "video_ready": video_ready(),
                         "video_model": VIDEO_UNET,
+                        "video_sizes": list(VIDEO_SIZES),
+                        "video_min_seconds": VIDEO_MIN_SECONDS,
+                        "video_max_seconds": VIDEO_MAX_SECONDS,
                         "translate_ready": translation_ready_for(user),
                         "translation": translation_status(user),
                         "auth": auth_enabled(),
@@ -3469,11 +3472,8 @@ class Handler(BaseHTTPRequestHandler):
             w, h = (int(v) for v in (data.get("size") or "832x1216").split("x"))
         except Exception:
             w, h = (480, 480) if is_video else (832, 1216)
-        # 视频用的是 Wan 的 480p 档位，比出图低一截
-        lo = 256 if is_video else 512
-        hi = 1024 if is_video else 1536
-        w = max(lo, min(hi, w))
-        h = max(lo, min(hi, h))
+        # 先做一次粗对齐；真正的模型上限在 ckpt 解析出来后再套。
+        w, h = fit_size(w, h, 256, 2048, 0)
 
         def num(key, default, lo, hi, cast):
             try:
@@ -3481,7 +3481,11 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 return default
 
-        frames = num("frames", 16, 8, 48, int)
+        # 视频时长按“秒”自由填，内部换算成 8fps 的帧数；必须是偶数，
+        # 这样 Wan 的 length=帧数*2+1 才会落在 4n+1 上。
+        frames = num("frames", 16, 4, 48, int)
+        if frames % 2:
+            frames -= 1
         count = 1 if is_video else num("count", 1, 1, 4, int)
         denoise = num("denoise", 0.6, 0.2, 1.0, float)
         if is_video:
@@ -3517,6 +3521,16 @@ class Handler(BaseHTTPRequestHandler):
                     negative = NOOB_NEGATIVE
                 elif not preset.get("supports_negative", True):
                     negative = ""
+
+        # 按具体模型再收一次画幅：16 像素对齐 + 单边 / 总像素上限。
+        # 图生图 / 局部重绘的画幅由参考图决定，这里只影响任务记录和预估。
+        if is_video:
+            w, h = fit_size(w, h, 256, VIDEO_MAX_SIDE, VIDEO_MAX_PIXELS)
+        else:
+            w, h = fit_size(
+                w, h, 256,
+                int(preset.get("max_side") or 1536),
+                int(preset.get("max_pixels") or 1500000))
 
         # LoRA：只接受 loras 目录里真实存在的文件名，强度限制在 -2 ~ 2
         loras = []
