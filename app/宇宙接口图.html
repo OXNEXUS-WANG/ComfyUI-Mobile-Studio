@@ -1379,6 +1379,7 @@ void main(){
   <button class="ctl" id="zoomOut" title="缩小">−</button>
   <button class="ctl" id="zoomIn" title="放大视图">＋</button>
   <button class="ctl on" id="autoBtn" title="暂停 / 继续自动旋转">自转 ON</button>
+  <button class="ctl on" id="bhBtn" title="显示 / 隐藏黑洞背景">黑洞 ON</button>
   <button class="ctl" id="resetBtn" title="重置视角">重置视角</button>
   <button class="ctl" id="posBtn" title="开启后拖动星球调整位置">布置</button>
 </div>
@@ -5864,6 +5865,8 @@ function drawBlackHole(){
 /* ---------- KERR WebGL 黑洞（MIT，右下角背景） ---------- */
 const bhGLCanvas = document.getElementById('bhGL');
 let bhGLActive = false, bhGL = null, bhGLSteps = 100;
+let bhVisible = true;
+try{ bhVisible = localStorage.getItem('nexusBhV1') !== '0'; }catch(e){}
 function bhCompile(gl, type, src){
   const sh = gl.createShader(type);
   gl.shaderSource(sh, src);
@@ -6039,13 +6042,61 @@ bhGLCanvas.addEventListener('webglcontextlost', e => {
   e.preventDefault();
   bhGLActive = false;
   bhGL = null;
-  bhCanvas.style.display = '';
-  drawBlackHole();
+  if(bhVisible){
+    bhCanvas.style.display = '';
+    drawBlackHole();
+  }else{
+    bhCanvas.style.display = 'none';
+  }
 });
 bhGLCanvas.addEventListener('webglcontextrestored', () => {
   bhGL = null;
-  initBlackHoleGL();
+  if(bhVisible) initBlackHoleGL();
 });
+
+function updateBlackHoleButton(){
+  const btn = document.getElementById('bhBtn');
+  if(!btn) return;
+  btn.classList.toggle('on', bhVisible);
+  btn.textContent = liveEn()
+    ? (bhVisible ? 'Black hole ON' : 'Black hole OFF')
+    : (bhVisible ? '黑洞 ON' : '黑洞 OFF');
+  btn.title = liveEn()
+    ? (bhVisible ? 'Hide black hole background' : 'Show black hole background')
+    : (bhVisible ? '隐藏黑洞背景' : '显示黑洞背景');
+}
+function setBlackHoleVisible(on, persist){
+  bhVisible = !!on;
+  if(persist !== false){
+    try{ localStorage.setItem('nexusBhV1', bhVisible ? '1' : '0'); }catch(e){}
+  }
+  updateBlackHoleButton();
+  const scrim = document.getElementById('bhScrim');
+  if(scrim) scrim.style.display = bhVisible ? '' : 'none';
+  if(!bhVisible){
+    // 停止 WebGL 循环并隐藏两块画布；不销毁 context，重新打开更快。
+    bhGLActive = false;
+    bhGLCanvas.style.display = 'none';
+    bhCanvas.style.display = 'none';
+    return;
+  }
+  bhGLCanvas.style.display = '';
+  if(bhGL){
+    bhGLActive = true;
+    bhCanvas.style.display = 'none';
+    if(!bhGLStart) bhGLStart = performance.now();
+    resizeBlackHoleGL();
+    drawBlackHoleGLFrame(performance.now());
+    requestAnimationFrame(bhGLFrame);
+    return;
+  }
+  // 首次显示或 WebGL 上下文丢失后重建；失败则用 2D 回退。
+  if(!initBlackHoleGL()){
+    bhGLCanvas.style.display = 'none';
+    bhCanvas.style.display = '';
+    drawBlackHole();
+  }
+}
 
 /* ---------- 交互 ---------- */
 let pointers = new Map(), lastX=0, lastY=0, pinchDist=0;
@@ -6141,6 +6192,8 @@ autoBtn.addEventListener('click', () => {
   autoBtn.classList.toggle('on', state.auto);
   autoBtn.textContent = state.auto ? '自转 ON' : '自转 OFF';
 });
+const bhBtn = document.getElementById('bhBtn');
+if(bhBtn) bhBtn.addEventListener('click', () => setBlackHoleVisible(!bhVisible));
 document.getElementById('posBtn').addEventListener('click', () => {
   setPosEdit(!state.posEdit);
 });
@@ -6164,6 +6217,10 @@ addEventListener('keydown', e => {
     e.preventDefault();
     setPosEdit(!state.posEdit);
   }
+  if(e.key === 'b' || e.key === 'B'){
+    e.preventDefault();
+    setBlackHoleVisible(!bhVisible);
+  }
   if(e.key === 'Escape'){
     if(genState.open) closeGenDeck(); else closePanel();
   }
@@ -6180,7 +6237,7 @@ addEventListener('resize', () => {
     if(bhGLActive){
       resizeBlackHoleGL();
       drawBlackHoleGLFrame(performance.now());
-    }else{
+    }else if(bhVisible){
       drawBlackHole();
     }
     // 横竖屏切换时重新取景；地址栏伸缩造成的小变化不动用户的缩放
@@ -7932,7 +7989,12 @@ async function initSessionUser(){
 /* ---------- 启动 ---------- */
 // 先把内圈（分类）完整装进画面，外圈接口靠缩小 / 拖拽探索
 build();
-if(!initBlackHoleGL()) drawBlackHole();
+if(bhVisible){
+  if(!initBlackHoleGL()) drawBlackHole();
+}else{
+  setBlackHoleVisible(false, false);
+}
+updateBlackHoleButton();
 state.zoom = state.targetZoom = fitZoom();
 refreshStates();
 requestAnimationFrame(loop);
@@ -7942,6 +8004,7 @@ initLoadHud();
 initWorkflowWatch();
 initSessionUser();
 document.addEventListener('mg-lang', function(){
+  updateBlackHoleButton();
   if(state.active) select(state.active);
 });
 setTimeout(() => document.getElementById('boot').classList.add('gone'), 850);
