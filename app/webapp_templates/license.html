@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>商用版激活 · Mobile Studio</title>
+<style>
+:root{
+  --bg:#060a12; --card:rgba(13,20,33,.92); --line:rgba(127,227,255,.16);
+  --tx:#e8f2fb; --tx2:#9fb2c8; --tx3:#6f8299; --acc:#8fe6ff;
+  --warn:#ffd18a; --ok:#8fe6b0; --bad:#ffc0c6;
+}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{
+  margin:0; padding:24px 16px; min-height:100vh; display:flex;
+  align-items:center; justify-content:center; color:var(--tx);
+  font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+  background:
+    radial-gradient(900px 500px at 80% -10%,rgba(70,170,255,.16),transparent 60%),
+    radial-gradient(700px 500px at 10% 110%,rgba(255,190,110,.10),transparent 55%),
+    var(--bg);
+}
+.card{
+  width:min(620px,100%); padding:22px 22px 18px; border-radius:20px;
+  border:1px solid var(--line); background:var(--card);
+  box-shadow:0 30px 90px rgba(0,0,0,.55); backdrop-filter:blur(12px);
+}
+.head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.logo{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;
+  background:linear-gradient(145deg,#8fe6ff,#3d7bd9);color:#06111f;font-weight:800;
+  font-size:17px;box-shadow:0 0 24px rgba(127,227,255,.30)}
+.brand{font-size:12px;letter-spacing:.14em;color:var(--tx3);text-transform:uppercase}
+.spacer{flex:1}
+.lang{background:transparent;border:1px solid var(--line);color:var(--tx2);
+  border-radius:8px;padding:6px 10px;font:600 11px inherit;cursor:pointer}
+h1{margin:14px 0 4px;font-size:22px;letter-spacing:.5px}
+.sub{margin:0 0 14px;color:var(--tx2);font-size:12.5px;line-height:1.65}
+.box{padding:12px 13px;border-radius:12px;border:1px solid var(--line);
+  background:rgba(255,255,255,.025);font-size:12px;line-height:1.7}
+.box.ok{border-color:rgba(110,230,160,.28);background:rgba(70,210,130,.07)}
+.box.bad{border-color:rgba(255,143,156,.28);background:rgba(255,90,110,.07)}
+.box.warn{border-color:rgba(255,190,110,.28);background:rgba(255,170,60,.07)}
+.machine{margin:14px 0 4px}
+.label{display:block;color:var(--tx3);font-size:10.5px;letter-spacing:.08em;
+  text-transform:uppercase;margin-bottom:6px}
+.code{font:700 15px var(--mono,Consolas,monospace);letter-spacing:1.2px;
+  color:var(--acc);word-break:break-all;padding:11px 12px;border-radius:10px;
+  border:1px dashed rgba(127,227,255,.30);background:rgba(0,0,0,.28)}
+.copy{margin-top:7px;background:rgba(255,255,255,.05);border:1px solid var(--line);
+  color:var(--tx2);border-radius:8px;padding:6px 10px;font:600 10.5px inherit;
+  cursor:pointer}
+.copy:hover{color:#fff;border-color:rgba(127,227,255,.42)}
+.hint{color:var(--tx3);font-size:11px;line-height:1.7;margin:9px 0}
+.hint a{color:var(--acc)}
+textarea{width:100%;min-height:96px;resize:vertical;border-radius:10px;
+  border:1px solid rgba(255,255,255,.14);background:#080f1b;color:var(--tx);
+  padding:10px 11px;font:11px var(--mono,Consolas,monospace);line-height:1.55}
+textarea:focus{outline:none;border-color:rgba(127,227,255,.55)}
+.row{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-top:10px}
+.file{color:var(--tx3);font-size:10.5px;max-width:260px}
+button.primary{background:linear-gradient(180deg,#9fe9ff,#6cc7ef);color:#06111f;
+  border:0;border-radius:10px;padding:10px 18px;font:700 12px inherit;cursor:pointer}
+button.primary:disabled{opacity:.45;cursor:not-allowed}
+.msg{margin-top:12px;font-size:11.5px;line-height:1.6;min-height:18px}
+.msg.err{color:var(--bad)} .msg.ok{color:var(--ok)}
+.back{display:inline-block;margin-top:14px;color:var(--acc);font-size:11.5px;
+  text-decoration:none}
+.hidden{display:none!important}
+.foot{margin-top:16px;color:var(--tx3);font-size:10px;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="head">
+    <div class="logo">M</div>
+    <div>
+      <div class="brand">Mobile Studio · Commercial</div>
+      <div id="editionLine" class="brand" style="letter-spacing:.02em"></div>
+    </div>
+    <div class="spacer"></div>
+    <button class="lang" id="langBtn" type="button">EN</button>
+  </div>
+
+  <h1 id="title">商用版激活</h1>
+  <p class="sub" id="subtitle">本机需要有效的商用授权码才能使用。授权码绑定这台电脑，离线验证。</p>
+
+  <div class="box" id="statusBox">正在读取授权状态…</div>
+
+  <div class="machine" id="machineWrap">
+    <span class="label" id="machineLabel">机器码</span>
+    <div class="code" id="machineCode">—</div>
+    <button class="copy" id="copyBtn" type="button">复制机器码</button>
+  </div>
+
+  <div class="hint" id="loginHint"></div>
+  <button class="copy hidden" id="logoutBtn" type="button">退出当前账号</button>
+
+  <div id="activateBox">
+    <label class="label" for="codeInput" id="codeLabel">授权码 / 授权文件内容</label>
+    <textarea id="codeInput" spellcheck="false" placeholder="MGS1.…"></textarea>
+    <div class="row">
+      <input class="file" type="file" id="fileInput" accept=".json,.txt">
+      <button class="primary" id="activateBtn" type="button">激活</button>
+    </div>
+    <div class="hint" id="activateHint">把机器码发给供应商换取授权码；也可以直接选择对方发来的 JSON 文件。</div>
+  </div>
+
+  <div class="msg" id="msg"></div>
+  <a class="back hidden" id="backLink" href="/">进入工作台 →</a>
+  <div class="foot" id="foot">授权只校验机器码和签名，不会上传任何图片、提示词或账号信息。</div>
+</div>
+
+<script>
+(function(){
+  var LANG_KEY = 'mg_license_lang';
+  var lang = localStorage.getItem(LANG_KEY) === 'en' ? 'en' : 'zh';
+  var status = null;
+  var session = null;
+  var texts = {
+    zh: {
+      lang: 'EN', title: '商用版激活',
+      subtitle: '本机需要有效的商用授权码才能使用。授权码绑定这台电脑，离线验证。',
+      statusLoading: '正在读取授权状态…',
+      machine: '机器码', copy: '复制机器码', copied: '已复制',
+      code: '授权码 / 授权文件内容',
+      activate: '激活', activating: '正在验证…',
+      hint: '把机器码发给供应商换取授权码；也可以直接选择对方发来的 JSON 文件。',
+      foot: '授权只校验机器码和签名，不会上传任何图片、提示词或账号信息。',
+      back: '进入工作台 →',
+      loginFirst: '请先用管理员账号登录，再回来激活。',
+      goLogin: '去登录',
+      notAdmin: '当前账号不是管理员，请让管理员登录后激活。',
+      logout: '退出当前账号',
+      share: '分享版不需要激活。',
+      valid: '已激活', expired: '授权已过期，请续期。',
+      customer: '客户', expires: '有效期', perpetual: '永久',
+      daysLeft: '剩余 {n} 天',
+      machineWrong: '授权码不属于这台机器。',
+      activateOk: '激活成功，正在进入工作台…',
+      fileBad: '这个文件里没有找到授权码。',
+      noCode: '请先粘贴授权码或选择授权文件。',
+      copyFail: '复制失败，请手动选中机器码。'
+    },
+    en: {
+      lang: '中文', title: 'Commercial activation',
+      subtitle: 'This PC needs a valid commercial license. The code is bound to this machine and verified offline.',
+      statusLoading: 'Reading license status…',
+      machine: 'Machine code', copy: 'Copy machine code', copied: 'Copied',
+      code: 'Activation code / license file content',
+      activate: 'Activate', activating: 'Verifying…',
+      hint: 'Send the machine code to your vendor, or choose the JSON file they send back.',
+      foot: 'The license only checks the machine code and signature. No images, prompts or account data are uploaded.',
+      back: 'Open workspace →',
+      loginFirst: 'Sign in with an administrator account before activating.',
+      goLogin: 'Sign in',
+      notAdmin: 'The current account is not an administrator. Ask an admin to activate.',
+      logout: 'Sign out',
+      share: 'The Share edition does not require activation.',
+      valid: 'Activated', expired: 'License expired. Please renew.',
+      customer: 'Customer', expires: 'Expires', perpetual: 'Perpetual',
+      daysLeft: '{n} days left',
+      machineWrong: 'This license belongs to a different machine.',
+      activateOk: 'Activated. Opening the workspace…',
+      fileBad: 'No activation code was found in this file.',
+      noCode: 'Paste an activation code or choose a license file first.',
+      copyFail: 'Copy failed; select the machine code manually.'
+    }
+  };
+  function t(key) { return (texts[lang] && texts[lang][key]) || key; }
+  function $(id) { return document.getElementById(id); }
+  function applyLang() {
+    document.documentElement.lang = lang === 'en' ? 'en' : 'zh-CN';
+    $('langBtn').textContent = t('lang');
+    $('title').textContent = t('title');
+    $('subtitle').textContent = t('subtitle');
+    $('machineLabel').textContent = t('machine');
+    $('copyBtn').textContent = t('copy');
+    $('codeLabel').textContent = t('code');
+    $('activateBtn').textContent = t('activate');
+    $('activateHint').textContent = t('hint');
+    $('foot').textContent = t('foot');
+    $('backLink').textContent = t('back');
+    if (!status) { $('statusBox').textContent = t('statusLoading'); }
+    else { render(); }
+  }
+  $('langBtn').onclick = function(){
+    lang = lang === 'zh' ? 'en' : 'zh';
+    localStorage.setItem(LANG_KEY, lang);
+    applyLang();
+  };
+  function fmtDate(ts) {
+    if (!ts) { return '—'; }
+    var d = new Date(ts * 1000), p = function(n){ return String(n).padStart(2,'0'); };
+    return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate()) +
+      ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  function render() {
+    if (!status) { return; }
+    $('editionLine').textContent = status.commercial ? 'COMMERCIAL · LICENSE' : 'SHARE';
+    if (!status.commercial) {
+      $('statusBox').className = 'box ok';
+      $('statusBox').textContent = t('share');
+      $('machineWrap').classList.add('hidden');
+      $('activateBox').classList.add('hidden');
+      $('loginHint').textContent = '';
+      $('logoutBtn').classList.add('hidden');
+      $('backLink').classList.remove('hidden');
+      return;
+    }
+    $('machineCode').textContent = status.machine_code || '—';
+    $('machineWrap').classList.remove('hidden');
+    if (status.valid) {
+      var text = t('valid');
+      if (status.customer) { text += ' · ' + t('customer') + ': ' + status.customer; }
+      text += ' · ' + t('expires') + ': ' +
+        (status.expires ? fmtDate(status.expires) : t('perpetual'));
+      if (status.days_left !== null && status.days_left !== undefined) {
+        text += ' · ' + t('daysLeft').replace('{n}', status.days_left);
+      }
+      $('statusBox').className = 'box ok';
+      $('statusBox').textContent = text;
+      $('activateBox').classList.add('hidden');
+      $('loginHint').textContent = '';
+      $('logoutBtn').classList.add('hidden');
+      $('backLink').classList.remove('hidden');
+      return;
+    }
+    $('statusBox').className = 'box bad';
+    $('statusBox').textContent = status.error || t('expired');
+    $('activateBox').classList.remove('hidden');
+    $('backLink').classList.add('hidden');
+    var admin = session && session.authed && session.user &&
+      session.user.role === 'admin';
+    $('activateBtn').disabled = !admin;
+    if (!session || !session.authed) {
+      $('loginHint').innerHTML = '';
+      var a = document.createElement('a');
+      a.href = '/'; a.textContent = t('goLogin');
+      $('loginHint').appendChild(document.createTextNode(t('loginFirst') + ' '));
+      $('loginHint').appendChild(a);
+    } else if (!admin) {
+      $('loginHint').textContent = t('notAdmin');
+    } else {
+      $('loginHint').textContent = '';
+    }
+    var logout = $('logoutBtn');
+    if (session && session.authed && !admin) {
+      logout.textContent = t('logout');
+      logout.classList.remove('hidden');
+    } else {
+      logout.classList.add('hidden');
+    }
+  }
+  function setMsg(text, cls) {
+    $('msg').className = 'msg' + (cls ? ' ' + cls : '');
+    $('msg').textContent = text || '';
+  }
+  $('copyBtn').onclick = function(){
+    var code = (status && status.machine_code) || '';
+    if (!code) { return; }
+    var done = function(){ setMsg(t('copied'), 'ok'); };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(code).then(done, function(){ setMsg(t('copyFail'), 'err'); });
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = code; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) { setMsg(t('copyFail'), 'err'); }
+      ta.remove();
+    }
+  };
+  $('logoutBtn').onclick = async function(){
+    try {
+      await fetch('/api/logout', {method:'POST', credentials:'same-origin'});
+    } catch (e) {}
+    location.href = '/';
+  };
+  $('fileInput').onchange = function(){
+    var f = this.files && this.files[0];
+    if (!f) { return; }
+    var reader = new FileReader();
+    reader.onload = function(){
+      var text = String(reader.result || '').trim();
+      try {
+        var obj = JSON.parse(text);
+        if (obj && obj.code) { text = String(obj.code); }
+      } catch (e) {}
+      if (!text) { setMsg(t('fileBad'), 'err'); return; }
+      $('codeInput').value = text;
+      setMsg('', '');
+    };
+    reader.readAsText(f);
+  };
+  $('activateBtn').onclick = async function(){
+    var code = $('codeInput').value.trim();
+    if (!code) { setMsg(t('noCode'), 'err'); return; }
+    this.disabled = true;
+    $('activateBtn').textContent = t('activating');
+    setMsg('', '');
+    try {
+      var r = await fetch('/api/license', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        credentials: 'same-origin', body: JSON.stringify({code: code})
+      });
+      var j = await r.json().catch(function(){ return {}; });
+      if (!r.ok || j.error) { throw new Error(j.error || ('HTTP ' + r.status)); }
+      status = j.status || status;
+      setMsg(t('activateOk'), 'ok');
+      setTimeout(function(){ location.href = '/'; }, 900);
+    } catch (e) {
+      var msg = String(e.message || e);
+      if (msg.indexOf('不属于这台机器') >= 0) { msg = t('machineWrong'); }
+      setMsg(msg, 'err');
+      $('activateBtn').disabled = false;
+      $('activateBtn').textContent = t('activate');
+    }
+  };
+  async function load() {
+    try {
+      var rs = await Promise.all([
+        fetch('/api/license', {cache:'no-store', credentials:'same-origin'}),
+        fetch('/api/session', {cache:'no-store', credentials:'same-origin'})
+      ]);
+      status = await rs[0].json();
+      session = await rs[1].json().catch(function(){ return {}; });
+      render();
+    } catch (e) {
+      $('statusBox').className = 'box bad';
+      $('statusBox').textContent = String(e.message || e);
+    }
+  }
+  applyLang();
+  load();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "updated": "2026-10-20",
+  "comfyui": {
+    "version": "0.42.0",
+    "tag": "v0.42.0",
+    "asset": "ComfyUI_windows_portable_nvidia.7z",
+    "size": 2018436691,
+    "source": "bundled-in-portable"
+  },
+  "python": {
+    "base": [
+      "psutil==7.2.2",
+      "pillow==12.3.0",
+      "cryptography==50.0.2"
+    ],
+    "argos": "argostranslate==1.11.0",
+    "translation": [
+      "ctranslate2==4.8.3",
+      "sentencepiece==0.2.2",
+      "packaging==26.3",
+      "stanza==1.10.1",
+      "sacremoses==0.1.1"
+    ]
+  },
+  "nodes": {
+    "ultimate_upscale": "a5547db9e1d07d3318bb21e9e9c474f4c1e9c8df",
+    "ultimate_upscale_sub": "2322caa480535b1011a1f9c18126d85ea444f146",
+    "alekpet": "2cdf255045fe52926793fa2444c8a0c571df9ac5"
+  },
+  "argos_model": {
+    "version": "1.9",
+    "file": "translate-zh_en-1_9.argosmodel",
+    "size": 74481402
+  },
+  "minisbd_shim": "1.0",
+  "sevenzip_sha256": "256FECA8E274E5DA655E2A284FABAFD9F554365EB164862089DACD4E8276D282"
+}

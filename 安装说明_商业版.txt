@@ -1,0 +1,46 @@
+ComfyUI Mobile Studio · 商用版
+==============================
+
+一、授权
+--------
+本安装包按 LICENSE（Commercial Software License Agreement / 商用版授权协议）
+授权。未经书面商业授权，不得转售、再分发、再许可或让第三方使用。
+第三方组件不适用商用版授权，详见 THIRD_PARTY_NOTICES.md。
+
+二、安装
+--------
+1. 解压 Setup ZIP 到一个普通文件夹。
+2. 双击“安装.bat”。
+3. 安装器默认使用商业清洁模式：
+   - 不下载画图模型
+   - 不安装 GPL 自定义节点
+   - 中文翻译使用 MIT 兼容层，不安装 AGPL 的 MiniSBD
+   - 已有 ComfyUI 直接复用，不自动更新
+   - 没有 ComfyUI 时询问是否下载官方版本
+4. 安装完成后，桌面出现“手机出图”快捷方式。
+
+如果已有 ComfyUI，也可以在命令行指定：
+  installer\install.ps1 -CommercialClean -ComfyUIDir "D:\你的ComfyUI目录"
+
+三、ComfyUI、模型和插件
+------------------------
+安装包不包含 ComfyUI、模型、LoRA、放大模型。
+用户自行安装 ComfyUI、选择模型和插件；它们的许可证由用户遵守。
+商业清洁模式会安装一个 MIT 许可的 MiniSBD 兼容层和 Argos 中文→英文模型
+（模型为 CC-BY 4.0），不会安装 AGPL 的 MiniSBD。也可以用 -NoTranslate
+完全跳过翻译，只使用英文提示词。
+
+四、版本锁定
+------------
+安装器默认使用 installer\versions.lock.json：
+ComfyUI v0.42.0、Python 依赖、自定义节点 commit、模型 revision、7zr 哈希
+都已锁定；已有 ComfyUI 默认不自动更新。
+升级请使用新安装包，并在测试机验证后再发布。
+详见 VERSION_LOCK.md。
+
+五、注意
+--------
+- 服务只监听本机和 192.168.137.1，不会对校园网开放。
+- 不要提交 users.json、workers.json、cert.pem、key.pem、models/。
+- 7-Zip / 7zr 的 LGPL 文本在 tools\7zip-LICENSE.txt。
+- 商业部署前请确认 GPL 条款和模型许可，必要时咨询律师。

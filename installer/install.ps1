@@ -1,0 +1,681 @@
+﻿param(
+    [string]$InstallDir = "",
+    [switch]$DryRun,
+    [switch]$Yes,
+    [switch]$SkipModels,
+    [string]$ModelPacks = "",
+    [switch]$NoTranslate,
+    [switch]$NoCustomNodes,
+    [switch]$CommercialClean,
+    [switch]$SkipComfyUI,
+    [string]$ComfyUIDir = "",
+    [switch]$AllowUpdates,
+    [switch]$NoShortcut
+)
+
+if ($CommercialClean) {
+    $SkipModels = $true
+    $NoCustomNodes = $true
+}
+if ($ComfyUIDir -and -not $InstallDir) { $InstallDir = $ComfyUIDir }
+if ($ComfyUIDir) { $SkipComfyUI = $true }
+if ($ComfyUIDir -and $InstallDir) {
+    $a = [IO.Path]::GetFullPath($InstallDir).TrimEnd('\')
+    $b = [IO.Path]::GetFullPath($ComfyUIDir).TrimEnd('\')
+    if ($a -ne $b) { throw "-InstallDir 和 -ComfyUIDir 指向不同目录，只能指定一个。" }
+}
+
+$ErrorActionPreference = "Stop"
+$PkgRoot = Split-Path -Parent $PSScriptRoot
+$Curl = Join-Path $env:SystemRoot "System32\curl.exe"
+$SevenZip = Join-Path $PkgRoot "tools\7zr.exe"
+$Manifest = Join-Path $PkgRoot "installer\models_manifest.json"
+$LockFile = Join-Path $PkgRoot "installer\versions.lock.json"
+$HfMirror = "https://hf-mirror.com"
+if (-not (Test-Path $LockFile)) { throw ("安装包缺少版本锁定文件：" + $LockFile) }
+$Lock = Get-Content $LockFile -Raw -Encoding UTF8 | ConvertFrom-Json
+$ComfyVersion = [string]$Lock.comfyui.version
+$ComfyTag = [string]$Lock.comfyui.tag
+$ComfyAssetName = [string]$Lock.comfyui.asset
+$ComfyAsset = ("https://github.com/Comfy-Org/ComfyUI/releases/download/" +
+               $ComfyTag + "/" + $ComfyAssetName)
+$ComfyProxy = "https://gh-proxy.com/" + $ComfyAsset
+$ComfySize = [int64]$Lock.comfyui.size
+$PythonBase = @($Lock.python.base)
+$PythonArgos = [string]$Lock.python.argos
+$PythonTranslation = @($Lock.python.translation)
+$NodeUltimate = [string]$Lock.nodes.ultimate_upscale
+$NodeUltimateSub = [string]$Lock.nodes.ultimate_upscale_sub
+$NodeAlekPet = [string]$Lock.nodes.alekpet
+$ArgosModelFile = [string]$Lock.argos_model.file
+$ArgosModelSize = [int64]$Lock.argos_model.size
+$LockSevenZipHash = [string]$Lock.sevenzip_sha256
+$LogFile = Join-Path $env:TEMP "ComfyUI-Mobile-Studio-install.log"
+$ComfyWasFresh = $false
+
+function Say($msg, $color = "White") {
+    Write-Host $msg -ForegroundColor $color
+}
+function Step($n, $msg) {
+    Write-Host ""
+    Write-Host ("[{0}] {1}" -f $n, $msg) -ForegroundColor Cyan
+}
+function Warn($msg) { Say ("  !! " + $msg) "Yellow" }
+function Ok($msg) { Say ("  [OK] " + $msg) "Green" }
+function Fail($msg) { throw $msg }
+
+function Test-Admin {
+    try {
+        $id = [Security.Principal.WindowsIdentity]::GetCurrent()
+        $p = New-Object Security.Principal.WindowsPrincipal($id)
+        return $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    } catch { return $false }
+}
+
+function Test-Url($url) {
+    try {
+        & $Curl -s -I -L --max-time 25 $url | Out-Null
+        return ($LASTEXITCODE -eq 0)
+    } catch { return $false }
+}
+
+function Download-File($urls, $dest, $minBytes, $label) {
+    $parent = Split-Path -Parent $dest
+    if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
+    if ((Test-Path $dest) -and ((Get-Item $dest).Length -ge $minBytes)) {
+        Ok ("已有 " + $label + "，跳过下载")
+        return
+    }
+    foreach ($url in $urls) {
+        Say ("  下载 " + $label)
+        Say ("    " + $url) "DarkGray"
+        & $Curl -L --fail --retry 3 --retry-delay 2 --connect-timeout 25 -C - -o $dest $url
+        if (($LASTEXITCODE -eq 0) -and (Test-Path $dest) -and ((Get-Item $dest).Length -ge $minBytes)) {
+            Ok ("下载完成 " + $label)
+            return
+        }
+        Warn ("这个下载源失败，尝试下一个：" + $url)
+    }
+    Fail ("下载失败：" + $label)
+}
+
+function Expand-7z($archive, $dest) {
+    if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $dest | Out-Null
+    & $SevenZip x $archive ("-o" + $dest) -y | Out-Null
+    if ($LASTEXITCODE -ne 0) { Fail ("解压失败：" + $archive) }
+}
+
+function Expand-Zip($archive, $dest) {
+    if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $dest | Out-Null
+    Expand-Archive -Path $archive -DestinationPath $dest -Force
+}
+
+function Get-ZipTop($dir) {
+    $top = Get-ChildItem $dir -Directory -Force | Select-Object -First 1
+    if (-not $top) { Fail ("ZIP 内容为空：" + $dir) }
+    return $top.FullName
+}
+
+function Copy-Tree($src, $dst) {
+    New-Item -ItemType Directory -Force -Path $dst | Out-Null
+    Get-ChildItem $src -Force | ForEach-Object {
+        $target = Join-Path $dst $_.Name
+        if ($_.PSIsContainer) {
+            Copy-Tree $_.FullName $target
+        } else {
+            Copy-Item $_.FullName $target -Force
+        }
+    }
+}
+
+function Copy-AppFiles {
+    Say "  复制网页、星图和 worker 程序..."
+    Get-ChildItem (Join-Path $PkgRoot "app") -Force | ForEach-Object {
+        if ($_.PSIsContainer) {
+            Copy-Tree $_.FullName (Join-Path $InstallDir $_.Name)
+        } else {
+            Copy-Item $_.FullName (Join-Path $InstallDir $_.Name) -Force
+        }
+    }
+    $editionFile = Join-Path $PkgRoot "EDITION"
+    if (Test-Path $editionFile) {
+        Copy-Item $editionFile (Join-Path $InstallDir "EDITION") -Force
+    }
+    Copy-Tree (Join-Path $PkgRoot "worker") (Join-Path $InstallDir "worker")
+    Copy-Tree (Join-Path $PkgRoot "docs") (Join-Path $InstallDir "docs")
+    Copy-Item (Join-Path $PkgRoot "docs\使用说明.md") (Join-Path $InstallDir "使用说明.md") -Force
+    $instDest = Join-Path $InstallDir "installer"
+    New-Item -ItemType Directory -Force -Path $instDest | Out-Null
+    foreach ($f in @("download_models.py", "bootstrap.py", "models_manifest.json")) {
+        Copy-Item (Join-Path $PkgRoot ("installer\" + $f)) (Join-Path $instDest $f) -Force
+    }
+    $toolsDest = Join-Path $InstallDir "tools"
+    New-Item -ItemType Directory -Force -Path $toolsDest | Out-Null
+    Copy-Item (Join-Path $PkgRoot "installer\download_models.py") (Join-Path $toolsDest "download_models.py") -Force
+    Copy-Item (Join-Path $PkgRoot "installer\models_manifest.json") (Join-Path $toolsDest "models_manifest.json") -Force
+}
+
+function Write-ModelBat {
+    $text = @"
+@echo off
+chcp 65001 >nul
+cd /d "%~dp0"
+.\python_embeded\python.exe -s tools\download_models.py --root "%~dp0" --manifest tools\models_manifest.json
+pause
+"@
+    Set-Content -Path (Join-Path $InstallDir "模型下载.bat") -Value $text -Encoding ascii
+}
+
+function Write-FirewallBat {
+    $text = @"
+@echo off
+chcp 65001 >nul
+net session >nul 2>&1
+if errorlevel 1 (
+  echo Please right-click and Run as administrator.
+  pause
+  exit /b 1
+)
+netsh advfirewall firewall delete rule name="ComfyUI Mobile Studio 8800" >nul 2>&1
+netsh advfirewall firewall add rule name="ComfyUI Mobile Studio 8800" dir=in action=allow protocol=TCP localport=8800 profile=any
+echo Allowed TCP 8800 for LAN access.
+pause
+"@
+    Set-Content -Path (Join-Path $InstallDir "修复手机访问.bat") -Value $text -Encoding ascii
+}
+
+function Invoke-Pip($py, $pkgs, $extra = @()) {
+    $index = "https://pypi.tuna.tsinghua.edu.cn/simple"
+    $common = @("-m", "pip", "install", "--disable-pip-version-check",
+                "--no-input", "--prefer-binary", "--timeout", "60",
+                "--upgrade-strategy", "only-if-needed")
+    & $py @common -i $index @extra @pkgs | Out-Host
+    $code = $LASTEXITCODE
+    if ($code -ne 0) {
+        Warn "清华 PyPI 镜像失败，改用官方源重试..."
+        & $py @common @extra @pkgs | Out-Host
+        $code = $LASTEXITCODE
+    }
+    return $code
+}
+
+function Install-PythonDeps {
+    $py = Join-Path $InstallDir "python_embeded\python.exe"
+    Say "  检查 Python / pip..."
+    & $py -m pip --version | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        & $py -m ensurepip --upgrade | Out-Null
+    }
+    Say "  安装运行依赖（版本锁定）..."
+    $rc = Invoke-Pip $py $PythonBase
+    if ($rc -ne 0) {
+        Fail "基础 Python 依赖安装失败，请检查网络后重试。"
+    }
+    if ($NoTranslate) {
+        Warn "已跳过中文翻译组件；中文提示词需要用户自行翻译成英文。"
+        return
+    }
+    Say "  安装中文翻译组件（版本锁定，argostranslate / MIT 兼容层）..."
+    $rc = Invoke-Pip $py @($PythonArgos) @("--no-deps")
+    if ($rc -ne 0) {
+        Warn "argostranslate 安装失败；网页仍可出图，但中文提示词翻译可能不可用。"
+        return
+    }
+    $rc = Invoke-Pip $py $PythonTranslation
+    if ($rc -ne 0) {
+        Warn "翻译运行依赖安装失败；中文提示词翻译可能不可用。"
+    }
+    Install-MiniSBDShim
+}
+
+function Install-MiniSBDShim {
+    # Argos imports the `minisbd` module. Upstream MiniSBD is AGPL-3.0; this
+    # independent MIT shim keeps the import working without that dependency.
+    $site = Join-Path $InstallDir "python_embeded\Lib\site-packages"
+    $dest = Join-Path $site "minisbd"
+    if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+    Get-ChildItem $site -Directory -Filter "minisbd-*.dist-info" -ErrorAction SilentlyContinue |
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    Copy-Tree (Join-Path $PkgRoot "installer\minisbd_shim\minisbd") $dest
+    Copy-Item (Join-Path $PkgRoot "installer\minisbd_shim\LICENSE") `
+        (Join-Path $site "minisbd-LICENSE.txt") -Force
+    Ok "MiniSBD 兼容层已安装（MIT，非 AGPL）"
+}
+
+function Install-ArgosModel {
+    $py = Join-Path $InstallDir "python_embeded\python.exe"
+    $dest = Join-Path $InstallDir ("_downloads\" + $ArgosModelFile)
+    Download-File @(
+        ("https://argos-net.com/v1/" + $ArgosModelFile),
+        ("https://data.argosopentech.com/argospm/v1/" + $ArgosModelFile)
+    ) $dest $ArgosModelSize "中文→英文翻译模型"
+    $env:MGS_ARGOS_MODEL = $dest
+    try {
+        & $py -c "import os; from argostranslate import package; package.install_from_path(os.environ['MGS_ARGOS_MODEL'])"
+        if ($LASTEXITCODE -ne 0) { Warn "翻译模型安装失败，可稍后重新运行安装器。" }
+        else { Ok "中文翻译模型已安装" }
+    } finally {
+        Remove-Item Env:MGS_ARGOS_MODEL -ErrorAction SilentlyContinue
+    }
+}
+
+function Install-NodeZip($name, $urls) {
+    $zip = Join-Path $InstallDir ("_downloads\" + $name + ".zip")
+    Download-File $urls $zip 1000 ($name + " 插件")
+    $tmp = Join-Path $InstallDir ("_bootstrap\node_" + $name)
+    Expand-Zip $zip $tmp
+    $root = Get-ZipTop $tmp
+    $dest = Join-Path $InstallDir ("ComfyUI\custom_nodes\" + $name)
+    if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dest) | Out-Null
+    Move-Item $root $dest
+    Ok ($name + " 已安装")
+}
+
+function Install-CustomNodes {
+    if ($NoCustomNodes) { Warn "已跳过自定义节点安装"; return }
+    Say "  安装 UltimateSDUpscale..."
+    $u1 = "https://github.com/ssitu/ComfyUI_UltimateSDUpscale/archive/" + $NodeUltimate + ".zip"
+    Install-NodeZip "ComfyUI_UltimateSDUpscale" @(
+        ("https://gh-proxy.com/" + $u1), $u1
+    )
+    $subZip = Join-Path $InstallDir "_downloads\ultimate_submodule.zip"
+    $u2 = "https://github.com/Coyote-A/ultimate-upscale-for-automatic1111/archive/" + $NodeUltimateSub + ".zip"
+    Download-File @(
+        ("https://gh-proxy.com/" + $u2), $u2
+    ) $subZip 1000 "UltimateSDUpscale 子模块"
+    $tmp = Join-Path $InstallDir "_bootstrap\node_ultimate_submodule"
+    Expand-Zip $subZip $tmp
+    $subRoot = Get-ZipTop $tmp
+    $subDest = Join-Path $InstallDir "ComfyUI\custom_nodes\ComfyUI_UltimateSDUpscale\repositories\ultimate_sd_upscale"
+    if (Test-Path $subDest) { Remove-Item $subDest -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $subDest) | Out-Null
+    Move-Item $subRoot $subDest
+    Ok "UltimateSDUpscale 子模块已安装"
+
+    Say "  安装 AlekPet（包含 Argos 翻译节点）..."
+    $u3 = "https://github.com/AlekPet/ComfyUI_Custom_Nodes_AlekPet/archive/" + $NodeAlekPet + ".zip"
+    Install-NodeZip "ComfyUI_Custom_Nodes_AlekPet" @(
+        ("https://gh-proxy.com/" + $u3), $u3
+    )
+}
+
+function Ensure-ComfyUI {
+    $py = Join-Path $InstallDir "python_embeded\python.exe"
+    $main = Join-Path $InstallDir "ComfyUI\main.py"
+    if ((Test-Path $py) -and (Test-Path $main)) {
+        Ok "检测到已有 ComfyUI，保留现有安装"
+        if ($CommercialClean) {
+            $script:SkipComfyUI = $true
+            Warn "商业清洁模式：不自动更新用户现有的 ComfyUI"
+        }
+        return
+    }
+    if ($SkipComfyUI) {
+        Fail ("未检测到 ComfyUI：" + $InstallDir + "。`n" +
+              "商业安装器不会自动下载 ComfyUI；请先安装 ComfyUI，或去掉 -SkipComfyUI，`n" +
+              "或用 -ComfyUIDir 指向已有安装目录。")
+    }
+    if ($CommercialClean -and -not $Yes) {
+        $ans = Read-Host "  未检测到 ComfyUI。是否下载官方 ComfyUI 便携版？[Y/n]"
+        if ($ans -match '^[nN]') {
+            Fail ("已按你的选择不安装 ComfyUI。请先自行安装 ComfyUI，或重新运行并选择下载。")
+        }
+    }
+    if (Test-Path $InstallDir) {
+        $items = Get-ChildItem $InstallDir -Force |
+            Where-Object { $_.Name -notin @("_downloads", "_bootstrap") }
+        if ($items.Count -gt 0) {
+            Fail ("安装目录不是空的，而且不像 ComfyUI 安装：" + $InstallDir)
+        }
+    }
+    New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+    $archive = Join-Path $InstallDir "_downloads\ComfyUI_portable.7z"
+    Download-File @($ComfyProxy, $ComfyAsset) $archive 1500000000 "ComfyUI 便携版（约 2GB）"
+    if ((Get-Item $archive).Length -ne $ComfySize) {
+        Warn ("ComfyUI 包大小和预期不同：" + (Get-Item $archive).Length + " / " + $ComfySize)
+    }
+    Say "  校验 7z 压缩包..."
+    & $SevenZip t $archive | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Remove-Item $archive -Force
+        Fail "ComfyUI 压缩包损坏，已删除；请重新运行安装器。"
+    }
+    $stage = Join-Path $InstallDir "_bootstrap\comfy_extract"
+    Expand-7z $archive $stage
+    $pyItem = Get-ChildItem $stage -Recurse -Filter python.exe |
+        Where-Object { $_.FullName -match 'python_embeded\\python\.exe$' } |
+        Select-Object -First 1
+    if (-not $pyItem) { Fail "解压后找不到 python_embeded\python.exe" }
+    $portableRoot = Split-Path (Split-Path $pyItem.FullName -Parent) -Parent
+    if (-not (Test-Path (Join-Path $portableRoot "ComfyUI\main.py"))) {
+        Fail "解压后的目录结构不认识：找不到 ComfyUI\main.py"
+    }
+    Say "  移动到安装目录..."
+    Get-ChildItem $portableRoot -Force | ForEach-Object {
+        $dest = Join-Path $InstallDir $_.Name
+        if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+        Move-Item $_.FullName $dest
+    }
+    Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
+    $script:ComfyWasFresh = $true
+    Ok "ComfyUI 便携版已解压"
+}
+
+function Verify-ComfyUI {
+    $py = Join-Path $InstallDir "python_embeded\python.exe"
+    $comfy = Join-Path $InstallDir "ComfyUI"
+    try {
+        $ver = (& $py -c "import sys; sys.path.insert(0, r'$comfy'); import comfyui_version; print(comfyui_version.__version__)" 2>$null | Select-Object -First 1)
+        if ($ver) { $ver = $ver.Trim() }
+        if ($ver -eq $ComfyVersion) {
+            Ok ("ComfyUI 版本锁定: " + $ComfyVersion)
+        } else {
+            Warn ("ComfyUI 版本不是锁定值：当前 " + $ver + " / 锁定 " + $ComfyVersion)
+            Warn "安装器不会自动升级；如需升级请显式加 -AllowUpdates"
+        }
+    } catch {
+        Warn "无法读取 ComfyUI 版本；保持现有安装"
+    }
+}
+
+function Update-ComfyUI($fresh) {
+    $py = Join-Path $InstallDir "python_embeded\python.exe"
+    $comfy = Join-Path $InstallDir "ComfyUI"
+    $zip = Join-Path $InstallDir "_downloads\ComfyUI_master.zip"
+    Say "  下载最新 ComfyUI 源码（便携包自带版本较旧，Anima 需要新节点）..."
+    Download-File @(
+        "https://gh-proxy.com/https://github.com/Comfy-Org/ComfyUI/archive/refs/heads/master.zip",
+        "https://github.com/Comfy-Org/ComfyUI/archive/refs/heads/master.zip"
+    ) $zip 1000000 "最新 ComfyUI 源码"
+    $tmp = Join-Path $InstallDir "_bootstrap\comfy_master"
+    Expand-Zip $zip $tmp
+    $src = Get-ZipTop $tmp
+    if ($fresh) {
+        if (Test-Path $comfy) { Remove-Item $comfy -Recurse -Force }
+        New-Item -ItemType Directory -Force -Path $comfy | Out-Null
+    }
+    Say "  合并最新 ComfyUI 代码（保留已有模型和插件）..."
+    Copy-Tree $src $comfy
+    foreach ($d in @("checkpoints", "diffusion_models", "text_encoders", "vae",
+                     "loras", "upscale_models", "clip", "unet", "clip_vision",
+                     "embeddings", "controlnet", "animatediff_models",
+                     "animatediff_motion_lora")) {
+        New-Item -ItemType Directory -Force -Path (Join-Path $comfy ("models\" + $d)) | Out-Null
+    }
+    New-Item -ItemType Directory -Force -Path (Join-Path $comfy "custom_nodes") | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $comfy "input") | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $comfy "output") | Out-Null
+    $req = Join-Path $comfy "requirements.txt"
+    if (Test-Path $req) {
+        Say "  安装 ComfyUI 最新依赖（可能需要几分钟）..."
+        $rc = Invoke-Pip $py @("-r", $req)
+        if ($rc -ne 0) {
+            Warn "ComfyUI 依赖安装没有完全成功；启动时可能还会自动补装。"
+        }
+    }
+    try {
+        $ver = & $py -c "import sys; sys.path.insert(0, r'$comfy'); import comfyui_version; print(comfyui_version.__version__)"
+        if ($LASTEXITCODE -eq 0) { Ok ("ComfyUI 版本: " + $ver) }
+    } catch { }
+    Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+function Install-Models {
+    if ($SkipModels) { Warn "已按参数跳过模型下载"; return }
+    $py = Join-Path $InstallDir "python_embeded\python.exe"
+    $script = Join-Path $InstallDir "installer\download_models.py"
+    $manifest = Join-Path $InstallDir "installer\models_manifest.json"
+    Say "  默认会下载 Anima 2B + 放大模型（约 6GB）。"
+    Say "  也可以稍后双击「模型下载.bat」补装。"
+    $pargs = @($script, "--root", $InstallDir, "--manifest", $manifest)
+    if ($ModelPacks) {
+        $pargs += @("--packs", $ModelPacks)
+    } elseif ($Yes) {
+        $m = Get-Content $Manifest -Raw -Encoding UTF8 | ConvertFrom-Json
+        $pargs += @("--packs", (($m.default_packs) -join ","))
+    }
+    & $py @pargs
+    if ($LASTEXITCODE -ne 0) {
+        Warn "模型下载没有全部完成；可以双击「模型下载.bat」断点续传。"
+    }
+}
+
+function Set-AdminPassword {
+    $py = Join-Path $InstallDir "python_embeded\python.exe"
+    $existing = Join-Path $InstallDir "users.json"
+    $pw = $env:MGS_ADMIN_PASSWORD
+    $preserve = $false
+    if ($pw) {
+        $preserve = $false
+    } elseif ((Test-Path $existing) -and $Upgrade) {
+        Say "  检测到已有账号，保留原管理员密码。"
+        $preserve = $true
+    } elseif ($Yes) {
+        $chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
+        $rnd = New-Object System.Random
+        $pw = -join (1..16 | ForEach-Object { $chars[$rnd.Next(0, $chars.Length)] })
+        Say ("  未提供密码，已生成随机管理员密码：" + $pw) "Yellow"
+        Say "  请现在记下来，登录后可以在「安全设置」里修改。" "Yellow"
+    } else {
+        while ($true) {
+            $s1 = Read-Host "  设置管理员密码（至少 8 位）" -AsSecureString
+            $b1 = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($s1)
+            try { $pw = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($b1) }
+            finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($b1) }
+            if ($pw.Length -lt 8) { Warn "密码太短，至少 8 位"; continue }
+            $s2 = Read-Host "  再输一次" -AsSecureString
+            $b2 = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($s2)
+            try { $pw2 = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($b2) }
+            finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($b2) }
+            if ($pw -ne $pw2) { Warn "两次输入不一致"; continue }
+            break
+        }
+    }
+    if ($preserve) {
+        & $py (Join-Path $InstallDir "installer\bootstrap.py") --root $InstallDir --no-cert
+        return
+    }
+    $env:MGS_ADMIN_PASSWORD = $pw
+    try {
+        & $py (Join-Path $InstallDir "installer\bootstrap.py") --root $InstallDir
+        if ($LASTEXITCODE -ne 0) { Fail "初始化管理员/证书失败" }
+    } finally {
+        Remove-Item Env:MGS_ADMIN_PASSWORD -ErrorAction SilentlyContinue
+    }
+}
+
+function Add-FirewallRule {
+    if (Test-Admin) {
+        & netsh advfirewall firewall delete rule name="ComfyUI Mobile Studio 8800" | Out-Null
+        & netsh advfirewall firewall add rule name="ComfyUI Mobile Studio 8800" dir=in action=allow protocol=TCP localport=8800 profile=any | Out-Null
+        if ($LASTEXITCODE -eq 0) { Ok "已放行 TCP 8800（手机访问）" }
+        else { Warn "防火墙规则添加失败，可运行「修复手机访问.bat」" }
+    } else {
+        Warn "当前不是管理员，未自动添加防火墙规则。若手机打不开，右键「修复手机访问.bat」以管理员运行。"
+    }
+}
+
+function Create-Shortcut {
+    try {
+        $desktop = [Environment]::GetFolderPath("Desktop")
+        $ws = New-Object -ComObject WScript.Shell
+        $lnk = $ws.CreateShortcut((Join-Path $desktop "手机出图.lnk"))
+        $lnk.TargetPath = (Join-Path $InstallDir "一键启动.bat")
+        $lnk.WorkingDirectory = $InstallDir
+        $icon = Join-Path $InstallDir "comfyui.ico"
+        if (Test-Path $icon) { $lnk.IconLocation = $icon }
+        $lnk.Save()
+        Ok "桌面快捷方式：手机出图"
+    } catch { Warn ("创建桌面快捷方式失败：" + $_.Exception.Message) }
+}
+
+function Write-Report {
+    $lines = @()
+    $lines += "ComfyUI Mobile Studio 安装报告"
+    $lines += ("时间: " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+    $lines += ("安装目录: " + $InstallDir)
+    $lines += ("GPU: " + $GpuText)
+    $lines += ("版本锁: ComfyUI " + $ComfyVersion)
+    $lines += ("模型包: " + $(if ($SkipModels) { "跳过" } elseif ($ModelPacks) { $ModelPacks } else { "交互选择/默认" }))
+    $lines += ("中文翻译组件: " + $(if ($NoTranslate) { "跳过（用户自行准备英文提示词）" } else { "已安装" }))
+    $lines += ("自定义节点: " + $(if ($NoCustomNodes) { "跳过" } else { "已安装" }))
+    $lines += ("ComfyUI 来源: " + $(if ($SkipComfyUI) { "用户现有安装，未自动更新" } else { "安装器下载/更新" }))
+    $lines += ("商业清洁模式: " + $(if ($CommercialClean) { "是" } else { "否" }))
+    $lines += ("管理员账号: admin")
+    $lines += ("本机地址: https://127.0.0.1:8800")
+    $lines += ("手机地址: https://192.168.137.1:8800（连接电脑热点后）")
+    $lines += "注意：本报告不包含密码。"
+    Set-Content -Path (Join-Path $InstallDir "install_report.txt") -Value $lines -Encoding utf8
+}
+
+# ------------------------------------------------------------------ main
+try {
+    Start-Transcript -Path $LogFile -Force | Out-Null
+} catch { }
+
+try {
+    Step "1" "环境检测"
+    if (-not [Environment]::Is64BitOperatingSystem) { Fail "只支持 64 位 Windows。" }
+    $osv = [Environment]::OSVersion.Version
+    if ($osv.Major -lt 10) { Fail "需要 Windows 10 或 Windows 11。" }
+    if (-not (Test-Path $Curl)) { Fail "找不到 Windows 自带的 curl.exe。" }
+    if (-not (Test-Path $SevenZip)) { Fail ("安装包缺少 7zr.exe：" + $SevenZip) }
+    $sevenHash = (Get-FileHash $SevenZip -Algorithm SHA256).Hash
+    if ($LockSevenZipHash -and $sevenHash -ne $LockSevenZipHash.ToUpper()) {
+        Fail "7zr.exe 校验失败，安装包可能被篡改或不完整。"
+    }
+    $gpus = Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue
+    $gpu = $gpus | Where-Object { $_.Name -match "NVIDIA" } | Select-Object -First 1
+    if (-not $gpu) { $gpu = $gpus | Select-Object -First 1 }
+    $GpuText = if ($gpu) { $gpu.Name } else { "未检测到显卡" }
+    Say ("  系统: Windows " + $osv.Major + "." + $osv.Minor + " 64-bit")
+    Say ("  显卡: " + $GpuText)
+    if (-not ($gpu -and $gpu.Name -match "NVIDIA")) {
+        Warn "没有检测到 NVIDIA 显卡；可以安装，但 CPU 出图会非常慢。"
+    }
+    if (-not $InstallDir) {
+        if (Test-Path "D:\") { $InstallDir = "D:\AI\ComfyUI_windows_portable" }
+        else { $InstallDir = Join-Path $env:LOCALAPPDATA "ComfyUI_windows_portable" }
+        if (-not $Yes) {
+            $typed = Read-Host ("  安装目录 [" + $InstallDir + "]")
+            if ($typed) { $InstallDir = $typed }
+        }
+    }
+    $InstallDir = [IO.Path]::GetFullPath($InstallDir)
+    $Upgrade = $false
+    if ((Test-Path (Join-Path $InstallDir "ComfyUI\main.py")) -and
+        (Test-Path (Join-Path $InstallDir "python_embeded\python.exe"))) {
+        $Upgrade = $true
+        Say ("  检测到已有安装：" + $InstallDir) "Yellow"
+        if (-not $Yes) {
+            $ans = Read-Host "  继续升级并保留模型/账号？[Y/n]"
+            if ($ans -match "^[nN]") { Say "已取消"; exit 0 }
+        }
+    } elseif (Test-Path $InstallDir) {
+        $items = Get-ChildItem $InstallDir -Force
+        if ($items.Count -gt 0) { Fail ("目录不是空的：" + $InstallDir) }
+    }
+    $drive = Split-Path -Qualifier $InstallDir
+    $freeGB = 0
+    try { $freeGB = [math]::Round((Get-PSDrive $drive.TrimEnd(":")).Free / 1GB, 1) } catch { }
+    if ($freeGB -gt 0 -and $freeGB -lt 20) {
+        Fail ("安装盘剩余空间不足（" + $freeGB + "GB），至少需要 20GB；默认模型约 6GB，安装过程还要临时空间。")
+    }
+    Say ("  安装目录: " + $InstallDir)
+    Say ("  可用空间: " + $freeGB + " GB")
+    $admin = Test-Admin
+    Say ("  管理员权限: " + $(if ($admin) { "是" } else { "否（防火墙规则需手动修复）" }))
+
+    Step "2" "网络与下载源检测"
+    $netComfy = Test-Url $ComfyProxy
+    $netHf = Test-Url ($HfMirror + "/circlestone-labs/Anima")
+    if ($netComfy) { Ok "ComfyUI 下载源可用（gh-proxy）" } else { Warn "gh-proxy 不可用，将尝试 GitHub 直连" }
+    if ($netHf) { Ok "模型镜像可用（hf-mirror）" } else { Warn "hf-mirror 不可用，将尝试 Hugging Face 直连" }
+    if ($DryRun) {
+        Say ""
+        Say ("  版本锁定: ComfyUI " + $ComfyTag + "；依赖/节点/模型 revision 已锁定") "Cyan"
+        if ($SkipModels) {
+            Say "  已跳过模型包检查（商业清洁模式）" "Cyan"
+        } else {
+            Say "  模型包 URL 检查：" "Cyan"
+            $m = Get-Content $Manifest -Raw -Encoding UTF8 | ConvertFrom-Json
+            foreach ($key in $m.packs.PSObject.Properties.Name) {
+                $pack = $m.packs.$key
+                $f = $pack.files | Select-Object -First 1
+                $rev = if ($f.revision) { $f.revision } else { "main" }
+                $u = $HfMirror + "/" + $f.repo + "/resolve/" + $rev + "/" + $f.path + "?download=true"
+                $ok = Test-Url $u
+                Say ("    " + $(if ($ok) { "OK  " } else { "FAIL" }) + " " + $key + "  " + $pack.label) $(if ($ok) { "Green" } else { "Red" })
+            }
+        }
+        if ($NoCustomNodes) {
+            Say "  已跳过自定义节点检查（商业清洁模式）" "Cyan"
+        } else {
+            $nodeOk = Test-Url "https://gh-proxy.com/https://github.com/AlekPet/ComfyUI_Custom_Nodes_AlekPet/archive/refs/heads/master.zip"
+            Say ("    " + $(if ($nodeOk) { "OK  " } else { "FAIL" }) + " 自定义节点 ZIP")
+        }
+        Say ""
+        Ok "DryRun 环境检测完成；没有下载或修改任何文件。"
+        try { Stop-Transcript | Out-Null } catch { }
+        exit 0
+    }
+
+    Step "3" "准备目录"
+    New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+    Ok "目录已准备"
+
+    Step "4" "获取 ComfyUI 便携版"
+    Ensure-ComfyUI
+    if ($SkipComfyUI) {
+        Warn "已跳过 ComfyUI 更新（使用用户现有安装）"
+    } elseif ($AllowUpdates) {
+        Warn "已启用 -AllowUpdates：可能脱离版本锁定"
+        Update-ComfyUI $ComfyWasFresh
+    } else {
+        Verify-ComfyUI
+    }
+
+    Step "5" "安装网页程序与 Python 依赖"
+    Copy-AppFiles
+    Install-PythonDeps
+    if (-not $NoTranslate) { Install-ArgosModel }
+
+    Step "6" "安装必要自定义节点"
+    Install-CustomNodes
+
+    Step "7" "下载模型（不随安装包分发）"
+    Install-Models
+
+    Step "8" "初始化账号、HTTPS 证书和自启动入口"
+    Set-AdminPassword
+    Add-FirewallRule
+    if (-not $NoShortcut) { Create-Shortcut }
+    Write-ModelBat
+    Write-FirewallBat
+    Write-Report
+
+    # 清理临时下载：模型已经放到 ComfyUI/models，保留 installer 供以后补模型
+    Remove-Item (Join-Path $InstallDir "_bootstrap") -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item (Join-Path $InstallDir "_downloads") -Recurse -Force -ErrorAction SilentlyContinue
+
+    Step "完成" "安装成功"
+    Say ""
+    Say ("  安装目录：" + $InstallDir)
+    Say ("  桌面快捷方式：手机出图")
+    Say ("  本机打开：https://127.0.0.1:8800")
+    Say ("  手机打开：https://192.168.137.1:8800（先连电脑热点）")
+    Say "  管理员账号：admin（密码是你刚才设置的）"
+    Say ""
+    Say "  下一步：双击桌面的「手机出图」，等待启动完成后用浏览器打开。" "Green"
+    Say ""
+    try { Stop-Transcript | Out-Null } catch { }
+    exit 0
+} catch {
+    Warn ("安装失败：" + $_.Exception.Message)
+    Say ("  日志：" + $LogFile) "Yellow"
+    try { Stop-Transcript | Out-Null } catch { }
+    exit 1
+}
