@@ -365,7 +365,7 @@ https://192.168.137.1:8800
 | 备份配置/图库元数据 | 双击 `备份数据.bat` |
 | 连图片/视频一起备份 | `python tools\backup.py --images` |
 | 恢复（先停服务） | 双击 `恢复数据.bat`，输入 ZIP 路径 |
-| 单元测试（147 项） | 双击 `运行测试.bat` |
+| 单元测试（152 项） | 双击 `运行测试.bat` |
 | 在线冒烟 | `set MGS_TEST_PASSWORD=...` 后运行 `python tests\run_tests.py` |
 | 无第二台机器的 worker 验收 | `python tests\worker_lan_sim.py` |
 

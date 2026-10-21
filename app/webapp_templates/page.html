@@ -30,6 +30,10 @@
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { background: var(--bg); }
+/* 触摸屏：避免双击缩放/点击延迟，所有可点控件按按钮处理 */
+button, .chip, .tab, .mode, .reload, .fchip, .ctl, .nav, .back {
+  touch-action: manipulation;
+}
 
 /* 深空背景：三团柔和光晕 */
 body::before {
@@ -181,12 +185,22 @@ input[type=range] { accent-color: var(--ac); }
 .viewer { position: fixed; inset: 0; background: rgba(6,7,11,.97);
   -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
   /* 要压过右上角 fixed 的语言/设置按钮（z=96），否则查看器的关闭键会被挡住 */
-  z-index: 97; display: none; flex-direction: column; }
+  z-index: 97; display: none; flex-direction: column;
+  overscroll-behavior: contain; }
 .viewer.on { display: flex; }
 .viewer .top { flex: 0 0 auto; display: flex; align-items: center;
-  justify-content: space-between; padding: 10px 14px; color: var(--tx2); font-size: 14px; }
+  justify-content: space-between; gap: 8px;
+  padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+  color: var(--tx2); font-size: 14px; }
+.viewer .top #vwIdx { flex: 1; text-align: center; }
 .viewer .top button { background: none; border: 0; color: var(--tx2); font-size: 26px;
-  line-height: 1; cursor: pointer; padding: 0 8px; }
+  line-height: 1; cursor: pointer; padding: 0 8px; min-width: 44px;
+  min-height: 44px; border-radius: 10px; touch-action: manipulation; }
+.viewer .top .back {
+  font-size: 13px; font-weight: 600; padding: 0 12px;
+  border: 1px solid var(--gline); background: rgba(255,255,255,.055);
+  color: var(--tx); white-space: nowrap;
+}
 .viewer .stage { flex: 1; position: relative; display: flex; align-items: center;
   justify-content: center; overflow: hidden; touch-action: pan-y; }
 .viewer .stage img, .viewer .stage video {
@@ -198,16 +212,18 @@ input[type=range] { accent-color: var(--ac); }
   z-index: 2; /* 图片有入场动画会形成层叠上下文，导航必须显式压在图片上 */
   background: rgba(255,255,255,.09);
   -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
-  color: #fff; border: 1px solid var(--gline); width: 42px; height: 62px;
-  border-radius: 12px; font-size: 24px; cursor: pointer; }
+  color: #fff; border: 1px solid var(--gline); width: 48px; height: 72px;
+  border-radius: 12px; font-size: 24px; cursor: pointer;
+  touch-action: manipulation; }
 .viewer .nav.prev { left: 6px; }
 .viewer .nav.next { right: 6px; }
 .viewer .cap { flex: 0 0 auto; padding: 8px 16px 6px; color: var(--tx2);
   font-size: 12.5px; max-height: 22vh; overflow-y: auto; text-align: center;
   white-space: pre-wrap; word-break: break-word; }
 .viewer .acts { flex: 0 0 auto; display: flex; gap: 10px; flex-wrap: wrap;
-  justify-content: center; padding: 10px 14px 6px; }
+  justify-content: center; padding: 10px 14px calc(6px + env(safe-area-inset-bottom)); }
 .viewer .acts button { flex: 0 0 auto; padding: 10px 14px; font-size: 13px;
+  min-height: 44px; touch-action: manipulation;
   background: rgba(255,255,255,.07);
   -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
   color: var(--tx); border: 1px solid var(--gline); border-radius: 11px;
@@ -218,7 +234,7 @@ input[type=range] { accent-color: var(--ac); }
 .viewer .acts button.danger { color: var(--err);
   border-color: rgba(255,143,156,.3); background: rgba(255,90,110,.12); font-weight: 600; }
 .viewer .tip { flex: 0 0 auto; text-align: center; font-size: 11.5px;
-  color: #5f6773; padding: 4px 0 14px; }
+  color: #5f6773; padding: 4px 0 calc(14px + env(safe-area-inset-bottom)); }
 
 /* ---------- 吸底操作栏 ---------- */
 .actionbar {
@@ -318,18 +334,41 @@ button.go:disabled { background: rgba(255,255,255,.07); color: var(--tx3);
 /* ---------- 蒙版涂抹 ---------- */
 .maskui { position: fixed; inset: 0; background: rgba(6,7,11,.99);
   -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  overscroll-behavior: contain;
   /* 涂抹编辑器要盖住查看器和右上角按钮；关闭键不能被语言键拦截 */
   z-index: 98; display: none; flex-direction: column; }
 .maskui.on { display: flex; }
-.maskui .top { padding: 10px 14px; color: var(--tx2); font-size: 14px;
-  display: flex; justify-content: space-between; align-items: center; }
-.maskui .top button { background: none; border: 0; color: var(--tx2); font-size: 26px; cursor: pointer; }
+.maskui .top {
+  padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+  color: var(--tx2); font-size: 14px;
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+}
+.maskui .top > span { flex: 1; text-align: center; min-width: 0; }
+.maskui .top button {
+  background: none; border: 0; color: var(--tx2); font-size: 26px;
+  cursor: pointer; min-width: 44px; min-height: 44px; border-radius: 10px;
+  touch-action: manipulation;
+}
+.maskui .top .back {
+  font-size: 13px; font-weight: 600; padding: 0 12px;
+  border: 1px solid var(--gline); background: rgba(255,255,255,.055);
+  color: var(--tx); white-space: nowrap;
+}
 .maskui .wrap { flex: 1; position: relative; display: flex; align-items: center;
   justify-content: center; overflow: hidden; touch-action: none; }
 .maskui .wrap img, .maskui .wrap canvas { position: absolute; border-radius: 8px; }
-.maskui canvas { touch-action: none; }
-.maskui .bottom { flex: 0 0 auto; padding: 10px 14px 20px; }
+.maskui canvas {
+  touch-action: none;
+  /* 透明画布 + 半透明暗色底：原图仍然看得见，白色笔迹是蒙版 */
+  background: rgba(0,0,0,.45);
+}
+.maskui .bottom {
+  flex: 0 0 auto; padding: 10px 14px calc(16px + env(safe-area-inset-bottom));
+}
 .maskui .bottom .lbl { margin-bottom: 6px; }
+.maskui .bottom input[type=range] { width: 100%; min-height: 44px; }
+.maskui .bottom .row2 button { min-height: 50px; }
+.maskui .mk-status { padding: 0 14px; font-size: 12px; color: var(--tx3); }
 .maskui .row2 { margin-top: 10px; }
 
 /* ---------- 风格条 ---------- */
@@ -1329,7 +1368,7 @@ body.scrolled #langBtn, body.scrolled #profileTopBtn {
 /* 任务完工弹窗 */
 #donePop, #profilePop, #adminSetPop, #guestPop, #createUserPop,
 #systemSettingsPop, #systemResetPop, #workerJoinPop, #workerEditPop,
-#quotaPop {
+#quotaPop, #confirmPop {
   position: fixed; inset: 0; z-index: 100; display: none;
   align-items: center; justify-content: center; padding: 18px;
   background: rgba(4,7,13,.68);
@@ -1337,7 +1376,8 @@ body.scrolled #langBtn, body.scrolled #profileTopBtn {
 }
 #donePop.on, #profilePop.on, #adminSetPop.on, #guestPop.on,
 #createUserPop.on, #systemSettingsPop.on, #systemResetPop.on,
-#workerJoinPop.on, #workerEditPop.on, #quotaPop.on { display: flex; }
+#workerJoinPop.on, #workerEditPop.on, #quotaPop.on,
+#confirmPop.on { display: flex; }
 #teamPop {
   position: fixed; inset: 0; z-index: 100; display: none;
   align-items: center; justify-content: center; padding: 18px;
@@ -1417,6 +1457,44 @@ body.scrolled #langBtn, body.scrolled #profileTopBtn {
 }
 .dp-actions button.ghost { background: rgba(255,255,255,.045); color: var(--tx2);
   border-color: rgba(255,255,255,.09); }
+
+/* 高危操作二次确认：触摸友好，危险动作需勾选“无法恢复” */
+#confirmPop .dp-ico { background: linear-gradient(135deg,#ffb28f,#ff7b8a); }
+.confirm-card { width: min(430px, 100%); }
+.cf-body {
+  margin: 6px 2px 10px; color: var(--tx2);
+  font-size: 13px; line-height: 1.7; white-space: pre-line;
+  word-break: break-word;
+}
+.cf-ack {
+  display: none; align-items: flex-start; gap: 10px;
+  margin: 8px 2px 10px; padding: 11px 12px; border-radius: 11px;
+  border: 1px solid rgba(255,143,156,.28);
+  background: rgba(255,90,110,.08);
+  color: #ffd7dc; font-size: 12.5px; line-height: 1.5;
+  cursor: pointer; user-select: none;
+}
+.cf-ack.on { display: flex; }
+.cf-ack input {
+  width: 20px; height: 20px; margin: 0; flex: 0 0 auto;
+  accent-color: #ff7b8a;
+}
+.confirm-card .dp-actions button { min-height: 48px; font-size: 14px; }
+.confirm-card .dp-actions button.primary.danger {
+  color: #210a0f;
+  background: linear-gradient(135deg, #ffb08f, #ff6f83);
+  border-color: transparent;
+}
+@media (max-width: 560px) {
+  .confirm-card { max-height: 86vh; }
+  .confirm-card .dp-actions { gap: 10px; }
+  .confirm-card .dp-actions button { min-height: 52px; }
+  /* 管理端和弹窗里的危险/操作按钮也保证手指点得中 */
+  .au-side button, .model-actions button, .aw-side button,
+  .dp-actions button, .admin-batch button, .logbar .chip {
+    min-height: 44px;
+  }
+}
 /* 个人设置 */
 .pf-user {
   padding: 9px 11px; margin-bottom: 12px; border-radius: 11px;
@@ -1473,7 +1551,7 @@ body.scrolled #langBtn, body.scrolled #profileTopBtn {
   }
 }
 </style>
-<script src="/i18n.js?v=20261021g"></script>
+<script src="/i18n.js?v=20261021i"></script>
 </head>
 <body>
 <button id="langBtn" type="button" data-lang-toggle>EN</button>
@@ -2545,10 +2623,34 @@ body.scrolled #langBtn, body.scrolled #profileTopBtn {
   </div>
 </div>
 
+<div id="confirmPop" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="dp-card confirm-card">
+    <div class="dp-head">
+      <div class="dp-ico" id="cfIco">⚠</div>
+      <div style="min-width:0">
+        <div class="dp-title" id="cfTitle">确认操作</div>
+        <div class="dp-sub" id="cfSub"></div>
+      </div>
+      <button class="dp-close" id="cfClose" type="button" title="关闭窗口">×</button>
+    </div>
+    <div class="cf-body" id="cfBody"></div>
+    <label class="cf-ack" id="cfAckWrap">
+      <input type="checkbox" id="cfAck">
+      <span id="cfAckText">我确认无法恢复</span>
+    </label>
+    <div class="pf-status err" id="cfStatus"></div>
+    <div class="dp-actions">
+      <button id="cfCancel" class="ghost" type="button">取消</button>
+      <button id="cfOk" class="primary danger" type="button">确认执行</button>
+    </div>
+  </div>
+</div>
+
 <div class="viewer" id="viewer">
   <div class="top">
+    <button class="back" id="vwBack" type="button">← 返回</button>
     <span id="vwIdx">0 / 0</span>
-    <button id="vwClose">&times;</button>
+    <button id="vwClose" type="button" title="关闭">&times;</button>
   </div>
   <div class="stage" id="vwStage">
     <button class="nav prev" id="vwPrev">&lsaquo;</button>
@@ -2575,13 +2677,15 @@ body.scrolled #langBtn, body.scrolled #profileTopBtn {
 
 <div class="maskui" id="maskUI">
   <div class="top">
+    <button class="back" id="mkBack" type="button">← 返回</button>
     <span>涂抹要重画的区域</span>
-    <button id="mkClose">&times;</button>
+    <button id="mkClose" type="button" title="关闭">&times;</button>
   </div>
   <div class="wrap" id="mkWrap">
     <img id="mkImg" alt="">
     <canvas id="mkCanvas"></canvas>
   </div>
+  <div class="mk-status" id="mkStatus"></div>
   <div class="bottom">
     <div class="lbl">笔刷 <b id="brushVal">40</b> px</div>
     <input type="range" id="brush" min="10" max="140" step="2" value="40">
@@ -3493,7 +3597,13 @@ async function loadProfileSessions() {
   }
 }
 async function revokeProfileSession(sid) {
-  if (!window.confirm(uiT("退出这个设备？", "Sign this device out?"))) { return; }
+  const ok = await uiConfirm({
+    title: uiT("退出登录设备", "Sign out device"),
+    message: uiT("退出这个设备？该设备需要重新登录。",
+                 "Sign this device out? It will need to log in again."),
+    okText: uiT("退出设备", "Sign out")
+  });
+  if (!ok) { return; }
   try {
     const r = await fetch("/api/sessions", {
       method: "POST", credentials: "same-origin",
@@ -3509,8 +3619,13 @@ async function revokeProfileSession(sid) {
   }
 }
 async function revokeOtherSessions() {
-  if (!window.confirm(uiT("退出除当前设备外的所有登录？",
-                          "Sign out all other devices?"))) { return; }
+  const ok = await uiConfirm({
+    title: uiT("退出其他设备", "Sign out other devices"),
+    message: uiT("退出除当前设备外的所有登录？其他设备需要重新登录。",
+                 "Sign out all other devices? They will need to log in again."),
+    okText: uiT("全部退出", "Sign out all")
+  });
+  if (!ok) { return; }
   try {
     const r = await fetch("/api/sessions", {
       method: "POST", credentials: "same-origin",
@@ -5098,10 +5213,13 @@ async function loadTeamDetail(tid) {
   const delBtn = box.querySelector("[data-team-del]");
   if (delBtn) {
     delBtn.onclick = async function () {
-      if (!window.confirm(uiT("删除这个团队？图片仍保留在各自账号里。",
-                              "Delete this team? Images stay in each account."))) {
-        return;
-      }
+      const ok = await uiConfirm({
+        title: uiT("删除团队", "Delete team"),
+        message: uiT("删除这个团队？图片仍保留在各自账号里。",
+                     "Delete this team? Images stay in each account."),
+        okText: uiT("删除团队", "Delete team")
+      });
+      if (!ok) { return; }
       try {
         await teamPost({ action: "delete", id: delBtn.getAttribute("data-team-del") });
         teamData.selected = "";
@@ -5111,6 +5229,13 @@ async function loadTeamDetail(tid) {
   }
   box.querySelectorAll("[data-member-del]").forEach(function (btn) {
     btn.onclick = async function () {
+      const ok = await uiConfirm({
+        title: uiT("移除团队成员", "Remove team member"),
+        message: uiT("把这个成员移出团队？对方账号和图片不会删除。",
+                     "Remove this member from the team? Their account and images stay."),
+        okText: uiT("移除", "Remove")
+      });
+      if (!ok) { return; }
       try {
         await teamPost({ action: "remove_member", id: team.id,
                          uid: btn.getAttribute("data-member-del") });
@@ -5151,6 +5276,12 @@ async function loadTeamDetail(tid) {
   });
   box.querySelectorAll("[data-prompt-del]").forEach(function (btn) {
     btn.onclick = async function () {
+      const ok = await uiConfirm({
+        title: uiT("删除共享提示词", "Delete shared prompt"),
+        message: uiT("删除这条团队共享提示词？", "Delete this shared team prompt?"),
+        okText: uiT("删除", "Delete")
+      });
+      if (!ok) { return; }
       try {
         await teamPromptPost({ action: "delete", team: team.id,
                                id: btn.getAttribute("data-prompt-del") });
@@ -5291,7 +5422,9 @@ async function loadGallery(reset) {
     tick.className = "tick";
     tick.textContent = "✓";
     cell.appendChild(tick);
+    let suppressClick = false;
     cell.onclick = function () {
+      if (suppressClick) { suppressClick = false; return; }
       if (selecting) { toggleSel(cell, it.name); return; }
       openViewer(galItems.indexOf(it));
     };
@@ -5302,14 +5435,18 @@ async function loadGallery(reset) {
     };
     cell.addEventListener("touchstart", function () {
       cancelPress();
-      press = setTimeout(function () {
+      press = setTimeout(async function () {
         press = null;
         if (selecting) { return; }
+        suppressClick = true;
+        setTimeout(function () { suppressClick = false; }, 700);
         const label = (it.prompt || it.name).slice(0, 40);
-        if (confirm((MGI18N.isEnglish()
-          ? "Delete this image?\n\n" : "删除这张图片？\n\n") + label)) {
-          doDelete([it.name]);
-        }
+        const ok = await uiConfirm({
+          title: uiT("删除这张图片", "Delete this image"),
+          message: label + "\n\n" + uiT("删除后无法恢复。", "This cannot be undone."),
+          okText: uiT("删除", "Delete")
+        });
+        if (ok) { doDelete([it.name]); }
       }, 800);
     }, { passive: true });
     cell.addEventListener("touchmove", cancelPress, { passive: true });
@@ -5430,6 +5567,7 @@ function closeViewer() {
 document.getElementById("vwPrev").onclick = function (e) { e.stopPropagation(); stepViewer(-1); };
 document.getElementById("vwNext").onclick = function (e) { e.stopPropagation(); stepViewer(1); };
 document.getElementById("vwClose").onclick = closeViewer;
+document.getElementById("vwBack").onclick = closeViewer;
 document.getElementById("viewer").onclick = function (e) {
   if (e.target.id === "viewer" || e.target.id === "vwStage") { closeViewer(); }
 };
@@ -5448,13 +5586,107 @@ document.getElementById("viewer").onclick = function (e) {
     const dy = e.changedTouches[0].clientY - y0;
     x0 = null; y0 = null;
     if (vwZoom > 1) { return; }   // 放大状态下左右滑不切图
-    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) { stepViewer(dx < 0 ? 1 : -1); }
+    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) {
+      stepViewer(dx < 0 ? 1 : -1);
+      return;
+    }
+    // 单指下滑关闭大图（手机返回手势的补充）
+    if (dy > 90 && Math.abs(dy) > Math.abs(dx) * 1.2) {
+      closeViewer();
+    }
   }, { passive: true });
   document.addEventListener("keydown", function (e) {
     if (!document.getElementById("viewer").classList.contains("on")) { return; }
     if (e.key === "ArrowLeft") { stepViewer(-1); }
     if (e.key === "ArrowRight") { stepViewer(1); }
     if (e.key === "Escape") { closeViewer(); }
+  });
+})();
+
+/* ================= 高危操作二次确认 ================= */
+let cfResolve = null;
+let cfPrevFocus = null;
+
+function uiConfirm(opts) {
+  opts = opts || {};
+  if (cfResolve) { cfResolve(false); cfResolve = null; }
+  const pop = document.getElementById("confirmPop");
+  const title = document.getElementById("cfTitle");
+  const sub = document.getElementById("cfSub");
+  const body = document.getElementById("cfBody");
+  const ackWrap = document.getElementById("cfAckWrap");
+  const ack = document.getElementById("cfAck");
+  const ackText = document.getElementById("cfAckText");
+  const ok = document.getElementById("cfOk");
+  const cancel = document.getElementById("cfCancel");
+  const status = document.getElementById("cfStatus");
+  const needAck = !!opts.ack;
+  const danger = opts.danger !== false;
+  title.textContent = opts.title || uiT("确认操作", "Confirm action");
+  sub.textContent = opts.sub || "";
+  sub.style.display = opts.sub ? "" : "none";
+  body.textContent = opts.message || "";
+  body.style.display = opts.message ? "" : "none";
+  ackWrap.style.display = needAck ? "flex" : "none";
+  ackWrap.classList.toggle("on", needAck);
+  ack.checked = false;
+  ackText.textContent = typeof opts.ack === "string"
+    ? opts.ack : uiT("我确认无法恢复", "I understand this cannot be undone");
+  ok.textContent = opts.okText || uiT("确认执行", "Confirm");
+  cancel.textContent = opts.cancelText || uiT("取消", "Cancel");
+  ok.classList.add("primary");
+  ok.classList.toggle("danger", danger);
+  status.textContent = "";
+  cfPrevFocus = document.activeElement;
+  pop.classList.add("on");
+  pop.setAttribute("aria-hidden", "false");
+  setTimeout(function () { try { cancel.focus(); } catch (e) {} }, 30);
+  return new Promise(function (resolve) { cfResolve = resolve; });
+}
+
+function closeConfirm(result) {
+  const pop = document.getElementById("confirmPop");
+  if (!pop) { return; }
+  pop.classList.remove("on");
+  pop.setAttribute("aria-hidden", "true");
+  const r = cfResolve;
+  cfResolve = null;
+  try {
+    if (cfPrevFocus && document.contains(cfPrevFocus) &&
+        cfPrevFocus.offsetParent !== null) {
+      cfPrevFocus.focus();
+    }
+  } catch (e) {}
+  cfPrevFocus = null;
+  if (r) { r(!!result); }
+}
+
+function cfTryOk() {
+  const ackWrap = document.getElementById("cfAckWrap");
+  const ack = document.getElementById("cfAck");
+  if (ackWrap.classList.contains("on") && !ack.checked) {
+    document.getElementById("cfStatus").textContent = uiT(
+      "请先勾选上面的确认项。", "Please tick the confirmation box first.");
+    return;
+  }
+  closeConfirm(true);
+}
+
+(function wireConfirm() {
+  const pop = document.getElementById("confirmPop");
+  if (!pop) { return; }
+  document.getElementById("cfOk").onclick = cfTryOk;
+  document.getElementById("cfCancel").onclick = function () { closeConfirm(false); };
+  document.getElementById("cfClose").onclick = function () { closeConfirm(false); };
+  document.getElementById("cfAck").onchange = function () {
+    document.getElementById("cfStatus").textContent = "";
+  };
+  pop.addEventListener("click", function (e) {
+    if (e.target === pop) { closeConfirm(false); }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (!pop.classList.contains("on")) { return; }
+    if (e.key === "Escape") { e.preventDefault(); closeConfirm(false); }
   });
 })();
 
@@ -5555,48 +5787,116 @@ document.getElementById("aSave").onclick = function () {
 
 document.getElementById("aDel").onclick = async function () {
   const it = curItem(); if (!it) { return; }
-  if (!confirm(MGI18N.isEnglish()
-    ? "Delete this image? This cannot be undone."
-    : "确定删除这张图片？删了就找不回来了。")) { return; }
+  const ok = await uiConfirm({
+    title: uiT("删除这张图片", "Delete this image"),
+    message: (it.prompt || it.name).slice(0, 80) +
+      "\n\n" + uiT("删除后无法恢复。", "This cannot be undone."),
+    okText: uiT("删除", "Delete")
+  });
+  if (!ok) { return; }
   closeViewer();
   doDelete([it.name]);
 };
 
 /* ================= 局部重绘 ================= */
 let mkName = null, mkCtx = null, mkSize = { w: 0, h: 0 }, mkDrawing = false;
+let mkReturnIndex = -1;
+
+function mkStatus(text, err) {
+  const el = document.getElementById("mkStatus");
+  if (!el) { return; }
+  el.textContent = text || "";
+  el.style.color = err ? "#ff8f9c" : "var(--tx3)";
+}
 
 document.getElementById("aMask").onclick = function () {
   const it = curItem(); if (!it) { return; }
   mkName = it.name;
+  mkReturnIndex = vwIndex;
   closeViewer();
   openMask(it.name);
 };
+
+function closeMask(returnToViewer) {
+  const ui = document.getElementById("maskUI");
+  ui.classList.remove("on");
+  mkCtx = null;
+  mkDrawing = false;
+  document.body.style.overflow = "";
+  const idx = mkReturnIndex;
+  mkReturnIndex = -1;
+  if (returnToViewer && idx >= 0 && galItems.length) {
+    openViewer(idx);
+  }
+}
 
 function openMask(name) {
   const ui = document.getElementById("maskUI");
   const img = document.getElementById("mkImg");
   const cv = document.getElementById("mkCanvas");
+  mkCtx = null;
+  mkDrawing = false;
+  mkSize = { w: 0, h: 0 };
+  img.onload = null;
+  img.onerror = null;
+  try { img.removeAttribute("src"); } catch (e) {}
+  img.style.display = "none";
+  cv.width = 1; cv.height = 1;
+  cv.style.display = "none";
   ui.classList.add("on");
-  img.onload = function () {
+  document.body.style.overflow = "hidden";
+  mkStatus(uiT("正在加载原图…", "Loading image…"), false);
+
+  const layout = function (tries) {
+    tries = tries || 0;
     const wrap = document.getElementById("mkWrap");
-    const maxW = wrap.clientWidth * 0.96;
-    const maxH = wrap.clientHeight * 0.96;
-    let w = img.naturalWidth, h = img.naturalHeight;
-    const r = Math.min(maxW / w, maxH / h);
-    w = Math.round(w * r); h = Math.round(h * r);
-    img.style.width = w + "px"; img.style.height = h + "px";
-    img.style.left = ((wrap.clientWidth - w) / 2) + "px";
-    img.style.top = ((wrap.clientHeight - h) / 2) + "px";
-    cv.width = w; cv.height = h;
-    cv.style.width = w + "px"; cv.style.height = h + "px";
-    cv.style.left = img.style.left; cv.style.top = img.style.top;
-    mkSize = { w: w, h: h };
+    const ww = wrap.clientWidth, wh = wrap.clientHeight;
+    if ((!ww || !wh) && tries < 8) {
+      setTimeout(function () { layout(tries + 1); }, 60);
+      return;
+    }
+    const nw = img.naturalWidth, nh = img.naturalHeight;
+    if (!nw || !nh) {
+      mkStatus(uiT("原图尺寸异常，请返回后重试。",
+                   "The image size is invalid. Go back and try again."), true);
+      return;
+    }
+    const maxW = Math.max(80, ww * 0.96);
+    const maxH = Math.max(80, wh * 0.96);
+    const r = Math.min(maxW / nw, maxH / nh);
+    const dw = Math.max(1, Math.round(nw * r));
+    const dh = Math.max(1, Math.round(nh * r));
+    img.style.width = dw + "px";
+    img.style.height = dh + "px";
+    img.style.left = Math.round((ww - dw) / 2) + "px";
+    img.style.top = Math.round((wh - dh) / 2) + "px";
+    img.style.display = "block";
+    // 画布用原图分辨率，导出蒙版才能和原图逐像素对齐；
+    // CSS 只负责显示大小。透明画布让原图透出来，白色笔迹才是蒙版。
+    cv.width = nw;
+    cv.height = nh;
+    cv.style.width = dw + "px";
+    cv.style.height = dh + "px";
+    cv.style.left = img.style.left;
+    cv.style.top = img.style.top;
+    cv.style.display = "block";
+    mkSize = { w: nw, h: nh };
     mkCtx = cv.getContext("2d");
-    mkCtx.fillStyle = "#000";
-    mkCtx.fillRect(0, 0, w, h);
+    mkCtx.clearRect(0, 0, nw, nh);
     mkCtx.strokeStyle = "#fff";
     mkCtx.lineCap = "round";
     mkCtx.lineJoin = "round";
+    mkStatus(uiT("用白色涂抹要重画的区域",
+                 "Paint the area to repaint in white"), false);
+  };
+
+  img.onload = function () {
+    requestAnimationFrame(function () { layout(0); });
+  };
+  img.onerror = function () {
+    mkCtx = null;
+    mkStatus(uiT("原图加载失败，请返回后重试。",
+                 "Could not load the image. Go back and try again."), true);
   };
   img.src = "/img/" + encodeURIComponent(name) + "?t=" + Date.now();
 }
@@ -5605,14 +5905,18 @@ function maskPos(e) {
   const cv = document.getElementById("mkCanvas");
   const rect = cv.getBoundingClientRect();
   const t = e.touches ? e.touches[0] : e;
-  return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+  const sx = cv.width / Math.max(1, rect.width);
+  const sy = cv.height / Math.max(1, rect.height);
+  return { x: (t.clientX - rect.left) * sx, y: (t.clientY - rect.top) * sy };
 }
 function maskStart(e) {
   if (!mkCtx) { return; }
   e.preventDefault();
   mkDrawing = true;
   const p = maskPos(e);
-  mkCtx.lineWidth = parseInt(document.getElementById("brush").value, 10);
+  const rect = document.getElementById("mkCanvas").getBoundingClientRect();
+  const brush = parseInt(document.getElementById("brush").value, 10);
+  mkCtx.lineWidth = Math.max(1, brush * mkSize.w / Math.max(1, rect.width));
   mkCtx.beginPath();
   mkCtx.moveTo(p.x, p.y);
   mkCtx.lineTo(p.x + 0.1, p.y + 0.1);
@@ -5632,32 +5936,41 @@ function maskEnd() { mkDrawing = false; }
   cv.addEventListener("touchstart", maskStart, { passive: false });
   cv.addEventListener("touchmove", maskMove, { passive: false });
   cv.addEventListener("touchend", maskEnd);
+  cv.addEventListener("touchcancel", maskEnd);
   cv.addEventListener("mousedown", maskStart);
   cv.addEventListener("mousemove", maskMove);
   cv.addEventListener("mouseup", maskEnd);
+  cv.addEventListener("mouseleave", maskEnd);
   document.getElementById("brush").oninput = function () {
     document.getElementById("brushVal").textContent = this.value;
   };
 })();
 
-document.getElementById("mkClose").onclick = function () {
-  document.getElementById("maskUI").classList.remove("on");
-};
+document.getElementById("mkBack").onclick = function () { closeMask(true); };
+document.getElementById("mkClose").onclick = function () { closeMask(true); };
 document.getElementById("mkClear").onclick = function () {
   if (!mkCtx) { return; }
-  mkCtx.fillStyle = "#000";
-  mkCtx.fillRect(0, 0, mkSize.w, mkSize.h);
+  mkCtx.clearRect(0, 0, mkSize.w, mkSize.h);
 };
 document.getElementById("mkGo").onclick = async function () {
-  if (!mkCtx || !mkName) { return; }
+  if (!mkCtx || !mkName || !mkSize.w) { return; }
   const prompt = document.getElementById("p").value.trim();
   if (!prompt) {
-    document.getElementById("maskUI").classList.remove("on");
+    closeMask(false);
     show("先在出图页写上「想画成什么」，再回来涂抹重绘", "err");
     return;
   }
-  const maskUrl = document.getElementById("mkCanvas").toDataURL("image/png");
-  document.getElementById("maskUI").classList.remove("on");
+  // 导出为标准黑白蒙版：黑=保留，白=重画
+  const src = document.getElementById("mkCanvas");
+  const mcv = document.createElement("canvas");
+  mcv.width = mkSize.w;
+  mcv.height = mkSize.h;
+  const mctx = mcv.getContext("2d");
+  mctx.fillStyle = "#000";
+  mctx.fillRect(0, 0, mkSize.w, mkSize.h);
+  mctx.drawImage(src, 0, 0);
+  const maskUrl = mcv.toDataURL("image/png");
+  closeMask(false);
 
   // 原图转 data URL
   let origUrl;
@@ -6358,11 +6671,14 @@ document.getElementById("plgRefresh").onclick = function () { loadPlugins(true);
 document.getElementById("plgTemplate").onclick = plgDownloadTemplate;
 document.getElementById("plgImport").onclick = plgImportPackFile;
 document.getElementById("plgSubmit").onclick = plgSubmitZip;
-document.getElementById("plgDisableAll").onclick = function () {
-  if (!confirm(plgT("禁用全部由插件中心管理的第三方插件？需要重启 ComfyUI 才生效。",
-                    "Disable all plugin-center managed third-party plugins? A ComfyUI restart is required."))) {
-    return;
-  }
+document.getElementById("plgDisableAll").onclick = async function () {
+  const ok = await uiConfirm({
+    title: plgT("禁用全部第三方插件", "Disable all third-party plugins"),
+    message: plgT("禁用全部由插件中心管理的第三方插件？需要重启 ComfyUI 才生效。",
+                  "Disable all plugin-center managed third-party plugins? A ComfyUI restart is required."),
+    okText: plgT("全部禁用", "Disable all")
+  });
+  if (!ok) { return; }
   plgAdminAction("disable_all");
 };
 document.getElementById("plgClearRestart").onclick = function () {
@@ -6381,15 +6697,23 @@ document.getElementById("view-plugins").addEventListener("click", async function
   const nodeAct = t.getAttribute("data-plg-node");
   if (nodeAct) {
     const name = t.getAttribute("data-name") || "";
-    if (nodeAct === "remove" &&
-        !confirm(plgT("移除插件 " + name + "？会移到回收站。",
-                      "Remove " + name + "? It will be moved to the recycle bin."))) {
-      return;
+    if (nodeAct === "remove") {
+      const ok = await uiConfirm({
+        title: plgT("移除插件", "Remove plugin"),
+        message: plgT("移除插件 " + name + "？会移到回收站。",
+                      "Remove " + name + "? It will be moved to the recycle bin."),
+        okText: plgT("移除", "Remove")
+      });
+      if (!ok) { return; }
     }
-    if (nodeAct === "rollback" &&
-        !confirm(plgT("回滚 " + name + " 到上一个备份？需要重启 ComfyUI。",
-                      "Roll back " + name + " to the last backup? A ComfyUI restart is required."))) {
-      return;
+    if (nodeAct === "rollback") {
+      const ok = await uiConfirm({
+        title: plgT("回滚插件", "Roll back plugin"),
+        message: plgT("回滚 " + name + " 到上一个备份？需要重启 ComfyUI。",
+                      "Roll back " + name + " to the last backup? A ComfyUI restart is required."),
+        okText: plgT("回滚", "Roll back")
+      });
+      if (!ok) { return; }
     }
     plgAdminAction(nodeAct, { name: name });
     return;
@@ -6419,13 +6743,22 @@ document.getElementById("view-plugins").addEventListener("click", async function
       let force = false;
       let replace = false;
       if (risk === "high") {
-        force = confirm(plgT("静态扫描发现高风险调用。确认你已审查代码并强制批准？",
-                             "Static scan found high-risk calls. Confirm you reviewed the code and force-approve?"));
+        force = await uiConfirm({
+          title: plgT("高风险插件", "High-risk plugin"),
+          message: plgT("静态扫描发现高风险调用。确认你已审查代码并强制批准？",
+                        "Static scan found high-risk calls. Confirm you reviewed the code and force-approve?"),
+          ack: plgT("我已经审查过这段代码", "I have reviewed this code"),
+          okText: plgT("强制批准", "Force approve")
+        });
         if (!force) { return; }
       }
       if (exists) {
-        replace = confirm(plgT("custom_nodes 里已有同名插件。覆盖并备份旧版本？",
-                               "A plugin with this name already exists. Replace it and back up the old version?"));
+        replace = await uiConfirm({
+          title: plgT("覆盖同名插件", "Replace existing plugin"),
+          message: plgT("custom_nodes 里已有同名插件。覆盖并备份旧版本？",
+                        "A plugin with this name already exists. Replace it and back up the old version?"),
+          okText: plgT("覆盖并批准", "Replace and approve")
+        });
         if (!replace) { return; }
       }
       plgAdminAction("approve", { id: sid, force: force, replace: replace });
@@ -6446,7 +6779,13 @@ document.getElementById("view-plugins").addEventListener("click", async function
   }
   const del = t.getAttribute("data-plg-del");
   if (del) {
-    if (!confirm(plgT("删除这个插件包？", "Delete this plugin pack?"))) { return; }
+    const ok = await uiConfirm({
+      title: plgT("删除插件包", "Delete plugin pack"),
+      message: plgT("删除这个插件包？", "Delete this plugin pack?"),
+      ack: plgT("我确认删除这个插件包", "I understand this pack will be deleted"),
+      okText: plgT("删除", "Delete")
+    });
+    if (!ok) { return; }
     try {
       await plgPost({ action: "delete_pack", id: del });
       await loadPlugins(true);
@@ -6458,7 +6797,13 @@ document.getElementById("view-plugins").addEventListener("click", async function
   }
   const delAny = t.getAttribute("data-plg-del-any");
   if (delAny) {
-    if (!confirm(plgT("删除这个账号的插件包？", "Delete this account's pack?"))) { return; }
+    const ok = await uiConfirm({
+      title: plgT("删除账号插件包", "Delete account pack"),
+      message: plgT("删除这个账号的插件包？", "Delete this account's pack?"),
+      ack: plgT("我确认删除这个插件包", "I understand this pack will be deleted"),
+      okText: plgT("删除", "Delete")
+    });
+    if (!ok) { return; }
     plgAdminAction("delete_pack", {
       id: delAny, owner: t.getAttribute("data-owner") || ""
     });
@@ -6945,9 +7290,14 @@ async function adminSaveCleanup() {
   }
 }
 async function adminRunCleanup() {
-  if (!confirm(adminT(
-    "现在按当前设置清理旧文件？收藏的图片不会被删除，清理后无法恢复。",
-    "Run cleanup with current settings now? Favorites are kept; deleted files cannot be restored."))) {
+  const ok = await uiConfirm({
+    title: adminT("清理旧文件", "Clean up old files"),
+    message: adminT("现在按当前设置清理旧文件？收藏的图片不会被删除，清理后无法恢复。",
+                    "Run cleanup with current settings now? Favorites are kept; deleted files cannot be restored."),
+    ack: adminT("我确认清理后无法恢复", "I understand deleted files cannot be restored"),
+    okText: adminT("开始清理", "Run cleanup")
+  });
+  if (!ok) {
     return;
   }
   adminCleanupStatus(adminT("正在清理…", "Cleaning…"), false);
@@ -7093,10 +7443,13 @@ async function adminModelPost(body, okText) {
   return j;
 }
 async function adminDeleteModel(category, name) {
-  if (!confirm(adminT("把「" + name + "」移到模型回收站？7 天内可以恢复。",
-    "Move \"" + name + "\" to the model trash? Restorable for 7 days."))) {
-    return;
-  }
+  const ok = await uiConfirm({
+    title: adminT("移到模型回收站", "Move model to trash"),
+    message: adminT("把「" + name + "」移到模型回收站？7 天内可以恢复。",
+                    "Move \"" + name + "\" to the model trash? Restorable for 7 days."),
+    okText: adminT("移到回收站", "Move to trash")
+  });
+  if (!ok) { return; }
   try {
     await adminModelPost({ action: "delete", category: category, name: name },
       adminT("已移到回收站：" + name, "Moved to trash: " + name));
@@ -7109,16 +7462,29 @@ async function adminRestoreModel(id) {
   } catch (e) { adminModelStatus(adminErrText(e), true); }
 }
 async function adminPurgeModel(id) {
-  if (!confirm(adminT("彻底删除这个模型？无法恢复。",
-    "Permanently delete this model? This cannot be undone."))) { return; }
+  const ok = await uiConfirm({
+    title: adminT("彻底删除模型", "Delete model forever"),
+    message: adminT("这个模型会被永久删除，无法恢复。",
+                    "This model will be permanently deleted and cannot be restored."),
+    ack: adminT("我确认永久删除这个模型", "I understand this model cannot be restored"),
+    okText: adminT("彻底删除", "Delete forever")
+  });
+  if (!ok) { return; }
   try {
     await adminModelPost({ action: "purge", id: id },
       adminT("已彻底删除", "Deleted permanently"));
   } catch (e) { adminModelStatus(adminErrText(e), true); }
 }
 async function adminEmptyTrash() {
-  if (!confirm(adminT("清空模型回收站？所有已删除模型将被永久删除。",
-    "Empty the model trash? All deleted models will be removed forever."))) {
+  const ok = await uiConfirm({
+    title: adminT("清空模型回收站", "Empty model trash"),
+    message: adminT("所有已删除模型将被永久删除，无法恢复。",
+                    "All deleted models will be removed forever and cannot be restored."),
+    ack: adminT("我确认永久删除回收站里的所有模型",
+                "I understand every model in the trash will be deleted"),
+    okText: adminT("清空回收站", "Empty trash")
+  });
+  if (!ok) {
     return;
   }
   try {
@@ -7306,8 +7672,13 @@ async function adminCreateSnapshot() {
 }
 async function adminRollbackSnapshot(name) {
   if (!name) { return; }
-  if (!confirm(adminT("回滚到 " + name + "？当前状态会先自动备份，正在跑的任务会停止。",
-    "Roll back to " + name + "? Current state is backed up first and running jobs stop."))) { return; }
+  const ok = await uiConfirm({
+    title: adminT("回滚还原点", "Roll back restore point"),
+    message: adminT("回滚到 " + name + "？当前状态会先自动备份，正在跑的任务会停止。",
+                    "Roll back to " + name + "? Current state is backed up first and running jobs stop."),
+    okText: adminT("回滚", "Roll back")
+  });
+  if (!ok) { return; }
   const st = document.getElementById("adminSystemStatus");
   if (st) { st.className = "pf-status"; st.textContent = adminT("正在回滚…", "Rolling back…"); }
   try {
@@ -7763,13 +8134,19 @@ function adminRenderUsers() {
     };
   });
   box.querySelectorAll("[data-admin-toggle]").forEach(function (btn) {
-    btn.onclick = function () {
+    btn.onclick = async function () {
       const uid = btn.dataset.adminToggle;
       const u = adminUsersAll.find(function (x) { return x.id === uid; });
       if (!u) { return; }
       const next = u.enabled === false;
-      if (!next && !confirm(uiT("禁用账号「" + u.username + "」？", "Disable account \"" + u.username + "\"?"))) {
-        return;
+      if (!next) {
+        const ok = await uiConfirm({
+          title: uiT("禁用账号", "Disable account"),
+          message: uiT("禁用「" + u.username + "」后，该账号会立即退出登录，正在运行的任务会停止。",
+                       "Disabling \"" + u.username + "\" signs it out and stops its running jobs."),
+          okText: uiT("禁用", "Disable")
+        });
+        if (!ok) { return; }
       }
       fetch("/api/users", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -8004,10 +8381,15 @@ function adminRenderNodes(data) {
     btn.onclick = function () { adminNodeCheck(btn.getAttribute("data-node-check")); };
   });
   box.querySelectorAll("[data-node-del]").forEach(function (btn) {
-    btn.onclick = function () {
+    btn.onclick = async function () {
       const name = btn.getAttribute("data-node-del");
-      if (!window.confirm(adminT("删除这个自定义节点？会移到 _node_trash，重启 ComfyUI 后不再加载。",
-                                 "Delete this custom node? It moves to _node_trash after restart."))) {
+      const ok = await uiConfirm({
+        title: adminT("删除自定义节点", "Delete custom node"),
+        message: adminT("删除这个自定义节点？会移到 _node_trash，重启 ComfyUI 后不再加载。",
+                        "Delete this custom node? It moves to _node_trash after restart."),
+        okText: adminT("移到回收站", "Move to trash")
+      });
+      if (!ok) {
         return;
       }
       adminNodePost({ action: "remove", name: name }).then(function () {
@@ -8077,9 +8459,14 @@ function adminRenderWorkflows(data) {
     };
   });
   box.querySelectorAll("[data-wf-del]").forEach(function (btn) {
-    btn.onclick = function () {
-      if (!window.confirm(adminT("删除这个工作流条目？原始文件不会被改。",
-                                 "Delete this workflow entry? The source file is untouched."))) {
+    btn.onclick = async function () {
+      const ok = await uiConfirm({
+        title: adminT("删除工作流条目", "Delete workflow entry"),
+        message: adminT("删除这个工作流条目？原始文件不会被改。",
+                        "Delete this workflow entry? The source file is untouched."),
+        okText: adminT("删除", "Delete")
+      });
+      if (!ok) {
         return;
       }
       adminWorkflowPost({ action: "delete", id: btn.getAttribute("data-wf-del") })
@@ -8290,15 +8677,24 @@ function adminStop() {
 async function adminBatch(action) {
   const ids = Array.from(adminSel);
   if (!ids.length) { return; }
-  if (action === "delete" &&
-      !confirm(adminT("删除选中的 " + ids.length + " 个账号？文件会保留。",
-                      "Delete " + ids.length + " selected accounts? Files are kept."))) {
-    return;
+  if (action === "delete") {
+    const ok = await uiConfirm({
+      title: adminT("删除选中账号", "Delete selected accounts"),
+      message: adminT("将删除选中的 " + ids.length + " 个账号，账号文件会保留。",
+                      "Delete " + ids.length + " selected accounts? Files are kept."),
+      ack: adminT("我确认这些账号会被移除", "I understand these accounts will be removed"),
+      okText: adminT("删除账号", "Delete accounts")
+    });
+    if (!ok) { return; }
   }
-  if (action === "disable" &&
-      !confirm(adminT("禁用选中的 " + ids.length + " 个账号？",
-                      "Disable " + ids.length + " selected accounts?"))) {
-    return;
+  if (action === "disable") {
+    const ok = await uiConfirm({
+      title: adminT("禁用选中账号", "Disable selected accounts"),
+      message: adminT("将禁用选中的 " + ids.length + " 个账号，正在运行的任务会停止。",
+                      "Disable " + ids.length + " selected accounts? Running jobs will stop."),
+      okText: adminT("禁用", "Disable")
+    });
+    if (!ok) { return; }
   }
   adminStatus(adminT("正在处理…", "Working…"), false);
   try {
@@ -8981,8 +9377,13 @@ async function workerCardAction(act, wid) {
   try {
     if (act === "edit" || act === "approve") { openWorkerEdit(wid); return; }
     if (act === "remove") {
-      if (!confirm(workerT("移除这个算力节点？正在跑的任务会失败。",
-        "Remove this worker? Its current job will fail."))) { return; }
+      const ok = await uiConfirm({
+        title: workerT("移除算力节点", "Remove worker"),
+        message: workerT("移除这个算力节点？正在跑的任务会失败。",
+                         "Remove this worker? Its current job will fail."),
+        okText: workerT("移除", "Remove")
+      });
+      if (!ok) { return; }
       await workerAdminAction({ action: "remove", id: wid });
       adminStatus(workerT("节点已移除", "Worker removed"), false);
       return;
@@ -9524,9 +9925,15 @@ document.getElementById("selNone").onclick = function () {
 };
 document.getElementById("delSelBtn").onclick = async function () {
   if (!selected.size) { show("还没有选中图片", "err"); return; }
-  if (!confirm(MGI18N.isEnglish()
-    ? "Delete " + selected.size + " selected images? This cannot be undone."
-    : "确定删除选中的 " + selected.size + " 张？删了就找不回来了。")) { return; }
+  const ok = await uiConfirm({
+    title: uiT("删除选中图片", "Delete selected images"),
+    message: uiT("将永久删除选中的 " + selected.size + " 张图片。",
+                 "Permanently delete " + selected.size + " selected images."),
+    ack: uiT("我确认这些图片删除后无法恢复",
+             "I understand these images cannot be restored"),
+    okText: uiT("删除", "Delete")
+  });
+  if (!ok) { return; }
   const names = Array.from(selected);
   selected.clear();
   doDelete(names);
