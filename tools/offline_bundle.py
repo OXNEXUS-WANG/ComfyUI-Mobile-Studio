@@ -28,6 +28,9 @@ PROTECTED_FILES = {
     "jobs_state.json", "local_llm.json", "monitor.json",
     "monitor_alerts.json", "monitor_trends.json", "cleanup.json",
     "queue_control.json", "teams.json", "team_prompts.json",
+    "trainings.json", "trainings.json.bak",
+    "training_settings.json", "training_settings.json.bak",
+    "loras.json", "loras.json.bak",
     "license.json", "access.json", "cert.pem", "key.pem",
     "worker_agent.json",
 }

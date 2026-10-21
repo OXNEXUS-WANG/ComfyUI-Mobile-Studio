@@ -248,13 +248,14 @@ def build_anima_workflow(prompt, negative, width, height, steps, cfg, seed,
                          use_translate, count=1, init_image=None,
                          init_mask=None, denoise=1.0,
                          sampler=DEFAULT_SAMPLER, hires=False,
-                         hires_scale=1.3, turbo=False, char_tags=None):
+                         hires_scale=1.3, turbo=False, char_tags=None,
+                         loras=None):
     """Anima 2B（Cosmos 架构）工作流：文生图 / 图生图 / 局部重绘 / 高清修复。
 
     和 SDXL 不同，模型、文本编码器、VAE 是三个独立文件，分别用
     UNETLoader / CLIPLoader / VAELoader 加载。官方推荐 30 步 / CFG 4。
     turbo=True 时套官方 Turbo LoRA，强制 8 步 / CFG 1（快一倍多）。
-    Anima 用不了 SDXL 的 LoRA，也没有验证过 PAG，这两项由调用方关掉。
+    Anima 用不了 SDXL 的 LoRA，但可以使用 Anima 专用 LoRA；PAG 不适用。
     """
     if turbo:
         steps, cfg = ANIMA_TURBO_STEPS, ANIMA_TURBO_CFG
@@ -282,13 +283,29 @@ def build_anima_workflow(prompt, negative, width, height, steps, cfg, seed,
               "inputs": {"filename_prefix": "phone", "images": ["8", 0]}},
     }
 
-    # 极速模式：只套官方 Turbo LoRA，模型本体不变
+    # 极速模式：先套官方 Turbo LoRA，再套用户选中的 Anima LoRA。
     model_src = ["4", 0]
     if turbo:
         nodes["43"] = {"class_type": "LoraLoaderModelOnly",
                        "inputs": {"lora_name": ANIMA_TURBO_LORA,
                                   "strength_model": 1.0, "model": model_src}}
         model_src = ["43", 0]
+    for i, item in enumerate((loras or [])[:8]):
+        try:
+            name = str(item.get("name") or "")
+            strength = float(item.get("strength", 1.0))
+        except (TypeError, ValueError, AttributeError):
+            continue
+        if not name:
+            continue
+        node_id = str(60 + i)
+        nodes[node_id] = {
+            "class_type": "LoraLoaderModelOnly",
+            "inputs": {"lora_name": name,
+                       "strength_model": max(-2.0, min(2.0, strength)),
+                       "model": model_src},
+        }
+        model_src = [node_id, 0]
     nodes["3"]["inputs"]["model"] = model_src
 
     # 参考图过大同样先缩到安全像素数，避免 8GB 爆显存

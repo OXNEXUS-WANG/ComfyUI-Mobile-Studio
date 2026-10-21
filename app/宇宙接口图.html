@@ -1311,7 +1311,7 @@ void main(){
   gl_FragColor = vec4(mapped, alpha);
 }
 </script>
-<script src="i18n.js?v=20261021i"></script>
+<script src="i18n.js?v=20261022a"></script>
 </head>
 <body>
 <canvas id="starCanvas"></canvas>
@@ -1611,7 +1611,9 @@ const ENDPOINTS = [
   {id:'ep_health_report', m:'GET', path:'/api/admin/report', desc:'一键体检：生成包含诊断、环境、监控和脱敏日志的 ZIP 报告；管理员专用。'},
   {id:'ep_admin_nodes', m:'GET/POST', path:'/api/admin/nodes', desc:'自定义节点管理：列出节点、体检依赖/语法/入口、ZIP 分块上传、服务器路径导入、移入回收站；管理员专用。'},
   {id:'ep_admin_workflows', m:'GET/POST', path:'/api/admin/workflows', desc:'工作流库：导入 ComfyUI UI / API 格式工作流，检查缺失节点、缺失模型、断链和循环依赖；管理员专用。'},
-  {id:'ep_workflow_download', m:'GET', path:'/api/admin/workflows/{id}', desc:'下载工作流库中保存的原始 JSON 文件；管理员专用。'}
+  {id:'ep_workflow_download', m:'GET', path:'/api/admin/workflows/{id}', desc:'下载工作流库中保存的原始 JSON 文件；管理员专用。'},
+  {id:'ep_training', m:'GET/POST', path:'/api/training', desc:'LoRA 训练：数据集、提交审核、进度/日志、取消；普通账号需要管理员开启训练功能。'},
+  {id:'ep_training_admin', m:'GET/POST', path:'/api/admin/training', desc:'训练管理：安装 sd-scripts、审核申请、训练窗口、资源上限和 LoRA 共享；管理员专用。'}
 ];
 
 const CATEGORIES = [
@@ -1623,7 +1625,9 @@ const CATEGORIES = [
     {id:'queue_admin', name:'队列控制', desc:'管理员暂停全局或单账号接单、设置优先级加成、取消排队、最长等待和维护窗口；运行中的任务不被打断。', api:['ep_queue_admin'], params:'pause_all / resume_all\npause_user / boost_user\nset_max_wait / set_maintenance'},
     {id:'param_presets', name:'参数模板', desc:'把底模 / 画幅 / 步数 / 画风 / PAG 存成模板，下次一键套用（规划中）。', api:[], params:'规划中\npresets.json', planned:true},
     {id:'schedule', name:'定时任务', desc:'按时间自动排队出图，例如每天凌晨跑一组（规划中）。', api:[], params:'规划中\ncron / 每日', planned:true},
-    {id:'notify', name:'完成通知', desc:'浏览器通知 + Webhook 任务状态通知（开始 / 完成 / 失败）；不含提示词和图片。', api:['ep_monitor_settings'], params:'浏览器通知\njob_notify_done / error\nwebhook_url'}
+    {id:'notify', name:'完成通知', desc:'浏览器通知 + Webhook 任务状态通知（开始 / 完成 / 失败）；不含提示词和图片。', api:['ep_monitor_settings'], params:'浏览器通知\njob_notify_done / error\nwebhook_url'},
+    {id:'lora_train', name:'LoRA 训练', desc:'用 Anima / SDXL 训练角色或画风 LoRA；普通账号提交后由管理员审核，训练期间本机出图让路。', api:['ep_training'], params:'数据集 ≥5 张\nAnima 768 / block swap 22\n管理员审核'},
+    {id:'train_queue', name:'训练队列', desc:'全局一次只跑一个训练；等待窗口、显存、内存和温度达标后自动开始，进度/日志/取消都在训练页。', api:['ep_training'], params:'GET /api/training\nsummary / progress\ncancel'}
    ]},
   {id:'monitor', name:'监控中心', short:'监控', color:'#6fd3c6', macro:true,
    desc:'负载、任务统计、错误记录、存储占用、智能让路和实时活动。',
@@ -1934,6 +1938,8 @@ const ENTER_TARGETS = {
   /* 自动化 */
   automation:{url:'/?view=gen&focus=auto', label:'打开挂机造图'},
   auto:{url:'/?view=gen&focus=auto', label:'打开挂机造图'},
+  lora_train:{url:'/?view=train', label:'打开 LoRA 训练'},
+  train_queue:{url:'/?view=train', label:'打开训练队列'},
   queue:{live:true, label:'任务队列'},
 
   /* 监控中心 */

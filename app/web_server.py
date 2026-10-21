@@ -42,6 +42,8 @@ import trusted_time
 import edition_policy
 import node_manager
 import plugin_manager
+import training_manager
+import training_profiles
 import workflow_manager
 import worker_bundle
 
@@ -89,10 +91,14 @@ def _models_payload():
         for job in JOBS.values():
             if job.get("status") not in ("queued", "running"):
                 continue
-            for raw in [job.get("model")] + list(job.get("loras") or []):
+            raw_loras = job.get("loras") or []
+            if not isinstance(raw_loras, (list, tuple)):
+                raw_loras = []
+            for raw in [job.get("model")] + list(raw_loras):
                 name = os.path.basename(str(raw or ""))
                 if name:
                     busy.add(name)
+    busy.update(training_manager.M.active_models())
     data["busy_models"] = sorted(busy)
     return data
 
@@ -1102,6 +1108,15 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 self._send(404, "not found", "text/plain; charset=utf-8")
             return
+        if path == "/training.js":
+            try:
+                with open(os.path.join(TEMPLATE_DIR, "training.js"), "r",
+                          encoding="utf-8") as fh:
+                    self._send(200, fh.read(),
+                               "application/javascript; charset=utf-8")
+            except Exception:
+                self._send(404, "not found", "text/plain; charset=utf-8")
+            return
 
         # 其余一切（图库、图片、缩略图、接口）都必须先登录
         if not authed:
@@ -1211,6 +1226,9 @@ class Handler(BaseHTTPRequestHandler):
                 snap = dict(LOAD_STATE)
             snap["ts"] = round(time.time(), 3)
             snap["guard"] = guard_snapshot()
+            _u = self._current_user()
+            snap["training"] = training_manager.M.summary(
+                admin=is_admin(_u), user=_u)
             self._json(snap)
             return
 
@@ -1218,7 +1236,11 @@ class Handler(BaseHTTPRequestHandler):
             # 主页面用它做心跳 + 读取“是否该暂停生图”
             touch_presence()
             ensure_guard()
-            self._json(guard_snapshot())
+            _u = self._current_user()
+            snap = guard_snapshot()
+            snap["training"] = training_manager.M.summary(
+                admin=is_admin(_u), user=_u)
+            self._json(snap)
             return
 
         if path == "/api/workflow":
@@ -1439,6 +1461,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"error": "读取插件注册表失败，请查看服务日志"}, 500)
             return
 
+        if (path == "/api/training"
+                or path == "/api/admin/training"
+                or path == "/api/admin/training/install/status"
+                or path.startswith("/api/training/")):
+            self._handle_training_get(path, self._query())
+            return
+
         if path == "/api/models":
             activity_request("/api/models", "GET", throttle=6.0, silent=True)
             user = self._current_user()
@@ -1455,7 +1484,7 @@ class Handler(BaseHTTPRequestHandler):
                         "negative": DEFAULT_NEGATIVE,
                         "upscalers": [UPSCALE_ANIME, UPSCALE_PHOTO_SHARP,
                                       UPSCALE_PHOTO],
-                        "loras": list_loras(),
+                        "loras": list_loras(user),
                         "styles": plugin_styles_for(user),
                         "samplers": [{"key": k, "label": v["label"]}
                                      for k, v in SAMPLERS.items()],
@@ -2212,6 +2241,9 @@ class Handler(BaseHTTPRequestHandler):
         if route == "/api/admin/nodes/upload_chunk":
             self._handle_node_chunk()
             return
+        if route == "/api/training/upload_chunk":
+            self._handle_training_chunk()
+            return
 
         try:
             n = int(self.headers.get("Content-Length") or 0)
@@ -2247,6 +2279,13 @@ class Handler(BaseHTTPRequestHandler):
             drop_session(self._cookie(COOKIE_NAME))
             self._send(200, json.dumps({"ok": True}),
                        headers=[self._set_cookie_header("", 0)])
+            return
+
+        if route == "/api/training":
+            self._handle_training_post(data)
+            return
+        if route == "/api/admin/training":
+            self._handle_training_admin_post(data)
             return
 
         if route == "/api/license":
@@ -2690,7 +2729,8 @@ class Handler(BaseHTTPRequestHandler):
                     category = str(data.get("category") or "")
                     name = str(data.get("name") or "")
                     payload = _models_payload()
-                    if name in (payload.get("busy_models") or []):
+                    if (name in (payload.get("busy_models") or [])
+                            or training_manager.M.model_in_use(name)):
                         self._json({"error": "这个模型正在被任务使用，先等任务结束或取消"}, 409)
                         return
                     meta = model_manager.remove_model(
@@ -3500,6 +3540,10 @@ class Handler(BaseHTTPRequestHandler):
             if blocked:
                 self._json({"error": blocked, "guard": guard_snapshot()}, 409)
                 return
+            if training_manager.M.local_gpu_blocked():
+                self._json({"error": training_manager.M.gate_message(user),
+                            "code": "training_busy"}, 503)
+                return
             ckpt = resolve_checkpoint(data.get("model"))
             preset = model_profile(ckpt)
             if not preset.get("supported", True):
@@ -3687,6 +3731,514 @@ class Handler(BaseHTTPRequestHandler):
             fh.write(out.getvalue())
         return path
 
+    # ------------------------------------------------------------ LoRA 训练
+    def _training_limits(self, user):
+        if is_admin(user):
+            return {}
+        lim = user_limits(user)
+        keys = ("max_dataset_images", "max_dataset_mb", "max_image_mb",
+                "max_image_pixels", "max_train_steps", "max_train_resolution",
+                "daily_training_jobs", "monthly_training_minutes",
+                "max_training_minutes")
+        return {k: lim.get(k) for k in keys}
+
+    def _training_usage(self, user):
+        snap = usage_snapshot((user or {}).get("id") or "")
+        return {
+            "train_jobs_today": snap.get("train_jobs_today", 0),
+            "train_jobs_month": snap.get("train_jobs_month", 0),
+            "train_seconds_today": snap.get("train_seconds_today", 0),
+            "train_seconds_month": snap.get("train_seconds_month", 0),
+        }
+
+    def _training_profiles_payload(self):
+        settings = training_manager.M.settings
+        allowed = set(settings.get("allowed_profiles") or ())
+        allowed_models = set(settings.get("allowed_sdxl_models") or ())
+        models_root = os.path.join(ROOT, "ComfyUI", "models")
+        out = []
+        for p in training_profiles.public_profiles():
+            if p["key"] not in allowed:
+                continue
+            item = dict(p)
+            choices = []
+            if p["key"] == "anima":
+                files = [
+                    os.path.join(models_root, "diffusion_models",
+                                 training_profiles.ANIMA_MODEL),
+                    os.path.join(models_root, "text_encoders",
+                                 training_profiles.ANIMA_CLIP),
+                    os.path.join(models_root, "vae",
+                                 training_profiles.ANIMA_VAE),
+                ]
+                if all(os.path.isfile(x) for x in files):
+                    choices.append({
+                        "name": training_profiles.ANIMA_MODEL,
+                        "label": "Anima 2B（768 推荐）",
+                        "family": "anima", "vpred": False,
+                    })
+            else:
+                for m in list_models():
+                    name = m.get("name") or ""
+                    prof = model_profile(name)
+                    fam = prof.get("family") or ""
+                    if fam not in ("sdxl_anime", "sdxl_photo", "noob",
+                                   "pony"):
+                        continue
+                    if allowed_models and name not in allowed_models:
+                        continue
+                    if fam == "noob" and not settings.get("allow_sdxl_vpred"):
+                        continue
+                    if "lightning" in name.lower():
+                        continue
+                    choices.append({
+                        "name": name, "label": m.get("label") or name,
+                        "family": fam, "vpred": bool(prof.get("vpred")),
+                    })
+            item["models"] = choices
+            item["ready"] = bool(choices)
+            out.append(item)
+        return out
+
+    def _training_public_payload(self, user, admin=False):
+        st = training_manager.M.trainer_status()
+        trainer = {
+            "installed": bool(st.get("installed")),
+            "ready": bool(st.get("ready")),
+            "version": st.get("version") or "",
+            "commit": st.get("commit") or "",
+            "installing": bool(st.get("installing")),
+            "health_ok": bool((st.get("health") or {}).get("ok")),
+            "health_error": (st.get("health") or {}).get("error") or "",
+            "install": st.get("install") or {},
+        }
+        if admin:
+            trainer["health"] = st.get("health") or {}
+            trainer["missing"] = st.get("missing") or []
+            trainer["size_mb"] = st.get("size_mb") or 0
+        payload = {
+            "ok": True,
+            "admin": bool(admin),
+            "settings": training_manager.M.settings_public(admin=admin),
+            "profiles": self._training_profiles_payload(),
+            "trainer": trainer,
+            "hardware": training_manager.M.hardware_summary(),
+            "summary": training_manager.M.summary(admin=admin, user=user),
+            "projects": training_manager.M.list_projects(user, admin=admin),
+            "limits": ({} if admin else user_limits(user)),
+            "usage": self._training_usage(user),
+            "can_train": (admin or feature_allowed(user, "train")),
+        }
+        return payload
+
+    def _training_admin_payload(self, user):
+        base = self._training_public_payload(user, admin=True)
+        all_projects = training_manager.M.list_projects(user, admin=True)
+        base["projects"] = all_projects
+        base["pending"] = [p for p in all_projects
+                           if p.get("status") == "pending"]
+        base["active"] = [p for p in all_projects
+                          if p.get("status") in ("running", "saving")]
+        base["trainer"]["log_tail"] = training_manager.M.install_log_tail(80)
+        loras = []
+        for item in training_manager.M.list_visible_loras(user):
+            name = item.get("name") or ""
+            path = os.path.join(training_manager.M.lora_dir, name)
+            meta = training_manager.M.lora_meta(name)
+            loras.append(dict(item, meta=meta,
+                              size=os.path.getsize(path)
+                              if os.path.isfile(path) else 0))
+        base["loras"] = loras
+        try:
+            base["diagnostics"] = {
+                "gpu": training_manager.M._gpu_info(),
+                "ram_free_mb": round(training_manager.M._ram_free_mb(), 1),
+                "disk_free_mb": round(training_manager.M._disk_free_mb(), 1),
+                "comfy_alive": local_comfy_alive(),
+                "local_active": local_generation_running(),
+                "queue": queue_control.load().get("paused", False),
+            }
+        except Exception as exc:
+            base["diagnostics"] = {"error": str(exc)}
+        return base
+
+    def _handle_training_get(self, path, q):
+        user = self._current_user()
+        admin = is_admin(user)
+        if path == "/api/training":
+            self._json(self._training_public_payload(user, admin=admin))
+            return
+        if path == "/api/training/status":
+            tid = str(q.get("project_id") or "")
+            try:
+                self._json({"ok": True, "project": training_manager.M.project_detail(
+                    tid, user, admin=admin)})
+            except PermissionError:
+                self._json({"error": "无权访问这个训练"}, 403)
+            except KeyError:
+                self._json({"error": "训练不存在"}, 404)
+            return
+        if path == "/api/training/dataset":
+            tid = str(q.get("project_id") or "")
+            try:
+                self._json({"ok": True, **training_manager.M.dataset_payload(
+                    tid, user, admin=admin)})
+            except PermissionError:
+                self._json({"error": "无权访问这个训练"}, 403)
+            except KeyError:
+                self._json({"error": "训练不存在"}, 404)
+            return
+        if path == "/api/training/log":
+            tid = str(q.get("project_id") or "")
+            try:
+                p = training_manager.M.get_project(tid, user, admin=admin)
+            except PermissionError:
+                self._json({"error": "无权访问这个训练"}, 403)
+                return
+            except KeyError:
+                self._json({"error": "训练不存在"}, 404)
+                return
+            log_path = training_manager.M._log_path(p)
+            try:
+                size = os.path.getsize(log_path)
+                with open(log_path, "r", encoding="utf-8",
+                          errors="replace") as fh:
+                    fh.seek(max(0, size - 65536))
+                    text = fh.read()
+            except OSError:
+                size, text = 0, ""
+            self._json({"ok": True, "size": size, "text": text[-65536:]})
+            return
+        if path == "/api/training/download":
+            tid = str(q.get("project_id") or "")
+            try:
+                p = training_manager.M.get_project(tid, user, admin=admin)
+            except PermissionError:
+                self._json({"error": "无权访问这个训练"}, 403)
+                return
+            except KeyError:
+                self._json({"error": "训练不存在"}, 404)
+                return
+            name = os.path.basename(str((p.get("output") or {}).get("name")
+                                        or ""))
+            if not name or not training_manager.M.lora_allowed(user, name):
+                self._json({"error": "训练结果还没有发布"}, 404)
+                return
+            file_path = os.path.join(training_manager.M.lora_dir, name)
+            if not os.path.isfile(file_path):
+                self._json({"error": "训练结果文件不存在"}, 404)
+                return
+            self._stream_file(file_path, "application/octet-stream", name)
+            return
+        if path.startswith("/api/training/preview/"):
+            rest = path[len("/api/training/preview/"):]
+            parts = rest.split("/")
+            if len(parts) != 2 or not parts[1].endswith(".png"):
+                self._json({"error": "图片不存在"}, 404)
+                return
+            tid, image_id = parts[0], parts[1][:-4]
+            try:
+                file_path = training_manager.M.image_path(
+                    tid, image_id, user, admin=admin)
+            except PermissionError:
+                self._json({"error": "无权访问"}, 403)
+                return
+            except KeyError:
+                self._json({"error": "图片不存在"}, 404)
+                return
+            if not self._file(file_path, "image/png"):
+                self._json({"error": "图片不存在"}, 404)
+            return
+        if path == "/api/admin/training/install/status":
+            if not admin:
+                self._json({"error": "只有管理员可以查看安装状态"}, 403)
+                return
+            self._json({"ok": True,
+                        "install": training_manager.M.install_state,
+                        "log": training_manager.M.install_log_tail(100)})
+            return
+        if path == "/api/admin/training":
+            if not admin:
+                self._json({"error": "只有管理员可以管理训练"}, 403)
+                return
+            self._json(self._training_admin_payload(user))
+            return
+        self._json({"error": "接口不存在"}, 404)
+
+    def _handle_training_chunk(self):
+        user = self._current_user()
+        if not user:
+            self._deny()
+            return
+        if not is_admin(user) and not self._require_feature(user, "train"):
+            return
+        q = self._query()
+        upload_id = str(q.get("upload_id") or "")
+        try:
+            offset = int(q.get("offset") or 0)
+            n = int(self.headers.get("Content-Length") or 0)
+        except Exception:
+            self._json({"error": "上传参数无效"}, 400)
+            return
+        if n < 0 or n > 5 * 1024 * 1024:
+            self._json({"error": "分块太大"}, 413)
+            return
+        data = self.rfile.read(n) if n else b""
+        note_traffic((user or {}).get("id"), rx=n)
+        try:
+            got = training_manager.M.upload_chunk(user, upload_id, offset, data)
+            self._json({"ok": True, **got})
+        except PermissionError:
+            self._json({"error": "无权上传"}, 403)
+        except KeyError:
+            self._json({"error": "上传不存在或已过期"}, 404)
+        except ValueError as exc:
+            self._json({"error": str(exc)}, 400)
+
+    def _handle_training_post(self, data):
+        user = self._current_user()
+        admin = is_admin(user)
+        if not admin and not self._require_feature(user, "train"):
+            return
+        action = str(data.get("action") or "")
+        limits = self._training_limits(user)
+        usage = self._training_usage(user)
+        try:
+            if action == "create":
+                p = training_manager.M.create_project(user, data)
+                audit("activity", "training_create", user=user,
+                      ip=self.client_address[0], project_id=p.get("id"),
+                      profile=p.get("profile"))
+                self._json({"ok": True, "project": training_manager.M.project_detail(
+                    p["id"], user, admin=admin)})
+                return
+            if action == "update":
+                p = training_manager.M.update_project(
+                    str(data.get("project_id") or ""), user, data)
+                self._json({"ok": True, "project": training_manager.M.project_detail(
+                    p["id"], user, admin=admin)})
+                return
+            if action == "delete":
+                tid = str(data.get("project_id") or "")
+                training_manager.M.delete_project(
+                    tid, user, admin=admin,
+                    delete_lora=bool(data.get("delete_lora")))
+                audit("activity", "training_delete", user=user,
+                      ip=self.client_address[0], project_id=tid)
+                self._json({"ok": True})
+                return
+            if action == "submit":
+                tid = str(data.get("project_id") or "")
+                err, quota = training_manager.M.submit_project(
+                    tid, user, limits=limits, usage=usage)
+                if err:
+                    self._json({"error": err, "quota": quota}, 429)
+                    return
+                audit("activity", "training_submit", user=user,
+                      ip=self.client_address[0], project_id=tid)
+                self._json({"ok": True, "project": training_manager.M.project_detail(
+                    tid, user, admin=admin)})
+                return
+            if action == "retry":
+                tid = str(data.get("project_id") or "")
+                p = training_manager.M.retry_project(tid, user, admin=admin)
+                audit("activity", "training_retry", user=user,
+                      ip=self.client_address[0], project_id=tid)
+                self._json({"ok": True, "project": p})
+                return
+            if action == "cancel":
+                tid = str(data.get("project_id") or "")
+                training_manager.M.cancel_project(
+                    tid, user, admin=admin,
+                    reason=str(data.get("reason") or "用户取消"))
+                audit("activity", "training_cancel", user=user,
+                      ip=self.client_address[0], project_id=tid)
+                self._json({"ok": True})
+                return
+            if action == "set_caption":
+                item = training_manager.M.set_caption(
+                    str(data.get("project_id") or ""), user,
+                    data.get("image_id"), data.get("caption"))
+                self._json({"ok": True, "image": item})
+                return
+            if action == "delete_image":
+                training_manager.M.delete_image(
+                    str(data.get("project_id") or ""), user,
+                    data.get("image_id"))
+                self._json({"ok": True})
+                return
+            if action == "add_gallery":
+                tid = str(data.get("project_id") or "")
+                names = data.get("names") or []
+                added, errors = 0, []
+                for name in names[:100]:
+                    rel = safe_media_rel(str(name or ""))
+                    if not rel:
+                        continue
+                    src = find_image(rel, user)
+                    if not src:
+                        errors.append(rel)
+                        continue
+                    meta = read_meta(rel) or {}
+                    caption = (meta.get("prompt_en") or meta.get("prompt")
+                               or meta.get("prompt_display") or "")
+                    try:
+                        training_manager.M.add_gallery_image(
+                            tid, user, src, caption, limits=limits)
+                        added += 1
+                    except Exception as exc:
+                        errors.append("%s: %s" % (rel, exc))
+                self._json({"ok": True, "added": added,
+                            "errors": errors[:20]})
+                return
+            if action == "upload_start":
+                out = training_manager.M.upload_start(
+                    str(data.get("project_id") or ""), user,
+                    data.get("filename"), data.get("size"), limits=limits)
+                self._json({"ok": True, **out})
+                return
+            if action == "upload_finish":
+                item = training_manager.M.upload_finish(
+                    user, data.get("upload_id"), data.get("caption") or "",
+                    limits=limits)
+                self._json({"ok": True, "image": item})
+                return
+        except PermissionError as exc:
+            self._json({"error": str(exc)}, 403)
+            return
+        except KeyError as exc:
+            self._json({"error": str(exc)}, 404)
+            return
+        except ValueError as exc:
+            self._json({"error": str(exc)}, 400)
+            return
+        self._json({"error": "未知操作"}, 400)
+
+    def _handle_training_admin_post(self, data):
+        user = self._current_user()
+        if not is_admin(user):
+            self._json({"error": "只有管理员可以管理训练"}, 403)
+            return
+        action = str(data.get("action") or "")
+        try:
+            if action == "settings":
+                patch = data.get("settings") if isinstance(
+                    data.get("settings"), dict) else {
+                    k: v for k, v in data.items() if k != "action"}
+                training_manager.M.update_settings(user, patch)
+                audit("security", "training_settings", user=user,
+                      ip=self.client_address[0])
+                self._json({"ok": True, **self._training_admin_payload(user)})
+                return
+            tid = str(data.get("project_id") or "")
+            if action == "approve":
+                training_manager.M.approve_project(tid, user, data)
+                audit("security", "training_approve", user=user,
+                      ip=self.client_address[0], project_id=tid)
+                self._json({"ok": True, **self._training_admin_payload(user)})
+                return
+            if action == "reject":
+                training_manager.M.reject_project(
+                    tid, user, data.get("reason"))
+                audit("security", "training_reject", user=user,
+                      ip=self.client_address[0], project_id=tid)
+                self._json({"ok": True, **self._training_admin_payload(user)})
+                return
+            if action == "cancel":
+                training_manager.M.cancel_project(
+                    tid, user, admin=True,
+                    reason=str(data.get("reason") or "管理员取消"))
+                audit("security", "training_cancel", user=user,
+                      ip=self.client_address[0], project_id=tid)
+                self._json({"ok": True, **self._training_admin_payload(user)})
+                return
+            if action in ("force_start", "resume"):
+                p = training_manager.M._project(tid)
+                if not p:
+                    raise KeyError("训练不存在")
+                if action == "resume":
+                    training_manager.M.update_settings(user, {"paused": False})
+                else:
+                    p["approved_at"] = time.time()
+                    p["approved_by"] = user.get("id") or "admin"
+                    p["priority"] = int(data.get("priority") or 0)
+                    training_manager.M._set_status(p, "approved", "admin")
+                    training_manager.M.wake.set()
+                self._json({"ok": True, **self._training_admin_payload(user)})
+                return
+            if action == "pause":
+                training_manager.M.update_settings(user, {
+                    "paused": True,
+                    "pause_reason": str(data.get("reason") or "管理员暂停队列"),
+                })
+                self._json({"ok": True, **self._training_admin_payload(user)})
+                return
+            if action == "delete_project":
+                training_manager.M.delete_project(
+                    tid, user, admin=True,
+                    delete_lora=bool(data.get("delete_lora")))
+                audit("security", "training_delete", user=user,
+                      ip=self.client_address[0], project_id=tid)
+                self._json({"ok": True, **self._training_admin_payload(user)})
+                return
+            if action == "share_lora":
+                training_manager.M.share_lora(
+                    str(data.get("name") or ""), bool(data.get("public")),
+                    user)
+                audit("security", "lora_share", user=user,
+                      ip=self.client_address[0], lora=data.get("name"),
+                      public=bool(data.get("public")))
+                self._json({"ok": True, **self._training_admin_payload(user)})
+                return
+            if action == "delete_lora":
+                training_manager.M.delete_lora(
+                    str(data.get("name") or ""), user, admin=True)
+                audit("security", "lora_delete", user=user,
+                      ip=self.client_address[0], lora=data.get("name"))
+                self._json({"ok": True, **self._training_admin_payload(user)})
+                return
+            if action == "classify_lora":
+                name = os.path.basename(str(data.get("name") or ""))
+                family = str(data.get("family") or "")
+                if family not in ("anima", "sdxl", "sd15", "flux", "unknown"):
+                    raise ValueError("分类无效")
+                meta = training_manager.M.loras.get(name) or {
+                    "owner_id": "", "project_id": "",
+                    "display_name": name, "public": False,
+                    "created": time.time()}
+                meta["family"] = family
+                training_manager.M.loras[name] = meta
+                training_manager.M.save_loras()
+                self._json({"ok": True, **self._training_admin_payload(user)})
+                return
+            if action in ("install", "repair"):
+                training_manager.M.install_trainer(user)
+                audit("security", "training_install", user=user,
+                      ip=self.client_address[0])
+                self._json({"ok": True,
+                            "install": training_manager.M.install_state})
+                return
+            if action == "uninstall":
+                training_manager.M.uninstall_trainer(user)
+                audit("security", "training_uninstall", user=user,
+                      ip=self.client_address[0])
+                self._json({"ok": True})
+                return
+            if action == "diagnose":
+                self._json({"ok": True,
+                            **self._training_admin_payload(user)})
+                return
+        except PermissionError as exc:
+            self._json({"error": str(exc)}, 403)
+            return
+        except KeyError as exc:
+            self._json({"error": str(exc)}, 404)
+            return
+        except ValueError as exc:
+            self._json({"error": str(exc)}, 400)
+            return
+        self._json({"error": "未知操作"}, 400)
+
     # ------------------------------------------------------------ 出图
     def _handle_generate(self, data):
         # 网页开着且检测到前台/整机高负载时，临时拦下新的出图任务。
@@ -3695,6 +4247,14 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"error": blocked, "guard": guard_snapshot()}, 409)
             return
         user = self._current_user()
+        if training_manager.M.local_gpu_blocked():
+            self._json({
+                "error": training_manager.M.gate_message(user),
+                "code": "training_busy",
+                "training": training_manager.M.summary(
+                    admin=is_admin(user), user=user),
+            }, 503)
+            return
         uid = (user or {}).get("id") or "admin"
         tr_mode = normalize_translation_mode(
             (user or {}).get("translation_mode"))
@@ -3851,6 +4411,7 @@ class Handler(BaseHTTPRequestHandler):
         # LoRA：只接受 loras 目录里真实存在的文件名，强度限制在 -2 ~ 2
         loras = []
         lora_skipped = []
+        lora_denied = []
         raw_loras = data.get("loras") or []
         if isinstance(raw_loras, list) and not is_video:
             for it in raw_loras[:8]:
@@ -3859,7 +4420,11 @@ class Handler(BaseHTTPRequestHandler):
                 nm = os.path.basename(str(it.get("name") or ""))
                 path = os.path.join(LORA_DIR, nm)
                 if nm and os.path.isfile(path):
-                    fam = model_profiles.detect_lora_family(nm, path)
+                    if not training_manager.M.lora_allowed(user, nm):
+                        lora_denied.append(nm)
+                        continue
+                    fam = (training_manager.M.lora_family(nm)
+                           or model_profiles.detect_lora_family(nm, path))
                     if not model_profiles.lora_compatible(
                             preset.get("family"), fam):
                         lora_skipped.append({"name": nm, "family": fam})
@@ -3869,6 +4434,10 @@ class Handler(BaseHTTPRequestHandler):
                     except (TypeError, ValueError):
                         st = 1.0
                     loras.append({"name": nm, "strength": max(-2.0, min(2.0, st))})
+        if lora_denied:
+            self._json({"error": "这个 LoRA 属于其他账号或尚未共享。",
+                        "lora_denied": lora_denied}, 403)
+            return
 
         hires = bool(data.get("hires")) and not is_video
         pag = bool(data.get("pag", True)) and not is_video
@@ -4082,6 +4651,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         user = self._current_user()
         if not self._require_feature(user, "upscale"):
+            return
+        if training_manager.M.local_gpu_blocked():
+            self._json({"error": training_manager.M.gate_message(user),
+                        "code": "training_busy"}, 503)
             return
         uid = (user or {}).get("id") or "admin"
         if not lan_share.settings().get("local_enabled", True):
@@ -4413,6 +4986,11 @@ def main():
     cleanup_archives()
     model_manager.cleanup_uploads()
     remote_spool_cleanup_startup()
+    # 训练队列要在服务开始接单之前就恢复；否则正在训练时可能先派出生图任务。
+    ensure_load_sampler()
+    training_manager.M.cleanup_uploads()
+    training_manager.M.ensure_started()
+    atexit.register(training_manager.M.shutdown)
 
     threading.Thread(target=ws_listener, daemon=True).start()
 

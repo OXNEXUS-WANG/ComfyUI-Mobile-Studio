@@ -54,17 +54,17 @@ GitHub Actions 会在 push / pull request 时自动运行 `.github/workflows/tes
 1. 分别构建两个版本：
 
 ```powershell
-.\build_release.ps1 -Version 1.1.3 -Edition share
-.\build_release.ps1 -Version 1.1.3 -Edition commercial
+.\build_release.ps1 -Version 1.2.0 -Edition share
+.\build_release.ps1 -Version 1.2.0 -Edition commercial
 ```
 
 2. 打开 GitHub 仓库 → **Releases** → **Draft a new release**。
-3. Tag 填 `v1.1.3`，标题填 `v1.1.3`。
+3. Tag 填 `v1.2.0`，标题填 `v1.2.0`。
 4. 上传：
 
 ```text
-dist\ComfyUI-Mobile-Studio-v1.1.3-Share.zip
-dist\ComfyUI-Mobile-Studio-v1.1.3-Commercial.zip
+dist\ComfyUI-Mobile-Studio-v1.2.0-Share.zip
+dist\ComfyUI-Mobile-Studio-v1.2.0-Commercial.zip
 ```
 
 商用版也可以只私下交付给购买客户，不公开上传到 GitHub Release。

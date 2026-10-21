@@ -1,0 +1,10 @@
+# LoRA 训练器最小依赖闭包（Windows / Python 3.13 / 已有 torch 2.14+cu130）
+# 只安装到 trainer/pysite，不碰 ComfyUI 的 Lib\site-packages，也不升级 torch。
+# 采用 --no-deps --require-hashes；版本与 sd-scripts 0.12.2 对齐。
+diffusers==0.40.0 --hash=sha256:5b5da7c3ddb62152fa4afc577f02e050af688c797375c34fb2d01006da3f3541
+accelerate==1.15.0 --hash=sha256:97eacca0b73e45cb867dbf8c5d5d4dc32219544300e0c8992c7334dc2ef33cec
+ftfy==6.3.1 --hash=sha256:7c70eb532015cd2f9adb53f101fb6c7945988d023a085d127d1573dc49dd0083
+voluptuous==0.15.2 --hash=sha256:016348bc7788a9af9520b1764ebd4de0df41fe2138ebe9e06fa036bf86a65566
+imagesize==1.4.1 --hash=sha256:0d8d18d08f840c19d0ee7ca1fd82490fdc3729b7ac93f49870406ddde8ef8d8b
+wcwidth==0.9.3 --hash=sha256:569a0cdb826d3097b6dbacfaa45aa0002d72a2ba6fa8a63251ea43ac4dd7b6a4
+opencv-python==4.10.0.84 --hash=sha256:32dbbd94c26f611dc5cc6979e6b7aa1f55a64d6b463cc1dcd3c95505a63e48fe

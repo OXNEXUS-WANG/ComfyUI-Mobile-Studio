@@ -31,6 +31,9 @@ ROOT_FILES = (
     "工作流_中文提示词.json",
     "README_VERY_IMPORTANT.txt",
     "jobs_state.json",
+    "trainings.json",
+    "training_settings.json",
+    "loras.json",
 )
 META_SUFFIX = ".json"
 IMAGE_SUFFIX = (".png", ".jpg", ".jpeg", ".webp", ".mp4", ".webm")

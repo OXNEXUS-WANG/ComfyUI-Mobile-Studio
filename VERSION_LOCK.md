@@ -20,6 +20,7 @@ installer/versions.lock.json
 | Argos 模型 | `translate-zh_en-1_9.argosmodel`，固定文件大小 |
 | 7-Zip | `tools/7zr.exe` 的 SHA256 |
 | MiniSBD | 本项目 MIT 兼容层 `1.0`，不安装上游 AGPL 包 |
+| LoRA 训练器 | kohya sd-scripts `0.12.2`，commit `11d8cedd0c67b93a10f8b2d75f43554f6f12c794`，ZIP 大小 + SHA256；依赖版本和哈希见 `training_requirements.txt` |
 
 ## 安装器的默认行为
 

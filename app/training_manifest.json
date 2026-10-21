@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "sd_scripts": {
+    "name": "kohya-ss/sd-scripts",
+    "version": "0.12.2",
+    "commit": "11d8cedd0c67b93a10f8b2d75f43554f6f12c794",
+    "url": "https://gh-proxy.com/https://github.com/kohya-ss/sd-scripts/archive/11d8cedd0c67b93a10f8b2d75f43554f6f12c794.zip",
+    "fallback_url": "https://github.com/kohya-ss/sd-scripts/archive/11d8cedd0c67b93a10f8b2d75f43554f6f12c794.zip",
+    "sha256": "b15f77298d047564b2ae956a6061a1031247dc32294d5fd1bd6eb0b7503c14ed",
+    "size": 6678181,
+    "license": "Apache-2.0"
+  },
+  "required_files": [
+    "anima_train_network.py",
+    "sdxl_train_network.py",
+    "networks/lora_anima.py",
+    "networks/convert_anima_lora_to_comfy.py",
+    "library/train_util.py",
+    "library/anima_utils.py",
+    "configs/qwen3_06b",
+    "configs/t5_old"
+  ]
+}

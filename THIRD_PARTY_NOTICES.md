@@ -37,6 +37,7 @@ No third-party icon font or JavaScript framework is bundled.
 | ComfyUI-Manager | https://github.com/ltdrdata/ComfyUI-Manager | GPL-3.0 | Optional / often installed manually; not required by core generation. |
 | ComfyUI-Custom-Scripts | https://github.com/pythongosssss/ComfyUI-Custom-Scripts | MIT | Optional, installed manually in the current setup. |
 | AIGODLIKE-ComfyUI-Translation | https://github.com/AIGODLIKE/AIGODLIKE-ComfyUI-Translation | No standard SPDX license detected in the repository | Optional UI translation pack; check its repository terms before redistribution. |
+| kohya-ss/sd-scripts | https://github.com/kohya-ss/sd-scripts, commit `11d8cedd0c67b93a10f8b2d75f43554f6f12c794` (0.12.2) | Apache-2.0 | Optional LoRA trainer, downloaded only when an administrator clicks “安装训练组件”; not bundled. |
 
 Each downloaded project keeps its own license file in its folder. If you
 redistribute an installation, keep those files and comply with their terms.
@@ -62,6 +63,26 @@ ComfyUI's portable Python also contains Python (PSF-2.0), PyTorch
 (BSD-3-Clause), torchvision (BSD-3-Clause), and NVIDIA CUDA/cuDNN runtime
 libraries under NVIDIA's proprietary license. These are downloaded as part of
 the ComfyUI portable package, not relicensed by this project.
+
+### Optional LoRA training dependencies / 可选训练依赖
+
+Only installed into the isolated `trainer/pysite` directory when an
+administrator installs the training component. They do **not** replace
+ComfyUI's torch/transformers:
+
+| Package | License | Purpose |
+|---|---|---|
+| `diffusers` | Apache-2.0 | Anima/SDXL training pipelines |
+| `accelerate` | Apache-2.0 | Mixed precision / device placement |
+| `ftfy` | Apache-2.0 | Text cleanup for captions |
+| `voluptuous` | BSD-3-Clause | Schema validation in sd-scripts |
+| `imagesize` | MIT | Image metadata |
+| `wcwidth` | MIT | Console output width |
+| `opencv-python` | MIT (OpenCV: Apache-2.0) | Dataset image processing |
+
+`training_requirements.txt` pins exact versions and SHA256 hashes; versions and
+hashes are verified before import. The trainer keeps its own license files under
+`trainer/sd-scripts` when installed.
 
 ### MiniSBD compatibility shim
 
@@ -117,6 +138,11 @@ subject to the source site's terms and any applicable rights in character
 names, artwork titles, and tags. This project does not claim ownership of that
 data. If you redistribute a large extracted dataset, review the source site's
 terms and applicable law.
+
+User-uploaded training images, captions, checkpoints and logs live under
+`trainings/<account>/<project>/` and are not included in the repository, setup
+ZIP or offline bundle. The operator is responsible for having the right to use
+the training images and for the license terms of any resulting LoRA weights.
 
 ## 6. GPL and commercial licensing
 

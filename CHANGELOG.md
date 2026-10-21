@@ -1,5 +1,44 @@
 ﻿# 变更日志
 
+## 2026-10-21 · v1.2.0 LoRA 训练、管理员审核与 GPU 资源闸门
+
+- **LoRA 训练**：网页新增「训练」标签。普通账号创建项目、上传数据集或从自己的
+  图库选择图片、逐图写 caption、提交审核；管理员通过/拒绝（拒绝必须填原因），
+  可设置优先级、最长运行分钟和训练时间窗口。普通账号默认关闭训练功能。
+- **底模**：
+  - **Anima 2B 推荐**：`anima_train_network.py`、`networks.lora_anima`，
+    默认 768、rank 16 / alpha 8、Adafactor、bf16、block swap 22（H2D-only）。
+    8GB 显存实测可训练；输出用官方脚本转成 ComfyUI 的 `diffusion_model.*` 格式。
+  - **SDXL 实验性**：Illustrious / Juggernaut 等 epsilon 模型；8GB 显存/16GB
+    内存实测在加载 U-Net 时 OOM，低于 11GB 显存或 22GB 内存直接拒绝提交。
+    NoobAI v-pred 默认隐藏，需管理员解锁。
+- **资源调配**：训练使用独立队列，不塞进图片任务调度器。真正启动前设置单向
+  本机 GPU 闸门：等待当前出图结束、调用 ComfyUI `/free`、检查显存/内存/磁盘/
+  温度，不达标进入「等待 GPU」并自动重试。训练期间本机出图、放大、挂机暂停；
+  远程 worker 不受影响；训练结束自动恢复。服务重启按 PID 接管正在运行的训练。
+- **组件安装**：管理员在网页一键安装 kohya sd-scripts 0.12.2（固定 commit
+  `11d8ced...`），依赖用 `--no-deps --require-hashes` 装到隔离的
+  `trainer/pysite`，不修改 ComfyUI 的 Python 环境；支持安装/修复/卸载和健康检查。
+  发布包和离线包不包含训练器、训练数据或依赖。
+- **数据集**：4MB 分块上传；Pillow 真正解码，只接受 PNG/JPEG/WebP，摆正 EXIF、
+  转 RGB、重编码并剥元数据；单项目 5–100 张，支持从图库复制；caption 只存
+  数据集目录，不写审计日志。
+- **LoRA 权限**：训练产物默认私有（owner/admin 可见），管理员可共享、分类、
+  删除；删除前检查是否有运行/排队任务引用。Anima 出图支持普通 LoRA，
+  `run_job` 会按账号过滤 LoRA 列表。
+- **配额和统计**：新增功能开关 `train`、每日训练次数、每月训练分钟、单次分钟、
+  最大步数、数据集张数/大小、最大分辨率；`usage.json` 增加训练 GPU 秒和任务数。
+- **UI / i18n / 星图**：训练项目卡片、新建向导、数据集网格、进度/loss/ETA、
+  日志、管理员审核和安装器、LoRA 管理全部支持中英文；训练闸门接入主页面和星图
+  提示条；星图新增 `lora_train`、`train_queue` 节点和 `/api/training` 接口。
+- **持久化**：新增 `trainings.json`、`training_settings.json`、`loras.json`，
+  纳入还原点、备份/恢复和离线迁移白名单；`.gitignore`、发布脚本、离线包
+  全部排除训练器、训练数据和 LoRA 状态。
+- **测试**：新增训练 profile、manager、UI 三组测试；完整套件 **172 项通过
+  （5 项跳过）**。新增 SDXL 硬件不足时拒绝提交的回归测试。
+- **已知限制**：SDXL 在 8GB/16GB 机器上不可用；NoobAI v-pred 训练未验证；
+  训练与出图共用本机 GPU，训练期间没有远程 worker 时出图会等待。
+
 ## 2026-10-21 · 高危操作二次确认、触摸屏与手机涂抹修复
 
 - 新增统一的二次确认弹窗（标题、说明、红色危险按钮、可选“我确认无法恢复”勾选）：

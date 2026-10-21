@@ -49,6 +49,18 @@
 双击“模型下载.bat”，可以重复运行，支持断点续传。
 模型不会提交到 GitHub，也不在安装包内。
 
+想在网页里训练 LoRA（可选）：
+1. 管理员登录 → 顶部“训练”标签 → 点“安装训练组件”。
+2. 首次安装约 200MB，下载 kohya sd-scripts 和最小依赖到 trainer\；
+   不修改 ComfyUI 的 Python 环境，发布包里也不带这些依赖。
+3. 安装完成后，在训练设置里打开“启用训练”。
+4. 普通账号默认没有训练权限，需要管理员在“用户管理”里单独开启。
+5. 推荐 Anima 2B（8GB 显存可跑）；SDXL 为实验性，8GB/16GB 会在加载模型时
+   内存不足，建议 12GB+ 显存、24GB+ 内存。
+6. 训练期间本机出图会自动暂停，训练结束后恢复；远程 worker 不受影响。
+
+详细步骤见 docs\训练说明.md。
+
 六、多机器算力共享
 ------------------
 把安装目录里的 worker 文件夹复制到第二台机器，
@@ -107,7 +119,8 @@ ComfyUI v0.42.0、Python 依赖、自定义节点 commit、模型 revision、7zr
 十、注意
 --------
 - 服务只监听本机和 192.168.137.1，不会对校园网开放。
-- 不要提交 users.json、workers.json、cert.pem、key.pem、models/。
+- 不要提交 users.json、workers.json、cert.pem、key.pem、models/、
+  trainings.json、training_settings.json、loras.json、trainings/、trainer/。
 - 模型版权归原模型作者，使用前看模型卡许可。
 
 十一、许可

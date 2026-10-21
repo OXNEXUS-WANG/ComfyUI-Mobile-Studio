@@ -18,10 +18,10 @@ PROFILES = {
         "family": "anima", "label": "动漫 · Anima 2B", "kind": "anime",
         "steps": 30, "cfg": 4.0, "sampler": "euler",
         "recommended_size": "832x1216", "vpred": False, "pag": False,
-        "supports_lora": False, "supports_negative": True,
+        "supports_lora": True, "supports_negative": True,
         "supports_hires": True, "supported": True, "beginner": True,
         "badges": ["新手推荐", "动漫"],
-        "tip": "原生支持中文描述，动漫首选。不能使用 SDXL LoRA 和 PAG；可用极速 LoRA。",
+        "tip": "原生支持中文描述，动漫首选。不能使用 SDXL LoRA 和 PAG；可用 Anima 专用 LoRA/极速 LoRA。",
         "advice": ["初次使用建议直接按推荐参数出图。", "想更快可打开「Anima 极速」（8 步）。"],
     },
     "noob": {
@@ -206,7 +206,7 @@ def _short_name(name):
 EN = {
     "anima": {
         "label": "Anime · Anima 2B",
-        "tip": "Great at natural descriptions and anime. No SDXL LoRA or PAG; use the Anima turbo LoRA for speed.",
+        "tip": "Great at natural descriptions and anime. No SDXL LoRA or PAG; use Anima LoRAs or the turbo LoRA for speed.",
         "advice": ["Start with the recommended settings.",
                    "Open Anima Turbo for 8-step generation."],
         "badges": ["Beginner pick", "Anime"],

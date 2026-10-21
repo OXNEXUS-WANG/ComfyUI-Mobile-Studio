@@ -27,6 +27,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.request
 import uuid
 import zipfile
 from collections import deque
@@ -49,6 +50,8 @@ import queue_control
 import runtime_settings
 import system_state
 import teams
+import training_manager
+import training_profiles
 import trusted_time
 
 COMFY = "http://127.0.0.1:8188"
@@ -742,7 +745,8 @@ USAGE_DIRTY = {"v": False}
 
 def _new_usage_counter():
     return {"requests": 0, "rx": 0, "tx": 0, "images": 0,
-            "gpu_seconds": 0.0, "jobs": 0, "kinds": {}}
+            "gpu_seconds": 0.0, "jobs": 0,
+            "train_seconds": 0.0, "train_jobs": 0, "kinds": {}}
 
 
 def _load_usage():
@@ -925,6 +929,29 @@ def note_job_usage(uid, seconds=0, images=0, kind="gen", ok=True):
             _save_usage_locked(now)
 
 
+def note_training_usage(uid, seconds=0, ok=True):
+    """训练单独记账，不重复占用生图的 GPU 秒配额。"""
+    uid = str(uid or "")
+    if not uid:
+        return
+    seconds = max(0.0, float(seconds or 0))
+    now = time.time()
+    with USAGE_LOCK:
+        total = _usage_user_locked(uid).get("total")
+        for bucket in (_usage_bucket(uid, "day"), _usage_bucket(uid, "month"),
+                       total):
+            if not bucket:
+                continue
+            bucket["train_seconds"] = float(
+                bucket.get("train_seconds") or 0.0) + seconds
+            bucket["train_jobs"] = int(bucket.get("train_jobs") or 0) + 1
+            kinds = bucket.setdefault("kinds", {})
+            kinds["train"] = int(kinds.get("train", 0)) + 1
+        USAGE_DIRTY["v"] = True
+        if now - USAGE_LAST_SAVE["t"] >= 2.0:
+            _save_usage_locked(now)
+
+
 def usage_snapshot(uid):
     """返回某账号今天 / 本月 / 累计的消耗计数。"""
     uid = str(uid or "")
@@ -940,7 +967,13 @@ def usage_snapshot(uid):
     return {"today": today, "month": mon, "total": total,
             "traffic_today": today["traffic"],
             "traffic_month": mon["traffic"],
-            "traffic_total": total["traffic"]}
+            "traffic_total": total["traffic"],
+            "train_seconds_today": round(
+                float(today.get("train_seconds") or 0), 1),
+            "train_seconds_month": round(
+                float(mon.get("train_seconds") or 0), 1),
+            "train_jobs_today": int(today.get("train_jobs") or 0),
+            "train_jobs_month": int(mon.get("train_jobs") or 0)}
 
 
 def _audit_user(user=None, user_id=None):
@@ -2008,6 +2041,8 @@ def _foreground_proc():
 
 def _own_job_running():
     """本机 GPU 是否在跑任务；远端任务不算，避免误触发“让路”。"""
+    if training_manager.M.local_gpu_blocked():
+        return True
     with JOBS_LOCK:
         return any(j.get("status") == "running"
                    and (j.get("worker_id") in ("", "local"))
@@ -2154,8 +2189,11 @@ FEATURE_LABELS = {
     # 真正安装必须管理员审批。两者默认允许，管理员可以按账号关闭。
     "plugin_pack": "安装安全插件",
     "plugin_submit": "提交代码插件",
+    "train": "LoRA 训练",
 }
 DEFAULT_FEATURES = {k: True for k in FEATURE_LABELS}
+# 训练会长时间占用显卡，普通账号默认关闭，由管理员逐个开启。
+DEFAULT_FEATURES["train"] = False
 
 GUEST_TTL_SECONDS = 24 * 3600
 GUEST_DEFAULT_HOURS = 24
@@ -2191,6 +2229,13 @@ def _default_limits():
         "monthly_traffic_mb": 0,
         "daily_gpu_seconds": 0,
         "monthly_gpu_seconds": 0,
+        "daily_training_jobs": 1,
+        "monthly_training_minutes": 180,
+        "max_training_minutes": 120,
+        "max_train_steps": 2000,
+        "max_dataset_images": 50,
+        "max_dataset_mb": 1024,
+        "max_train_resolution": 1024,
         "features": dict(DEFAULT_FEATURES),
         # 兼容旧字段；新代码优先看 features
         "allow_video": True,
@@ -2202,9 +2247,11 @@ def _default_limits():
 
 # 普通账号默认限额；0 表示不限制
 USER_DEFAULT_LIMITS = _default_limits()
-ADMIN_DEFAULT_LIMITS = dict(_default_limits(), daily_images=0, max_images=0,
-                            max_storage_mb=0, max_steps=0, max_count=0,
-                            max_concurrent=0)
+ADMIN_DEFAULT_LIMITS = dict(
+    _default_limits(), daily_images=0, max_images=0, max_storage_mb=0,
+    max_steps=0, max_count=0, max_concurrent=0, daily_training_jobs=0,
+    monthly_training_minutes=0, max_training_minutes=0, max_train_steps=0,
+    max_dataset_images=0, max_dataset_mb=0, max_train_resolution=0)
 
 
 def _as_int(value, lo, hi, default):
@@ -2226,6 +2273,18 @@ def normalize_limits(raw, role="user"):
                 "daily_gpu_seconds", "monthly_gpu_seconds"):
         if key in src:
             out[key] = _as_int(src.get(key), 0, 100_000_000, out.get(key, 0))
+    for key, hi in (("daily_training_jobs", 100),
+                    ("monthly_training_minutes", 100_000),
+                    ("max_training_minutes", 10_080),
+                    ("max_train_steps", 20_000),
+                    ("max_dataset_images", 500),
+                    ("max_dataset_mb", 50_000)):
+        if key in src:
+            out[key] = _as_int(src.get(key), 0, hi, out.get(key, 0))
+    if "max_train_resolution" in src:
+        out["max_train_resolution"] = _as_int(
+            src.get("max_train_resolution"), 0, 2048,
+            out.get("max_train_resolution", 1024))
     if "max_upload_mb" in src:
         n = _as_int(src.get("max_upload_mb"), 0,
                     UPLOAD_MAX_BYTES // 1048576, out["max_upload_mb"])
@@ -3261,24 +3320,14 @@ def list_models():
     return out
 
 
-def list_loras():
-    """扫描 loras 目录，返回 SDXL 能用的 LoRA 文件名。
+def list_loras(user=None):
+    """扫描 loras 目录，按账号过滤训练出来的私有 LoRA。
 
-    Anima 专用 LoRA（anima- 前缀）不放进列表：它们是给极速模式内部用的，
-    选到别的底模上只会没效果。
+    只隐藏内部 Anima Turbo LoRA；训练输出的 Anima LoRA 正常显示。
+    没有归属元数据的历史 LoRA 继续视为共享；训练文件名在元数据丢失时
+    fail-closed，普通账号看不到。
     """
-    out = []
-    if os.path.isdir(LORA_DIR):
-        for f in os.listdir(LORA_DIR):
-            if f.lower().startswith("anima-"):
-                continue
-            if f.lower().endswith((".safetensors", ".pt", ".ckpt")):
-                out.append(f)
-    out.sort()
-    return [{"name": f,
-             "family": model_profiles.detect_lora_family(
-                 f, os.path.join(LORA_DIR, f))}
-            for f in out]
+    return training_manager.M.list_visible_loras(user)
 
 
 def resolve_checkpoint(name):
@@ -3456,6 +3505,10 @@ def stop_user_jobs(uid, reason="账号已停用"):
     uid = safe_uid(uid)
     if not uid:
         return 0
+    try:
+        training_manager.M.cancel_user(uid, reason)
+    except Exception:
+        pass
     jobs = []
     with JOBS_LOCK:
         for jid, job in JOBS.items():
@@ -3497,6 +3550,10 @@ def stop_user_jobs(uid, reason="账号已停用"):
 
 def stop_all_jobs(reason="系统维护"):
     """停掉所有账号的排队和运行任务；系统回滚 / 重置前使用。"""
+    try:
+        training_manager.M.stop_all(reason)
+    except Exception:
+        pass
     with AUTO_LOCK:
         AUTO["stop"] = True
         AUTO["running"] = False
@@ -3544,6 +3601,7 @@ def system_rollback(name):
     reload_jobs_state()
     local_llm.load(force=True)
     lan_share.reload_workers()
+    training_manager.M.reload()
     scheduler_kick()
     return result
 
@@ -3556,6 +3614,10 @@ def system_reset(admin_user):
         raise ValueError("只有管理员可以重置系统")
     snap = system_state.create_snapshot(ROOT, "系统重置前自动备份")
     stop_all_jobs("系统重置，任务已中断")
+    try:
+        training_manager.M.reset_all("系统重置，训练已中断")
+    except Exception:
+        pass
     with USERS_LOCK:
         current = USERS.get(uid)
         if not current or current.get("role") != "admin":
@@ -3773,7 +3835,9 @@ def _sched_refresh_slots_locked(local_ok=None):
     })
     local["kind"] = "local"
     local["name"] = "本机"
-    local["available"] = bool(settings.get("local_enabled", True) and local_ok)
+    local["available"] = bool(
+        settings.get("local_enabled", True) and local_ok
+        and not training_manager.M.local_gpu_blocked())
     snap = {w.get("id"): w for w in lan_share.scheduler_workers()
             if w.get("id")}
     for sid in list(SCHEDULER["slots"].keys()):
@@ -4496,7 +4560,10 @@ def scheduler_snapshot():
                 "paused": bool(control.get("paused")),
                 "pause_reason": control.get("pause_reason") or "",
                 "maintenance_active": queue_control.maintenance_active(),
-                "max_wait_seconds": int(control.get("max_wait_seconds") or 0)}
+                "max_wait_seconds": int(control.get("max_wait_seconds") or 0),
+                "training": training_manager.M.gate_snapshot(),
+                "local_available": bool(
+                    (SCHEDULER["slots"].get("local") or {}).get("available"))}
 
 
 def scheduler_has_remote(user, requirements, pixels=0, count=1):
@@ -4514,6 +4581,92 @@ def scheduler_has_remote(user, requirements, pixels=0, count=1):
         if _worker_policy_can_run(policy, job):
             return True
     return False
+
+
+def local_generation_running():
+    """本机正在采样的生图任务数；训练闸门只拦本机，不管远端。"""
+    with JOBS_LOCK:
+        return sum(1 for j in JOBS.values()
+                   if j.get("status") == "running"
+                   and j.get("worker_kind", "local") == "local")
+
+
+def comfy_free_models():
+    """让 ComfyUI 释放模型/显存；/free 返回空体，不能走 http_json。"""
+    try:
+        data = json.dumps({"unload_models": True,
+                           "free_memory": True}).encode("utf-8")
+        req = urllib.request.Request(
+            COMFY + "/free", data=data,
+            headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            resp.read(64)
+        return True
+    except Exception:
+        return False
+
+
+def training_limits_for(uid):
+    user = get_user(uid) or {}
+    return user_limits(user)
+
+
+def training_usage_for(uid):
+    snap = usage_snapshot(uid)
+    return {
+        "train_seconds_today": snap.get("train_seconds_today", 0),
+        "train_seconds_month": snap.get("train_seconds_month", 0),
+        "train_jobs_today": snap.get("train_jobs_today", 0),
+        "train_jobs_month": snap.get("train_jobs_month", 0),
+    }
+
+
+def training_feature_allowed(uid):
+    user = get_user(uid) or {}
+    return bool(is_admin(user) or feature_allowed(user, "train"))
+
+
+def training_lora_in_use(name):
+    name = os.path.basename(str(name or ""))
+    with JOBS_LOCK:
+        for job in JOBS.values():
+            if job.get("status") not in ("queued", "running"):
+                continue
+            if any(os.path.basename(str(x.get("name") or "")) == name
+                   for x in (job.get("loras") or [])):
+                return True
+    return False
+
+
+def _training_audit(category, action, user=None, ip="", ok=True,
+                    user_id=None, **detail):
+    return audit(category, action, user=user, ip=ip, ok=ok,
+                 user_id=user_id, **detail)
+
+
+def _training_note_usage(uid, seconds=0):
+    note_training_usage(uid, seconds)
+
+
+def _training_activity(event_kind, **fields):
+    return activity(event_kind, **fields)
+
+
+training_manager.bind_runtime(
+    local_active=local_generation_running,
+    gpu_snapshot=lambda: dict(LOAD_STATE),
+    guard_snapshot=lambda: guard_snapshot(),
+    free_comfy=comfy_free_models,
+    scheduler_kick=scheduler_kick,
+    audit=_training_audit,
+    note_usage=_training_note_usage,
+    activity=_training_activity,
+    limits_for=training_limits_for,
+    usage_for=training_usage_for,
+    lora_in_use=training_lora_in_use,
+    can_train=training_feature_allowed,
+    ensure_sampler=ensure_load_sampler,
+)
 
 
 def job_requirements(ckpt, loras=None, turbo=False, kind="gen"):
@@ -5243,12 +5396,12 @@ def run_job(job_id, prompt, negative, width, height, steps, cfg, seed,
             profile = model_profile(ckpt)
             pony_prefix = pony_prefix_for(ckpt, text)
             if ckpt == ANIMA_MODEL:
-                wf = build_anima_workflow(text, negative, width, height, steps,
-                                          cfg, seed, use_translate,
-                                          count=count, init_image=init_image,
-                                          init_mask=init_mask, denoise=denoise,
-                                          sampler=sampler, hires=hires,
-                                          turbo=turbo, char_tags=char_tags)
+                wf = build_anima_workflow(
+                    text, negative, width, height, steps, cfg, seed,
+                    use_translate, count=count, init_image=init_image,
+                    init_mask=init_mask, denoise=denoise,
+                    sampler=sampler, hires=hires, turbo=turbo,
+                    char_tags=char_tags, loras=loras)
             else:
                 wf = build_workflow(text, negative, width, height, steps, cfg,
                                     seed, use_translate, count=count,
@@ -6994,6 +7147,10 @@ def user_usage(uid):
         "gpu_seconds_month": round(snap["month"].get("gpu_seconds", 0), 1),
         "images_month": snap["month"].get("images", 0),
         "jobs_month": snap["month"].get("jobs", 0),
+        "train_seconds_today": snap.get("train_seconds_today", 0),
+        "train_seconds_month": snap.get("train_seconds_month", 0),
+        "train_jobs_today": snap.get("train_jobs_today", 0),
+        "train_jobs_month": snap.get("train_jobs_month", 0),
     }
 
 
@@ -7261,6 +7418,15 @@ def auto_loop(params, count, interval, uid="admin"):
                 if AUTO["stop"]:
                     break
                 AUTO["done"] = i
+            # LoRA 训练占用本机显卡时，挂机造图跟着暂停，训练结束再继续。
+            while training_manager.M.local_gpu_blocked():
+                with AUTO_LOCK:
+                    if AUTO["stop"]:
+                        break
+                time.sleep(2)
+            with AUTO_LOCK:
+                if AUTO["stop"]:
+                    break
             user = get_user(uid)
             eta = round(estimate_seconds(params["ckpt"], params["steps"], 1), 1)
             if user:

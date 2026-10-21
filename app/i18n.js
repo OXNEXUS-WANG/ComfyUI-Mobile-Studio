@@ -1904,7 +1904,92 @@
     '提示词超过 ': 'Prompt was truncated to ',
     ' 字，已截断': ' characters',
     '负面提示词已清理 ': 'Removed ',
-    '负面提示词超过 ': 'Negative prompt was truncated to '
+    '负面提示词超过 ': 'Negative prompt was truncated to ',
+
+    /* ---------- LoRA 训练 ---------- */
+    '训 练': 'TRAIN',
+    'LoRA 训练': 'LoRA training',
+    '训练会长时间占用显卡；普通账号需管理员审核，训练期间本机出图让路。':
+      'Training occupies the GPU for a long time. Regular accounts need admin approval, and local generation waits during training.',
+    '刷新': 'Refresh',
+    '新建训练': 'New training',
+    '第一次使用请让管理员先安装训练组件。数据集至少 5 张，建议 10–30 张同一角色/画风。':
+      'Ask the admin to install the trainer first. Use at least 5 images; 10–30 images of the same character/style work best.',
+    '我的训练': 'My training',
+    '草稿、审核、排队、训练和结果都在这里。':
+      'Drafts, reviews, queue, training, and results are all here.',
+    '训练管理': 'Training management',
+    '安装组件、审核申请、设置训练窗口和资源上限。':
+      'Install the trainer, review requests, and set windows and resource limits.',
+    '先填基本参数，创建后再加图片和修改 caption。':
+      'Fill in the basics first; add images and captions after creating.',
+    '训练名称': 'Training name',
+    '训练类型': 'Training type',
+    '底模': 'Base model',
+    '触发词': 'Trigger word',
+    '默认描述': 'Default caption',
+    '预设': 'Preset',
+    '分辨率': 'Resolution',
+    '学习率': 'Learning rate',
+    '重复次数': 'Repeats',
+    '训练轮数': 'Epochs',
+    '最大步数': 'Max steps',
+    '创建并添加图片': 'Create and add images',
+    '取消': 'Cancel',
+    '从图库选择训练图片': 'Pick training images from gallery',
+    '只会复制到训练集，不会影响原图。':
+      'Images are copied into the dataset; originals are untouched.',
+    '加入训练集': 'Add to dataset',
+    '训练详情': 'Training details',
+    '角色 LoRA（推荐）': 'Character LoRA (recommended)',
+    '画风 LoRA': 'Style LoRA',
+    '快速测试': 'Quick test',
+    '512（快，细节少）': '512 (fast, less detail)',
+    '768（推荐）': '768 (recommended)',
+    '1024（慢，8GB 风险高）': '1024 (slow, risky on 8GB)',
+    '这个底模不可用': 'This base model is unavailable',
+    '这张图的 caption': 'Caption for this image',
+    '上传图片': 'Upload images',
+    '从图库选择': 'Pick from gallery',
+    '提交审核': 'Submit for review',
+    '取消训练': 'Cancel training',
+    '去出图使用': 'Use in generator',
+    '下载 LoRA': 'Download LoRA',
+    '删除记录': 'Delete record',
+    '重试': 'Retry',
+    '保存参数': 'Save',
+    '还没有训练项目。点右上角「新建训练」。':
+      'No training projects yet. Click "New training" at the top right.',
+    '管理员还没有开启你的 LoRA 训练功能。':
+      'The administrator has not enabled LoRA training for you.',
+    '正在读取训练数据…': 'Loading training data…',
+    '读取失败：': 'Load failed: ',
+    '训练组件就绪': 'Trainer ready',
+    '组件需要自检': 'Trainer needs check',
+    '组件未安装': 'Trainer not installed',
+    'GPU 训练中': 'GPU training',
+    '本机可出图': 'GPU available',
+    '训练开始后本机出图会排队': 'Local generation queues during training',
+    '训练次数': 'Training jobs',
+    '训练时长': 'Training time',
+    '今日': 'today',
+    '本月分钟': 'min this month',
+    '每日训练次数（0=不限）': 'Training jobs/day (0 = unlimited)',
+    '每月训练分钟（0=不限）': 'Training minutes/month (0 = unlimited)',
+    '单次训练分钟（0=不限）': 'Minutes per training (0 = unlimited)',
+    '训练最大步数（0=不限）': 'Max training steps (0 = unlimited)',
+    '训练集图片（0=不限）': 'Dataset images (0 = unlimited)',
+    '训练集 MB（0=不限）': 'Dataset MB (0 = unlimited)',
+    '训练最大分辨率（0=不限）': 'Max training resolution (0 = unlimited)',
+    '训练队列': 'Training queue',
+    '用 Anima / SDXL 训练角色或画风 LoRA；普通账号提交后由管理员审核，训练期间本机出图让路。':
+      'Train character or style LoRAs with Anima / SDXL. Regular accounts need admin approval; local generation waits during training.',
+    '全局一次只跑一个训练；等待窗口、显存、内存和温度达标后自动开始，进度/日志/取消都在训练页。':
+      'One training runs at a time. It starts when the window, VRAM, RAM, and temperature allow; progress, logs, and cancel are on the training page.',
+    'LoRA 训练：数据集、提交审核、进度/日志、取消；普通账号需要管理员开启训练功能。':
+      'LoRA training: dataset, review, progress/logs, cancel. Regular accounts need the feature enabled by an admin.',
+    '训练管理：安装 sd-scripts、审核申请、训练窗口、资源上限和 LoRA 共享；管理员专用。':
+      'Training admin: install sd-scripts, review requests, windows, resource limits, and LoRA sharing. Admin only.'
   });
 
   /* 动态句子的英文模板（按顺序匹配） */

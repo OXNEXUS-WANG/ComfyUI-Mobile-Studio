@@ -20,6 +20,12 @@ cleanup.json
 queue_control.json
 teams.json
 team_prompts.json
+trainings.json
+trainings.json.bak
+training_settings.json
+training_settings.json.bak
+loras.json
+loras.json.bak
 license.json
 access.json
 cert.pem
@@ -39,6 +45,12 @@ _node_trash/
 _node_uploads/
 workflows/
 plugins/
+trainings/
+training_uploads/
+trainer/
+_training_trash/
+_trainer_trash/
+_lora_trash/
 install_report.txt
 *.log
 

@@ -30,6 +30,11 @@ ComfyUI Mobile Studio · 商用版
 （模型为 CC-BY 4.0），不会安装 AGPL 的 MiniSBD。也可以用 -NoTranslate
 完全跳过翻译，只使用英文提示词。
 
+LoRA 训练组件默认也不安装、不随包分发。管理员在网页“训练”标签里手动安装时，
+才会从上游下载 kohya sd-scripts（Apache-2.0）和固定哈希的最小依赖到隔离的
+trainer\ 目录。该组件的许可证和安全更新由使用方自行遵守；训练出的 LoRA
+版权和模型许可由训练数据、底模和用户自行负责。
+
 四、版本锁定
 ------------
 安装器默认使用 installer\versions.lock.json：
@@ -56,6 +61,7 @@ install_problem.txt 诊断报告和安装日志；点“是”可直接打开。
 六、注意
 --------
 - 服务只监听本机和 192.168.137.1，不会对校园网开放。
-- 不要提交 users.json、workers.json、cert.pem、key.pem、models/。
+- 不要提交 users.json、workers.json、cert.pem、key.pem、models/、
+  trainings.json、training_settings.json、loras.json、trainings/、trainer/。
 - 7-Zip / 7zr 的 LGPL 文本在 tools\7zip-LICENSE.txt。
 - 商业部署前请确认 GPL 条款和模型许可，必要时咨询律师。

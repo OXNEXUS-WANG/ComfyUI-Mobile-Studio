@@ -40,6 +40,9 @@ $runtimeFiles = @(
     "local_llm.json", "monitor.json",
     "monitor_alerts.json", "monitor_trends.json", "cleanup.json",
     "queue_control.json", "teams.json", "team_prompts.json",
+    "trainings.json", "trainings.json.bak",
+    "training_settings.json", "training_settings.json.bak",
+    "loras.json", "loras.json.bak",
     "license.json", "cert.pem", "key.pem", "worker_agent.json", "access.json"
 )
 Get-ChildItem $Stage -Recurse -File -Force -ErrorAction SilentlyContinue |
@@ -52,7 +55,9 @@ Get-ChildItem $Stage -Recurse -File -Force -ErrorAction SilentlyContinue |
     Remove-Item -Force -ErrorAction SilentlyContinue
 $runtimeDirs = @("logs", "_restore_points", "generated", "web_uploads",
     "_backups", "_model_trash", "_model_uploads",
-    "_node_trash", "_node_uploads", "workflows", "plugins")
+    "_node_trash", "_node_uploads", "workflows", "plugins",
+    "trainings", "training_uploads", "trainer",
+    "_training_trash", "_trainer_trash", "_lora_trash")
 foreach ($name in $runtimeDirs) {
     Get-ChildItem $Stage -Recurse -Directory -Force -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -eq $name } |

@@ -22,7 +22,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import backup  # noqa: E402
 
 ROOT_FILES = set(backup.ROOT_FILES)
-ALLOWED_PREFIXES = ("generated/", "logs/", "workflows/", "plugins/")
+ALLOWED_PREFIXES = ("generated/", "logs/", "workflows/", "plugins/",
+                    "trainings/")
 SKIP_VERSION = 1
 
 
