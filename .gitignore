@@ -9,6 +9,7 @@ jobs_state.json
 jobs_resume.json
 supervisor.json
 supervisor_status.json
+instance.lock
 time_state.json
 trusted_time.key
 local_llm.json

@@ -3,6 +3,7 @@
 
 后端逻辑在 app_core.py；这里只负责 HTTP 和进程启动。
 """
+import atexit
 import base64
 import csv
 import hashlib
@@ -28,6 +29,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from app_core import *
 # 星号导入不会带下划线开头的内部函数，单独补一个
 from app_core import _stage_to_input
+
+# 单实例锁：端口绑定在 Windows 上可被两个进程同时抢到，光靠 /api/session
+# 有竞态；锁文件保证同一安装目录只跑一个网页服务。
+INSTANCE_FILE = os.path.join(ROOT, "instance.lock")
 import lan_share
 import license_guard
 import model_manager
@@ -4249,6 +4254,62 @@ def make_server(addr):
     return httpd
 
 
+def _pid_alive(pid):
+    if not pid or pid <= 0:
+        return False
+    try:
+        import psutil
+        return psutil.pid_exists(pid)
+    except Exception:
+        try:
+            os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
+
+
+def acquire_instance_lock():
+    """用 O_EXCL 抢锁；崩溃留下的旧锁按 PID 判断后清理。"""
+    for _ in range(2):
+        try:
+            fd = os.open(INSTANCE_FILE, os.O_CREAT | os.O_EXCL | os.O_RDWR)
+        except FileExistsError:
+            pid = 0
+            try:
+                with open(INSTANCE_FILE, "r", encoding="ascii") as fh:
+                    pid = int((fh.read() or "0").strip() or 0)
+            except Exception:
+                pid = 0
+            if _pid_alive(pid):
+                return False
+            try:
+                os.remove(INSTANCE_FILE)
+            except OSError:
+                return False
+            continue
+        except OSError:
+            return False
+        try:
+            os.write(fd, str(os.getpid()).encode("ascii"))
+        finally:
+            os.close(fd)
+        return True
+    return False
+
+
+def release_instance_lock():
+    try:
+        with open(INSTANCE_FILE, "r", encoding="ascii") as fh:
+            if int((fh.read() or "0").strip() or 0) != os.getpid():
+                return
+    except Exception:
+        return
+    try:
+        os.remove(INSTANCE_FILE)
+    except OSError:
+        pass
+
+
 def already_running():
     """端口上已经有本服务在跑吗？
 
@@ -4316,6 +4377,13 @@ def monitor_loop():
 
 def main():
     set_console_title("手机出图服务  ·  关闭这个窗口 = 服务停止")
+
+    if not acquire_instance_lock():
+        print()
+        print("!! 手机出图服务已经有另一个实例在运行（%s）。" % INSTANCE_FILE)
+        print("   如果确认没有运行，请把这个文件删掉后重试。")
+        return 4
+    atexit.register(release_instance_lock)
 
     if already_running():
         print()

@@ -16,6 +16,8 @@ class InstallerConflictTests(unittest.TestCase):
             encoding="utf-8")
         cls.start = (base / "app" / "start_service.py").read_text(
             encoding="utf-8")
+        cls.web = (base / "app" / "web_server.py").read_text(
+            encoding="utf-8")
         cls.bat = (base / "app" / "一键启动.bat").read_text(encoding="utf-8")
 
     def test_port_and_process_conflicts_are_detected(self):
@@ -57,6 +59,12 @@ class InstallerConflictTests(unittest.TestCase):
         self.assertIn("_cert_ok", self.boot)
         self.assertIn("_backup_file", self.boot)
         self.assertIn("旧证书已备份", self.boot)
+
+    def test_single_instance_lock_exists(self):
+        for text in ("acquire_instance_lock", "release_instance_lock",
+                     "instance.lock", "O_CREAT | os.O_EXCL"):
+            self.assertIn(text, self.web)
+        self.assertIn("atexit.register(release_instance_lock)", self.web)
 
     def test_launcher_distinguishes_our_ports_from_foreign_services(self):
         for name in ("check_port_conflicts", "web_is_ours",
