@@ -37,10 +37,14 @@ def _cert_ok(cert_path, key_path):
     try:
         from cryptography import x509
         from cryptography.hazmat.primitives import serialization
+        from cryptography.x509.oid import NameOID
     except Exception:
         return True
     try:
         cert = x509.load_pem_x509_certificate(cert_path.read_bytes())
+        names = cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+        if not names or names[0].value != u"手机出图":
+            return False
         key = serialization.load_pem_private_key(
             key_path.read_bytes(), password=None)
         now = datetime.datetime.now(datetime.timezone.utc)

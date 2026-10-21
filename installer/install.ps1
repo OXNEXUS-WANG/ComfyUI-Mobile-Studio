@@ -792,7 +792,19 @@ function Verify-ComfyUI {
             Ok ("ComfyUI 版本锁定: " + $ComfyVersion)
         } else {
             Warn ("ComfyUI 版本不是锁定值：当前 " + $ver + " / 锁定 " + $ComfyVersion)
-            Warn "安装器不会自动升级；如需升级请显式加 -AllowUpdates"
+            Add-Conflict ("现有 ComfyUI 版本 " + $ver + "，锁定版本 " + $ComfyVersion)
+            if ($script:Dialogs) {
+                $cont = Show-Gui (
+                    "检测到现有 ComfyUI 版本与安装包锁定版本不同：`n`n" +
+                    "现有：" + $ver + "`n锁定：" + $ComfyVersion + "`n`n" +
+                    "安装器不会自动升级。继续使用现有版本，部分新节点或工作流" +
+                    "可能不兼容。`n`n是否继续安装？") "ComfyUI 版本不一致" "YesNo" "Warning"
+                if ($cont -ne "Yes") {
+                    throw "用户取消安装：ComfyUI 版本与锁定版本不一致。"
+                }
+            } else {
+                Warn "安装器不会自动升级；如需升级请显式加 -AllowUpdates"
+            }
         }
     } catch {
         Warn "无法读取 ComfyUI 版本；保持现有安装"
