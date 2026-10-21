@@ -38,6 +38,8 @@ PROTECTED_DIR_NAMES = {
     "generated", "web_uploads", "logs", "_backups", "_restore_points",
     "_model_trash", "_model_uploads", "_node_trash", "_node_uploads",
     "workflows", "__pycache__", ".git",
+    "trainer", "trainings", "training_uploads",
+    "_training_trash", "_trainer_trash", "_lora_trash",
     "input", "output", "temp", "user",
 }
 APP_DIRS = ("worker", "docs", "installer", "tools", "webapp_templates")
@@ -129,11 +131,16 @@ def _copy_app_level(source, payload, progress=None):
             src = os.path.join(app_dir, item)
             dst = os.path.join(payload, item)
             if os.path.isdir(src):
+                if item in PROTECTED_DIR_NAMES:
+                    continue
                 c, b = _copy_tree(src, dst, skip_same=False,
                                   progress=progress, label=item)
                 count += c
                 total += b
             elif os.path.isfile(src):
+                if item in PROTECTED_FILES or item.endswith(
+                        (".lnk", ".pyc", ".pyo", ".part", ".tmp")):
+                    continue
                 got = _copy_file(src, dst, skip_same=False)
                 if got:
                     count += 1

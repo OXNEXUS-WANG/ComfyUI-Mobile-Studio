@@ -564,6 +564,13 @@ body::after{content:'';position:fixed;inset:0;z-index:9;pointer-events:none;opac
 .status .dot{width:7px;height:7px;border-radius:50%;background:#63d9a0;
   box-shadow:0 0 10px #63d9a0;animation:pulse 2s infinite}
 .status b{color:var(--cy);font-weight:500}
+.lic-badge{display:inline-flex;align-items:center;gap:4px;max-width:260px;
+  padding:2px 8px;border:1px solid rgba(127,227,255,.18);border-radius:999px;
+  background:rgba(127,227,255,.05);color:var(--tx3);font-size:10px;
+  letter-spacing:.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lic-badge b{color:rgba(190,225,255,.85);font-weight:500;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:640px){.lic-badge{max-width:150px;font-size:9px;padding:2px 6px}}
 .feed-dot{width:6px;height:6px;border-radius:50%;background:#55606f;margin-left:3px;
   box-shadow:none;transition:.2s;flex:0 0 auto}
 .feed-dot.on{background:#7cffc4;box-shadow:0 0 9px #7cffc4;animation:pulse 1.8s infinite}
@@ -1311,7 +1318,7 @@ void main(){
   gl_FragColor = vec4(mapped, alpha);
 }
 </script>
-<script src="i18n.js?v=20261022a"></script>
+<script src="i18n.js?v=20261022b"></script>
 </head>
 <body>
 <canvas id="starCanvas"></canvas>
@@ -1331,6 +1338,7 @@ void main(){
   <div class="search-wrap"><input id="search" placeholder="搜索功能 / 接口，例如：图生视频、/api/gallery" autocomplete="off"></div>
   <div class="status"><span class="dot"></span>SYSTEM ONLINE <b id="fps">60</b> FPS
     <i class="feed-dot" id="feedDot" title="实时活动连接"></i>
+    <span class="lic-badge" id="licenseMark" style="display:none"><span>商用授权</span><span>·</span><span>客户</span><b id="licenseCustomer" data-no-i18n></b></span>
     <a class="lang-btn" href="/?focus=profile" title="个人设置">⚙</a>
     <button class="lang-btn" type="button" data-lang-toggle>EN</button></div>
 </header>
@@ -8236,6 +8244,21 @@ async function pollMonitor(){
   }catch(e){}
 }
 
+async function initLicenseBadge(){
+  try{
+    const d = await (await fetch('/api/license', {cache:'no-store'})).json();
+    const box = document.getElementById('licenseMark');
+    const name = document.getElementById('licenseCustomer');
+    const customer = String((d && d.customer) || '').trim();
+    if(!box || !name || !d || !d.commercial || !d.valid || !customer) return;
+    name.textContent = customer.length > 36
+      ? customer.slice(0, 36) + '…' : customer;
+    box.title = '授权客户：' + customer +
+      (d.machine_code ? '\n机器码：' + d.machine_code : '');
+    box.style.display = '';
+  }catch(e){}
+}
+
 async function initSessionUser(){
   try{
     const j = await (await fetch('/api/session', {cache:'no-store'})).json();
@@ -8243,6 +8266,7 @@ async function initSessionUser(){
   }catch(e){
     currentUser = null;
   }
+  initLicenseBadge();
   refreshStates();
   if(state.active && isAdminOnlyNode(state.active)){
     closePanel();

@@ -4297,11 +4297,17 @@ class Handler(BaseHTTPRequestHandler):
         mode = str(data.get("mode") or "txt")
         is_video = mode in ("vid", "i2v")
         is_i2v = mode == "i2v"
-        if mode in ("img", "img2img", "inpaint") and not data.get("image"):
-            self._json({"error": "图生图 / 局部重绘需要先上传参考图"}, 400)
+        raw_img = data.get("image") or ""
+        raw_mask = data.get("mask") or ""
+        needs_image = mode in ("img", "img2img", "inpaint", "i2v")
+        if needs_image and not (isinstance(raw_img, str)
+                                and raw_img.lower().startswith("data:image/")):
+            self._json({"error": "参考图格式不正确，需要 PNG/JPEG/WebP 图片"}, 400)
             return
-        if mode == "inpaint" and not data.get("mask"):
-            self._json({"error": "局部重绘需要涂抹蒙版"}, 400)
+        if mode == "inpaint" and not (isinstance(raw_mask, str)
+                                      and raw_mask.lower().startswith(
+                                          "data:image/")):
+            self._json({"error": "局部重绘需要有效的涂抹蒙版"}, 400)
             return
         feature_key = ("video" if is_video else
                        "inpaint" if data.get("mask") else
@@ -4381,7 +4387,12 @@ class Handler(BaseHTTPRequestHandler):
             # 不跟随出图页的步数滑块（那是给 SDXL 用的）。
             steps, cfg = 20, 6.0
         else:
-            ckpt = resolve_checkpoint(data.get("model"))
+            requested_model = str(data.get("model") or "").strip()
+            ckpt = resolve_checkpoint(requested_model)
+            if requested_model and requested_model != ckpt:
+                self._json({"error": "底模不存在或当前不可用",
+                            "model": requested_model}, 400)
+                return
             preset = model_profile(ckpt)
             if not preset.get("supported", True):
                 msg = "；".join(preset.get("warnings") or []) or \
@@ -4412,31 +4423,40 @@ class Handler(BaseHTTPRequestHandler):
         loras = []
         lora_skipped = []
         lora_denied = []
+        lora_missing = []
         raw_loras = data.get("loras") or []
         if isinstance(raw_loras, list) and not is_video:
             for it in raw_loras[:8]:
                 if not isinstance(it, dict):
                     continue
                 nm = os.path.basename(str(it.get("name") or ""))
+                if not nm:
+                    continue
                 path = os.path.join(LORA_DIR, nm)
-                if nm and os.path.isfile(path):
-                    if not training_manager.M.lora_allowed(user, nm):
-                        lora_denied.append(nm)
-                        continue
-                    fam = (training_manager.M.lora_family(nm)
-                           or model_profiles.detect_lora_family(nm, path))
-                    if not model_profiles.lora_compatible(
-                            preset.get("family"), fam):
-                        lora_skipped.append({"name": nm, "family": fam})
-                        continue
-                    try:
-                        st = float(it.get("strength", 1.0))
-                    except (TypeError, ValueError):
-                        st = 1.0
-                    loras.append({"name": nm, "strength": max(-2.0, min(2.0, st))})
+                if not os.path.isfile(path):
+                    lora_missing.append(nm)
+                    continue
+                if not training_manager.M.lora_allowed(user, nm):
+                    lora_denied.append(nm)
+                    continue
+                fam = (training_manager.M.lora_family(nm)
+                       or model_profiles.detect_lora_family(nm, path))
+                if not model_profiles.lora_compatible(
+                        preset.get("family"), fam):
+                    lora_skipped.append({"name": nm, "family": fam})
+                    continue
+                try:
+                    st = float(it.get("strength", 1.0))
+                except (TypeError, ValueError):
+                    st = 1.0
+                loras.append({"name": nm, "strength": max(-2.0, min(2.0, st))})
         if lora_denied:
             self._json({"error": "这个 LoRA 属于其他账号或尚未共享。",
                         "lora_denied": lora_denied}, 403)
+            return
+        if lora_missing:
+            self._json({"error": "LoRA 不存在或已被删除。",
+                        "lora_missing": lora_missing}, 400)
             return
 
         hires = bool(data.get("hires")) and not is_video

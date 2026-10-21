@@ -1014,6 +1014,22 @@ def _prune_audit(now=None):
         pass
 
 
+def license_audit_fields():
+    """商用版审计附加字段：客户名 + 机器指纹（不写授权码原文/完整机器码）。"""
+    try:
+        lic = license_guard.status()
+        if not lic.get("commercial"):
+            return {}
+        machine = str(lic.get("machine_code") or "")
+        out = {"license_customer": str(lic.get("customer") or "")[:100]}
+        if machine:
+            out["license_fp"] = hashlib.sha256(
+                machine.encode("utf-8")).hexdigest()[:12]
+        return out
+    except Exception:
+        return {}
+
+
 def audit(category, action, user=None, ip="", ok=True, user_id=None, **detail):
     """追加一条持久日志。category 只能是 activity / security。"""
     if category not in ("activity", "security"):
@@ -1033,6 +1049,9 @@ def audit(category, action, user=None, ip="", ok=True, user_id=None, **detail):
         "ip": str(ip or "")[:64],
         "detail": detail,
     }
+    lic_fields = license_audit_fields()
+    if lic_fields:
+        rec.update(lic_fields)
     try:
         with AUDIT_LOCK:
             _prune_audit(now)

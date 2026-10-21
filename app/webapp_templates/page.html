@@ -867,6 +867,25 @@ h1::after {
 }
 @keyframes caretBlink { 50% { opacity: 0; } }
 
+/* 商用授权水印：客户名只做标识，不影响操作 */
+.license-mark {
+  display: inline-flex; align-items: center; flex-wrap: wrap; gap: 5px;
+  margin: -4px 0 12px; padding: 4px 11px;
+  border: 1px solid rgba(127,227,255,.16);
+  border-radius: 999px;
+  background: rgba(127,227,255,.045);
+  color: var(--tx3); font-size: 11.5px; line-height: 1.35;
+  letter-spacing: .2px; max-width: 100%;
+}
+.license-mark .lic-sep { opacity: .45; }
+.license-mark b {
+  color: rgba(190,225,255,.82); font-weight: 550;
+  min-width: 0; overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .license-mark { margin: -2px 0 10px; font-size: 10.5px; padding: 3px 9px; }
+}
+
 /* 8) 状态条：左侧色条 */
 .status { border-left-width: 2px; }
 .status.done { border-left-color: rgba(99,217,160,.85); }
@@ -1618,7 +1637,7 @@ body.scrolled #langBtn, body.scrolled #profileTopBtn {
   }
 }
 </style>
-<script src="/i18n.js?v=20261022a"></script>
+<script src="/i18n.js?v=20261022b"></script>
 </head>
 <body>
 <button id="langBtn" type="button" data-lang-toggle>EN</button>
@@ -1753,6 +1772,10 @@ body.scrolled #langBtn, body.scrolled #profileTopBtn {
 </div>
 
 <h1>手机出图 <span id="subtitle">本地 · ComfyUI</span></h1>
+<div class="license-mark" id="licenseMark" style="display:none">
+  <span>商用授权</span><span class="lic-sep">·</span><span>客户</span>
+  <b id="licenseCustomer" data-no-i18n></b>
+</div>
 
 <div class="tabs">
   <div class="tab on" data-view="gen" title="写提示词、调参数、生成图片">出 图</div>
@@ -6421,6 +6444,26 @@ fetch("/api/session", { cache: "no-store", credentials: "same-origin" })
     }
   })
   .catch(function () {});
+
+/* ================= 商用授权水印 ================= */
+function loadLicenseMark() {
+  fetch("/api/license", { cache: "no-store", credentials: "same-origin" })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) {
+      var box = document.getElementById("licenseMark");
+      var name = document.getElementById("licenseCustomer");
+      if (!box || !name || !d || !d.commercial || !d.valid) { return; }
+      var customer = String(d.customer || "").trim();
+      if (!customer) { return; }
+      name.textContent = customer.length > 48
+        ? customer.slice(0, 48) + "…" : customer;
+      box.title = uiT("授权客户：", "Licensed to: ") + customer +
+        (d.machine_code ? "\n" + uiT("机器码：", "Machine: ") + d.machine_code : "");
+      box.style.display = "";
+    })
+    .catch(function () {});
+}
+loadLicenseMark();
 
 /* ================= 插件中心 ================= */
 let plgState = null;

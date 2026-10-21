@@ -1229,6 +1229,7 @@
     '至少 6 位': 'At least 6 characters',
     'D:\\下载\\model.safetensors': 'D:\\Downloads\\model.safetensors',
     '商用授权': 'Commercial license',
+    '客户': 'Customer',
     '商用版绑定机器码；分享版不需要激活。授权到期前可以在这里打开激活页续期。':
       'The Commercial edition is bound to a machine code; the Share edition needs no activation. Open the activation page here to renew before expiry.',
     '激活 / 续期': 'Activate / renew',
