@@ -163,6 +163,32 @@ function Copy-AppFiles {
     New-Item -ItemType Directory -Force -Path $toolsDest | Out-Null
     Copy-Item (Join-Path $PkgRoot "installer\download_models.py") (Join-Path $toolsDest "download_models.py") -Force
     Copy-Item (Join-Path $PkgRoot "installer\models_manifest.json") (Join-Path $toolsDest "models_manifest.json") -Force
+    # 备份/恢复/U 盘打包脚本和 7zr 也要装进目标目录，否则根目录的 .bat 会找不到工具。
+    $toolsSrc = Join-Path $PkgRoot "tools"
+    if (Test-Path $toolsSrc) {
+        Get-ChildItem $toolsSrc -Force | ForEach-Object {
+            $target = Join-Path $toolsDest $_.Name
+            if ($_.PSIsContainer) { Copy-Tree $_.FullName $target }
+            else { Copy-Item $_.FullName $target -Force }
+        }
+    }
+    # 版本号、许可证、更新日志和根目录小工具（商业包没有的文件自动跳过）。
+    $rootFiles = @(
+        "VERSION", "VERSION_LOCK.md", "LICENSE", "THIRD_PARTY_NOTICES.md",
+        "README.md", "CHANGELOG.md", "EDITIONS.md", "COMMERCIAL_LICENSE.md",
+        "安装说明.txt", "备份数据.bat", "恢复数据.bat", "打包到U盘.bat",
+        "运行测试.bat"
+    )
+    foreach ($name in $rootFiles) {
+        $src = Join-Path $PkgRoot $name
+        if (Test-Path $src) {
+            Copy-Item $src (Join-Path $InstallDir $name) -Force
+        }
+    }
+    $testsSrc = Join-Path $PkgRoot "tests"
+    if (Test-Path $testsSrc) {
+        Copy-Tree $testsSrc (Join-Path $InstallDir "tests")
+    }
 }
 
 function Write-ModelBat {
@@ -672,12 +698,20 @@ try {
     Step "完成" "安装成功"
     Say ""
     Say ("  安装目录：" + $InstallDir)
-    Say ("  桌面快捷方式：手机出图")
+    if ($NoShortcut) {
+        Say ("  启动方式：安装目录里的 一键启动.bat")
+    } else {
+        Say ("  桌面快捷方式：手机出图")
+    }
     Say ("  本机打开：https://127.0.0.1:8800")
     Say ("  手机打开：https://192.168.137.1:8800（先连电脑热点）")
     Say "  管理员账号：admin（密码是你刚才设置的）"
     Say ""
-    Say "  下一步：双击桌面的「手机出图」，等待启动完成后用浏览器打开。" "Green"
+    if ($NoShortcut) {
+        Say "  下一步：双击安装目录里的「一键启动.bat」，等待启动完成后用浏览器打开。" "Green"
+    } else {
+        Say "  下一步：双击桌面的「手机出图」，等待启动完成后用浏览器打开。" "Green"
+    }
     Say ""
     try { Stop-Transcript | Out-Null } catch { }
     exit 0

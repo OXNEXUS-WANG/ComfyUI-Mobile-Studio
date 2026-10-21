@@ -1,5 +1,26 @@
 ﻿# 变更日志
 
+## 2026-10-21 · 全新目录完整安装实测与安装完整性修复
+
+- 用 v1.1.2 分享包在全新目录完成一次从零安装：
+  - 安装器真实下载 ComfyUI 便携版（2,018,436,691 字节，7z 校验通过）、
+    Turbo LoRA（148,902,616 字节）、4x-UltraSharp（66,961,958 字节）；
+  - 其余 5 个大模型文件（约 5.7GB）按精确大小预置，安装器校验后跳过；
+  - 自定义节点、Argos 翻译模型、HTTPS 证书和管理员账号均正常初始化。
+- 全新安装首次启动发现并修复：安装器只复制了 app 目录，漏掉根目录的
+  `VERSION`、`LICENSE`、`THIRD_PARTY_NOTICES.md`、`备份数据.bat`、
+  `恢复数据.bat`、`打包到U盘.bat`、`运行测试.bat`、`tests/`，以及
+  `tools/backup.py`、`restore.py`、`usb_bundle.py`、`7zr.exe`。
+  现在 `Copy-AppFiles` 会完整复制这些文件；`-NoShortcut` 的完成提示
+  也改为指向安装目录里的 `一键启动.bat`。
+- 实测通过：HTTPS 登录、模型列表、Argos 中译英、Anima 极速 512×512
+  中英文提示词各出一张图、图库隔离路径、主页面 / 星图 / 图库接口 200；
+  安装目录内 `tests\run_tests.py` **117 项通过**（5 项跳过）；
+  `tools\backup.py` 生成 15 个文件、0.4MB 的备份 ZIP。
+- 说明：本机没有可用的 Windows 虚拟机软件，本轮是“全新目录 + 真实下载”
+  的干净安装，不是独立虚拟机；完整 6GB 模型包中 5.7GB 为预置校验，
+  hf-mirror 实际下载覆盖 2GB ComfyUI、149MB LoRA、67MB 放大模型。
+
 ## 2026-10-21 · 安装包下载功能实测与 429 重试
 
 - 对 v1.1.2 Share / Commercial 解压包运行 `install.ps1 -DryRun`：
