@@ -37,6 +37,7 @@ except Exception:       # 便携版没装也能跑，负载页只是少几项
     psutil = None
 
 import disk_cleanup
+import edition_policy
 import health_report
 import lan_share
 import license_guard
@@ -2272,6 +2273,28 @@ def admin_users_payload():
     return out
 
 
+def _active_accounts_locked():
+    """调用方必须持有 USERS_LOCK；过期游客不占名额。"""
+    return sum(1 for u in USERS.values() if user_is_active(u))
+
+
+def account_quota():
+    """当前版本的启用账号额度；停用/删除/过期游客会释放名额。"""
+    p = edition_policy.policy()
+    with USERS_LOCK:
+        used = _active_accounts_locked()
+    maxn = max(0, int(p.get("max_accounts") or 0))
+    return {
+        "edition": p.get("edition"),
+        "label": p.get("label"),
+        "label_en": p.get("label_en"),
+        "used": used,
+        "max": maxn,
+        "remaining": max(0, maxn - used),
+        "reached": bool(maxn and used >= maxn),
+    }
+
+
 def create_user(username, password, name="", role="user", limits=None):
     username = str(username or "").strip()
     if not re.fullmatch(r"[A-Za-z0-9_.-]{2,32}", username):
@@ -2300,6 +2323,12 @@ def create_user(username, password, name="", role="user", limits=None):
         "limits": normalize_limits(limits, role),
     }
     with USERS_LOCK:
+        # 并发创建时也必须再查一次用户名和版本额度。
+        for existing in USERS.values():
+            if str(existing.get("username") or "").lower() == username.lower():
+                raise ValueError("用户名已经存在")
+        if _active_accounts_locked() >= edition_policy.max_accounts():
+            raise ValueError(edition_policy.quota_message("accounts"))
         USERS[uid] = user
         _save_users_locked()
     return user
@@ -2334,6 +2363,9 @@ def update_user(uid, patch):
             user["role"] = role
         if "enabled" in patch:
             enabled = bool(patch.get("enabled"))
+            if enabled and not user.get("enabled", True):
+                if _active_accounts_locked() >= edition_policy.max_accounts():
+                    raise ValueError(edition_policy.quota_message("accounts"))
             user["enabled"] = enabled
             if (user.get("role") == "admin" and not enabled
                     and sum(1 for u in USERS.values()
@@ -2461,6 +2493,9 @@ def renew_guest(uid, hours=GUEST_DEFAULT_HOURS):
         user = USERS.get(str(uid or ""))
         if not user or not user.get("guest"):
             raise ValueError("这个账号不是游客账号")
+        if not user_is_active(user):
+            if _active_accounts_locked() >= edition_policy.max_accounts():
+                raise ValueError(edition_policy.quota_message("accounts"))
         user["expires_at"] = time.time() + hours * 3600
         user["enabled"] = True
         user.pop("expired_at", None)

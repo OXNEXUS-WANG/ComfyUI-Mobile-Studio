@@ -2149,6 +2149,12 @@
     var fd2 = core.match(/^管理员暂时关闭了「(.+)」功能。$/);
     if (fd2) return lead + 'The administrator has temporarily disabled "' +
       tr(fd2[1]) + '" for your account.' + tail;
+    var aq = core.match(/^(分享版|商业版)最多 (\d+) 个启用账号（含管理员）。请先停用或删除账号，或升级商业版。$/);
+    if (aq) return lead + (aq[1] === '分享版' ? 'Share edition' : 'Commercial edition') +
+      ' allows at most ' + aq[2] + ' active accounts (including admin). Disable or delete an account, or upgrade to Commercial.' + tail;
+    var wq = core.match(/^(分享版|商业版)最多 (\d+) 台算力节点。请先移除旧节点，或升级商业版。$/);
+    if (wq) return lead + (wq[1] === '分享版' ? 'Share edition' : 'Commercial edition') +
+      ' allows at most ' + wq[2] + ' worker nodes. Remove an old worker or upgrade to Commercial.' + tail;
     var gd = core.match(/^检测到\s*(.+)。新的出图任务会暂时被拦下，占用降下来后自动恢复。$/);
     if (gd) return lead + 'Detected ' + tr(gd[1]) +
       '. New generation jobs are paused until load drops.' + tail;

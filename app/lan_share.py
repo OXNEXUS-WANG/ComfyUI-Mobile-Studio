@@ -17,6 +17,7 @@ import time
 from collections import deque
 from pathlib import Path
 
+import edition_policy
 import monitor_center
 
 ROOT = Path(__file__).resolve().parent
@@ -406,6 +407,28 @@ def worker_public(worker, admin=False):
     return out
 
 
+def _used_worker_slots_locked():
+    """调用方必须持有 WORKERS_LOCK；pending 和 approved 都占名额。"""
+    return sum(1 for w in WORKERS.values()
+               if w.get("status") in ("pending", "approved"))
+
+
+def worker_quota():
+    p = edition_policy.policy()
+    with WORKERS_LOCK:
+        used = _used_worker_slots_locked()
+    maxn = max(0, int(p.get("max_workers") or 0))
+    return {
+        "edition": p.get("edition"),
+        "label": p.get("label"),
+        "label_en": p.get("label_en"),
+        "used": used,
+        "max": maxn,
+        "remaining": max(0, maxn - used),
+        "reached": bool(maxn and used >= maxn),
+    }
+
+
 def admin_payload():
     with WORKERS_LOCK:
         workers = [worker_public(w, admin=True) for w in WORKERS.values()]
@@ -415,6 +438,7 @@ def admin_payload():
         return {
             "settings": dict(SETTINGS),
             "workers": workers,
+            "quota": worker_quota(),
             "pending": sum(1 for w in workers if w.get("status") == "pending"),
             "online": sum(1 for w in workers if w.get("online")),
             "join_codes": [
@@ -508,6 +532,8 @@ def redeem_join_code(code, ip, name, probe, agent_version):
             return None, "", "接入码已过期"
         if item.get("used_by"):
             return None, "", "接入码已经被使用"
+        if _used_worker_slots_locked() >= edition_policy.max_workers():
+            return None, "", edition_policy.quota_message("workers")
         wid = _new_id()
         secret = _new_secret()
         worker = _worker_default(wid, name, secret, ip, probe, agent_version)
@@ -637,6 +663,19 @@ def update_worker(wid, data, by="admin"):
             worker["enabled"] = bool(data.get("enabled"))
         if "status" in data and data.get("status") in (
                 "pending", "approved", "rejected", "revoked"):
+            needs_slot = (
+                (data["status"] == "approved"
+                 and worker.get("status") != "approved")
+                or (data["status"] == "pending"
+                    and worker.get("status") not in ("pending", "approved")))
+            if needs_slot:
+                # 当前节点不计入 others；其他 pending/approved 已占满时拒绝。
+                others = sum(
+                    1 for oid, other in WORKERS.items()
+                    if oid != str(wid or "")
+                    and other.get("status") in ("pending", "approved"))
+                if others >= edition_policy.max_workers():
+                    return None, edition_policy.quota_message("workers")
             worker["status"] = data["status"]
             worker["approved"] = data["status"] == "approved"
             if worker["approved"]:

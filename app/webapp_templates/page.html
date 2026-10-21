@@ -127,6 +127,7 @@ input[type=range] { accent-color: var(--ac); }
 }
 
 /* ---------- 图库 ---------- */
+.reload:disabled { opacity: .45; cursor: not-allowed; }
 .reload { width: 100%; padding: 12px; margin-bottom: 10px;
   color: var(--tx); border-radius: 12px; font-size: 14px; cursor: pointer; }
 .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -1013,6 +1014,9 @@ img.result, video.result {
 }
 .admin-worker-head h3 { margin: 0; font-size: 14px; font-weight: 700; }
 .admin-worker-head p { margin: 2px 0 0; color: var(--tx3); font-size: 10.5px; }
+.admin-quota { color: #8fe6ff; font: 600 10.5px var(--mono);
+  margin-left: auto; white-space: nowrap; }
+.admin-quota.warn { color: #ffcf8a; }
 .admin-worker-head .reload { margin-left: auto; }
 .admin-worker-settings {
   display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
@@ -2006,6 +2010,7 @@ img.result, video.result {
       <h3>算力节点</h3>
       <p>本机 + 局域网 worker；管理员逐台审批，普通账号只能使用可信且在白名单里的节点。</p>
     </div>
+    <span class="admin-quota" id="adminWorkerQuota"></span>
     <button class="reload" id="adminWorkerRefresh" type="button">刷新节点</button>
     <button class="reload" id="adminWorkerBundle" type="button">生成节点部署包</button>
     <button class="reload" id="adminWorkerJoin" type="button">生成接入码</button>
@@ -2118,6 +2123,7 @@ img.result, video.result {
       <h3>账号管理</h3>
       <p>创建普通账号或 24 小时游客；下方可搜索、勾选并批量修改限额。</p>
     </div>
+    <span class="admin-quota" id="adminAccountQuota"></span>
     <button class="reload" id="adminCreateUser" type="button">创建账号</button>
     <button class="reload" id="adminGuestCreate" type="button">生成 24 小时游客</button>
   </div>
@@ -7238,6 +7244,26 @@ function copyGuest() {
   if (st) { st.className = "pf-status"; st.textContent = adminT("已复制", "Copied"); }
 }
 
+let adminAccountQuotaData = null;
+function renderAccountQuota(q) {
+  const box = document.getElementById("adminAccountQuota");
+  if (!q || !box) { return; }
+  adminAccountQuotaData = q;
+  const label = uiEn() ? (q.label_en || q.label) : q.label;
+  box.textContent = adminT("账号 ", "Accounts ") + q.used + " / " + q.max +
+    " · " + label + (q.reached ? adminT(" · 已达上限", " · limit reached") : "");
+  box.classList.toggle("warn", !!q.reached);
+  ["adminCreateUser", "adminGuestCreate"].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (!el) { return; }
+    el.disabled = !!q.reached;
+    el.title = q.reached
+      ? adminT("当前版本账号数已达上限，请先停用或删除账号。",
+               "Account limit reached for this edition; disable or delete an account first.")
+      : "";
+  });
+}
+
 function adminRenderUsers() {
   const box = document.getElementById("adminUsers");
   const empty = document.getElementById("adminEmpty");
@@ -7816,6 +7842,7 @@ async function loadAdmin(showLoading) {
     const nodes = await rs[9].json().catch(function () { return {}; });
     const workflows = await rs[10].json().catch(function () { return {}; });
     if (users.error) { throw new Error(users.error); }
+    renderAccountQuota(users.quota || null);
     if (queue && queue.control) { adminRenderQueue(queue); }
     if (nodes && nodes.nodes) { adminRenderNodes(nodes); }
     if (workflows && workflows.workflows) { adminRenderWorkflows(workflows); }
@@ -8201,6 +8228,8 @@ async function adminSaveSet() {
     });
   }
   document.addEventListener("mg-lang", function () {
+    if (adminAccountQuotaData) { renderAccountQuota(adminAccountQuotaData); }
+    if (workersData) { renderWorkerSettings(); }
     if (adminLlmData) { adminRenderLlm(); }
     if (adminSystemData) { adminRenderSystem(); }
     if (adminCleanupData) { adminRenderCleanup(); }
@@ -8359,6 +8388,22 @@ function renderWorkerSettings() {
   const local = document.getElementById("adminLocalEnabled");
   if (remote) { remote.checked = !!workersData.settings.remote_enabled; }
   if (local) { local.checked = !!workersData.settings.local_enabled; }
+  const q = workersData.quota;
+  const box = document.getElementById("adminWorkerQuota");
+  if (q && box) {
+    const label = uiEn() ? (q.label_en || q.label) : q.label;
+    box.textContent = workerT("节点 ", "Nodes ") + q.used + " / " + q.max +
+      " · " + label + (q.reached ? workerT(" · 已达上限", " · limit reached") : "");
+    box.classList.toggle("warn", !!q.reached);
+  }
+  const join = document.getElementById("adminWorkerJoin");
+  if (join && q) {
+    join.disabled = !!q.reached;
+    join.title = q.reached
+      ? workerT("已达到当前版本的算力节点上限，请先移除旧节点。",
+                "Worker limit reached for this edition; remove an old worker first.")
+      : "";
+  }
 }
 async function loadWorkers(showLoading) {
   if (!window.__me || window.__me.role !== "admin") { return; }

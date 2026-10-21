@@ -1693,6 +1693,7 @@ class Handler(BaseHTTPRequestHandler):
             activity_request("/api/users", "GET", throttle=1.0, silent=True,
                              private_user_id=(user or {}).get("id"))
             self._json({"users": admin_users_payload(),
+                        "quota": account_quota(),
                         "me": public_user(user)})
             return
 
@@ -3255,6 +3256,7 @@ class Handler(BaseHTTPRequestHandler):
             audit("activity", "user_" + action, user=user,
                   ip=self.client_address[0], target=target)
             self._json({"ok": True, "users": admin_users_payload(),
+                        "quota": account_quota(),
                         "guest": guest_result,
                         "me": public_user(get_user(user.get("id")))})
             return
