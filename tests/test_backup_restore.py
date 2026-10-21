@@ -24,6 +24,11 @@ class BackupRestoreTests(unittest.TestCase):
             '{"prompt":"x"}', encoding="utf-8")
         (root / "generated" / ".favorites.json").write_text(
             '["admin/m/a.png"]', encoding="utf-8")
+        (root / "plugins" / "packs" / "admin").mkdir(parents=True)
+        (root / "plugins" / "packs" / "admin" / "p.json").write_text(
+            '{"id":"p","name":"示例"}', encoding="utf-8")
+        (root / "plugins" / "registry.json").write_text(
+            '{"version":1,"baseline":[]}', encoding="utf-8")
         return root
 
     def test_backup_and_restore_round_trip(self):
@@ -35,6 +40,8 @@ class BackupRestoreTests(unittest.TestCase):
                 names = set(zf.namelist())
                 self.assertIn("users.json", names)
                 self.assertIn("generated/admin/m/a.png", names)
+                self.assertIn("plugins/packs/admin/p.json", names)
+                self.assertIn("plugins/registry.json", names)
                 manifest = json.loads(zf.read("backup_manifest.json"))
                 self.assertEqual(manifest["format"],
                                  "comfyui-mobile-studio-backup")
@@ -53,6 +60,9 @@ class BackupRestoreTests(unittest.TestCase):
                              '{"users":{}}')
             self.assertEqual((dest / "generated/admin/m/a.png").read_bytes(),
                              b"PNG")
+            self.assertEqual(
+                (dest / "plugins/packs/admin/p.json").read_text(encoding="utf-8"),
+                '{"id":"p","name":"示例"}')
             self.assertTrue(list((dest / "_backups").glob("pre-restore-*.zip")))
 
     def test_path_traversal_is_rejected(self):

@@ -75,6 +75,21 @@ def iter_workflows(root):
             yield p
 
 
+def iter_plugins(root):
+    """只备份插件注册表和安全插件包；隔离区 ZIP 和节点备份不进备份。"""
+    base = root / "plugins"
+    if not base.is_dir():
+        return
+    registry = base / "registry.json"
+    if registry.is_file():
+        yield registry
+    packs = base / "packs"
+    if packs.is_dir():
+        for p in packs.rglob("*.json"):
+            if p.is_file():
+                yield p
+
+
 def iter_logs(root):
     base = root / "logs"
     if not base.is_dir():
@@ -95,6 +110,7 @@ def build(root, out, include_images=False, include_logs=False):
             files.append(p)
     files.extend(iter_generated(root, include_images))
     files.extend(iter_workflows(root))
+    files.extend(iter_plugins(root))
     if include_logs:
         files.extend(iter_logs(root))
     # 去重并保持稳定顺序

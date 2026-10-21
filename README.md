@@ -18,6 +18,8 @@
 - 自定义节点导入：ZIP 分块上传 / 服务器路径，检查 `__init__.py`、
   `NODE_CLASS_MAPPINGS`、Python 语法、requirements 依赖和 ZIP 安全
 - 工作流库：导入 UI / API 格式 JSON，体检缺失节点、缺失模型、断链和循环依赖
+- 插件中心：安全 JSON 插件包（画风/提示词/预设，不执行代码）可直接导入；
+  ComfyUI 代码插件先隔离、静态风险扫描、管理员审批，支持备份/禁用/回滚
 - 商用版机器码绑定与离线授权码激活；一键体检生成 HTML/JSON/日志 ZIP 报告
 - 模型下载前可选择本机或另一台电脑；一键打包到 U 盘并一键迁移到新机器
 - 多台机器算力共享：中央统一排队，把任务派给局域网内的 worker
@@ -93,8 +95,8 @@ commit、模型 revision 和 7zr 哈希都已锁定，不会自动追最新版�
 
 ## 2. 安装
 
-1. 分享版从 GitHub Releases 下载 `ComfyUI-Mobile-Studio-v1.1.1-Share.zip`；
-   商用客户使用 `ComfyUI-Mobile-Studio-v1.1.1-Commercial.zip`。
+1. 分享版从 GitHub Releases 下载 `ComfyUI-Mobile-Studio-v1.1.2-Share.zip`；
+   商用客户使用 `ComfyUI-Mobile-Studio-v1.1.2-Commercial.zip`。
 2. 解压到一个目录（不要在压缩包里直接运行）。
 3. 双击 `安装.bat`（或 `install.bat`）。
 4. 按提示操作：
@@ -356,7 +358,7 @@ https://192.168.137.1:8800
 | 备份配置/图库元数据 | 双击 `备份数据.bat` |
 | 连图片/视频一起备份 | `python tools\backup.py --images` |
 | 恢复（先停服务） | 双击 `恢复数据.bat`，输入 ZIP 路径 |
-| 单元测试（97 项） | 双击 `运行测试.bat` |
+| 单元测试（106 项） | 双击 `运行测试.bat` |
 | 在线冒烟 | `set MGS_TEST_PASSWORD=...` 后运行 `python tests\run_tests.py` |
 | 无第二台机器的 worker 验收 | `python tests\worker_lan_sim.py` |
 

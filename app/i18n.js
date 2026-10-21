@@ -94,6 +94,23 @@
     '出 图': 'Generate',
     '图 库': 'Gallery',
     '日 志': 'Logs',
+    '插 件': 'Plugins',
+    '插件中心': 'Plugin center',
+    '刷新插件': 'Refresh plugins',
+    '我的插件包': 'My plugin packs',
+    '下载示例': 'Download example',
+    '插件包 JSON': 'Plugin JSON',
+    '导入插件包': 'Import pack',
+    '代码插件': 'Code plugins',
+    '插件 ZIP（≤20MB）': 'Plugin ZIP (≤20MB)',
+    '提交审批': 'Submit for review',
+    '我的提交': 'My submissions',
+    '管理员审批': 'Admin review',
+    '禁用全部第三方插件': 'Disable all third-party plugins',
+    '已重启 ComfyUI': 'ComfyUI restarted',
+    '全部安全插件包': 'All safe packs',
+    '安装安全插件': 'Safe plugin packs',
+    '提交代码插件': 'Submit code plugins',
     '文生图': 'Text to Image',
     '图生图': 'Image to Image',
     '局部重绘': 'Inpaint',
@@ -187,6 +204,24 @@
       'Not sure where to start? Try Anima 2B or Illustrious for anime, RealVis for photoreal. Selecting a model shows its recommended size, steps and cautions above.',
     '选一个模型；不同模型擅长的东西不一样。':
       'Pick a model; each one is good at different things.',
+    '安全插件包直接导入；代码插件先隔离，管理员审批后才安装，原功能不受影响。':
+      'Safe packs install directly; code plugins are quarantined and only installed after admin approval. Existing features stay untouched.',
+    'JSON 格式，不执行代码；可以添加风格、提示词模板和出图参数预设。':
+      'JSON only, no code execution: add styles, prompt templates and generation presets.',
+    '已审批的 ComfyUI 自定义节点；安装、禁用、回滚都只动 custom_nodes。':
+      'Approved ComfyUI custom nodes; install, disable and rollback only touch custom_nodes.',
+    '提交后只进入隔离区，不会自动执行；管理员能看到文件清单、依赖和静态风险扫描结果。':
+      'Submissions go to quarantine and never run automatically; the admin sees files, dependencies and static risk hints.',
+    '待审批、已通过、已拒绝的代码插件。':
+      'Pending, approved and rejected code plugin submissions.',
+    '高危插件必须显式强制批准；安装前自动备份旧版本，可一键回滚。':
+      'High-risk plugins need explicit force approval; the previous version is backed up for rollback.',
+    '管理员可以查看所有账号导入的 JSON 插件包并删除。':
+      'Admins can inspect and delete JSON packs imported by any account.',
+    '安全插件包只含风格、提示词模板和参数预设，不执行代码，只影响当前账号的界面。':
+      'Safe packs contain only styles, prompt templates and presets; they never run code and only affect your own UI.',
+    '代码插件会进入隔离区，静态扫描只做风险提示；只有管理员审批后才写入 custom_nodes，并要求重启 ComfyUI。':
+      'Code plugins are quarantined; static scanning is only a hint. They are written to custom_nodes only after admin approval, and need a ComfyUI restart.',
     '这个模型不能使用当前 LoRA 目录里的 SDXL LoRA。':
       'This model cannot use the SDXL LoRAs in the current LoRA folder.',
     '这个模型没有验证 PAG，开关已自动关闭。':

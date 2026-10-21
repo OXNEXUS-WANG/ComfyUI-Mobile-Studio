@@ -37,6 +37,12 @@ class NodeManagerTests(unittest.TestCase):
             "definitely_missing_pkg_xyz>=1.0\n", encoding="utf-8")
         return path
 
+    def test_invalid_node_name_is_not_scanned(self):
+        info = node_manager.check_node("..")
+        self.assertFalse(info.get("exists"))
+        info = node_manager.check_node("")
+        self.assertFalse(info.get("exists"))
+
     def test_check_missing_requirement(self):
         self._make_node()
         info = node_manager.check_node("my-node")

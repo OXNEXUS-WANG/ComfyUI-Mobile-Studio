@@ -228,9 +228,71 @@ def _binary_files(root):
     return out
 
 
-def check_node(name):
-    name = safe_node_name(name)
-    path = node_dir(name)
+# 静态风险扫描只做提示，不是沙箱：真正的安全边界是“隔离 + 管理员审批”。
+RISK_PATTERNS = (
+    ("subprocess", "启动外部进程", "high", re.compile(r"\bsubprocess\b")),
+    ("os_system", "执行系统命令", "high", re.compile(r"\bos\.(system|popen)\s*\(")),
+    ("eval_exec", "动态执行代码", "high", re.compile(r"\b(eval|exec)\s*\(")),
+    ("ctypes", "调用本地库", "high", re.compile(r"\bctypes\b")),
+    ("torch_load", "加载可执行 pickle", "high", re.compile(r"\btorch\.load\s*\(")),
+    ("credentials", "读取账号/密钥文件", "high", re.compile(
+        r"(users\.json|sessions\.json|workers\.json|cert\.pem|key\.pem|license\.json)")),
+    ("persistence", "注册表/计划任务/启动项", "high", re.compile(
+        r"(winreg|schtasks|StartupFolder|CurrentVersion\\Run)")),
+    ("network", "网络访问", "medium", re.compile(
+        r"\b(socket|requests|urllib\.request|http\.client|aiohttp)\b")),
+    ("delete", "删除文件", "medium", re.compile(r"\b(rmtree|os\.remove|os\.unlink)\s*\(")),
+    ("sys_path", "修改模块搜索路径", "medium", re.compile(r"\bsys\.path\b")),
+)
+
+
+def scan_risks(root):
+    """扫描 .py 文本里的高风险调用；返回给管理员看的提示，不构成安全保证。"""
+    found = {}
+    scanned = 0
+    for walk_root, dirs, names in os.walk(root):
+        dirs[:] = [d for d in dirs if d not in SKIP_NAMES
+                   and not d.startswith(".")]
+        for fn in names:
+            if not fn.lower().endswith(".py"):
+                continue
+            path = os.path.join(walk_root, fn)
+            try:
+                if os.path.getsize(path) > MAX_SOURCE_FILE:
+                    continue
+                with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                    text = fh.read()
+            except OSError:
+                continue
+            scanned += 1
+            rel = os.path.relpath(path, root)
+            for key, label, severity, rx in RISK_PATTERNS:
+                hits = len(rx.findall(text))
+                if not hits:
+                    continue
+                item = found.setdefault(key, {
+                    "key": key, "label": label, "severity": severity,
+                    "count": 0, "files": []})
+                item["count"] += hits
+                if rel not in item["files"] and len(item["files"]) < 5:
+                    item["files"].append(rel)
+            if scanned >= MAX_SCAN_PY:
+                break
+    items = list(found.values())
+    if any(x["severity"] == "high" for x in items):
+        level = "high"
+    elif items:
+        level = "medium"
+    else:
+        level = "low"
+    return {"risk_level": level, "risk_items": items, "scanned_py": scanned}
+
+
+def inspect_dir(path, name=""):
+    """对任意节点目录做体检；路径由调用方保证在安全范围内。"""
+    raw = str(path or "").strip()
+    path = os.path.abspath(raw) if raw else ""
+    name = safe_node_name(name) or os.path.basename(path)
     if not path or not os.path.isdir(path):
         return {"name": name, "level": "error", "exists": False,
                 "errors": ["节点目录不存在"], "warnings": []}
@@ -254,6 +316,13 @@ def check_node(name):
     binary = _binary_files(path)
     if binary:
         warnings.append("包含可执行脚本：%s" % ", ".join(binary[:5]))
+    risks = scan_risks(path)
+    if risks["risk_level"] == "high":
+        warnings.append("静态扫描发现高风险调用：%s" % ", ".join(
+            x["label"] for x in risks["risk_items"]
+            if x["severity"] == "high")[:160])
+    elif risks["risk_level"] == "medium":
+        warnings.append("静态扫描发现网络/删除等敏感调用，建议管理员确认来源。")
     level = "error" if errors else ("warn" if warnings else "ok")
     return {
         "name": name,
@@ -270,10 +339,38 @@ def check_node(name):
         "has_web_directory": web_dir,
         "syntax_errors": syntax,
         "binary_files": binary,
+        "risk_level": risks["risk_level"],
+        "risk_items": risks["risk_items"],
         "errors": errors,
         "warnings": warnings,
         "mtime": os.path.getmtime(path),
     }
+
+
+def check_node(name):
+    name = safe_node_name(name)
+    path = node_dir(name)
+    if not path:
+        return {"name": name, "level": "error", "exists": False,
+                "errors": ["节点名称不合法"], "warnings": []}
+    return inspect_dir(path, name)
+
+
+def inspect_zip(zip_path, name=""):
+    """解压到临时目录做体检，不写入 custom_nodes，也不执行代码。"""
+    zip_path = os.path.abspath(str(zip_path or ""))
+    if not os.path.isfile(zip_path):
+        raise ValueError("ZIP 文件不存在")
+    staging = os.path.join(UPLOAD_DIR, "inspect-" + secrets.token_hex(8))
+    os.makedirs(staging, exist_ok=True)
+    try:
+        _extract_zip(zip_path, staging)
+        payload = _find_payload_root(staging)
+        info = inspect_dir(payload, name or os.path.basename(payload))
+        info["payload_name"] = safe_node_name(os.path.basename(payload))
+        return info
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
 
 
 def list_nodes(check=False):

@@ -1068,6 +1068,20 @@ img.result, video.result {
 }
 .admin-model-hint { color: var(--tx3); font-size: 10.5px; line-height: 1.6; margin: 4px 2px 8px; }
 .admin-models { display: grid; gap: 6px; }
+/* 插件中心 */
+.plg-items { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.plg-item {
+  padding: 4px 8px; border-radius: 7px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.04); color: var(--tx2);
+  font: 600 10.5px inherit;
+}
+.plg-item:hover { color: #fff; border-color: rgba(127,227,255,.4); }
+.plg-item.prompt { color: #bfffe4; border-color: rgba(70,220,170,.2); }
+.plg-note { color: var(--tx3); font-size: 10px; margin-top: 4px; }
+.plg-danger { color: #ffc1c8 !important; border-color: rgba(255,143,156,.3) !important;
+  background: rgba(255,90,110,.09) !important; }
+
 .model-row {
   display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 9px;
   align-items: center; padding: 8px 10px; border-radius: 10px;
@@ -1084,6 +1098,13 @@ img.result, video.result {
 .model-actions button:hover { color: #fff; border-color: rgba(127,227,255,.4); }
 .model-actions button.danger { color: #ffc1c8; border-color: rgba(255,143,156,.3);
   background: rgba(255,90,110,.09); }
+.model-actions a {
+  min-height: 26px; padding: 0 8px; border-radius: 7px; cursor: pointer;
+  display: inline-flex; align-items: center; text-decoration: none;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.045); color: var(--tx2); font: 600 10px inherit;
+}
+.model-actions a:hover { color: #fff; border-color: rgba(127,227,255,.4); }
 .model-cat { margin: 10px 0 5px; color: #8fe6ff; font: 700 11px var(--mono);
   letter-spacing: .4px; }
 .admin-trash-head { margin-top: 18px; }
@@ -1536,6 +1557,7 @@ img.result, video.result {
   <div class="tab on" data-view="gen" title="写提示词、调参数、生成图片">出 图</div>
   <div class="tab" data-view="gal" title="看历史作品、收藏、删除">图 库</div>
   <div class="tab" data-view="log" title="查看谁在用、做了什么、安全事件">日 志</div>
+  <div class="tab" data-view="plugins" title="安全插件包、代码插件提交与审批">插 件</div>
   <div class="tab" id="adminTab" data-view="admin" style="display:none"
        title="管理员后台：统计数据和批量操作">后 台</div>
 </div>
@@ -1869,6 +1891,75 @@ img.result, video.result {
   <div id="logList"></div>
   <div class="logempty" id="logEmpty" style="display:none">还没有日志</div>
   <div class="hint" id="logScopeHint"></div>
+</div>
+
+<div class="view" id="view-plugins">
+  <div class="admin-head">
+    <div>
+      <h2>插件中心</h2>
+      <p>安全插件包直接导入；代码插件先隔离，管理员审批后才安装，原功能不受影响。</p>
+    </div>
+    <div class="admin-head-actions">
+      <button class="reload" id="plgRefresh" type="button">刷新插件</button>
+    </div>
+  </div>
+  <div class="admin-model-hint" id="plgNotice">
+    <span>安全插件包只含风格、提示词模板和参数预设，不执行代码，只影响当前账号的界面。</span><br>
+    <span>代码插件会进入隔离区，静态扫描只做风险提示；只有管理员审批后才写入 custom_nodes，并要求重启 ComfyUI。</span>
+  </div>
+  <div class="pf-status" id="plgStatus"></div>
+
+  <div class="admin-worker-head">
+    <div>
+      <h3>我的插件包</h3>
+      <p>JSON 格式，不执行代码；可以添加风格、提示词模板和出图参数预设。</p>
+    </div>
+    <button class="reload" id="plgTemplate" type="button">下载示例</button>
+  </div>
+  <div class="admin-model-tools">
+    <label class="admin-model-pick">插件包 JSON
+      <input type="file" id="plgFile" accept=".json,application/json">
+    </label>
+    <button class="reload" id="plgImport" type="button">导入插件包</button>
+  </div>
+  <div class="admin-models" id="plgPacks"></div>
+
+  <div class="admin-worker-head">
+    <div>
+      <h3>代码插件</h3>
+      <p>已审批的 ComfyUI 自定义节点；安装、禁用、回滚都只动 custom_nodes。</p>
+    </div>
+  </div>
+  <div class="admin-models" id="plgNodes"></div>
+  <div id="plgSubmitBox" style="display:none">
+    <div class="admin-model-tools">
+      <label class="admin-model-pick">插件 ZIP（≤20MB）
+        <input type="file" id="plgZip" accept=".zip">
+      </label>
+      <button class="reload" id="plgSubmit" type="button">提交审批</button>
+    </div>
+    <div class="admin-model-hint">提交后只进入隔离区，不会自动执行；管理员能看到文件清单、依赖和静态风险扫描结果。</div>
+  </div>
+  <div class="admin-worker-head">
+    <div><h3>我的提交</h3><p>待审批、已通过、已拒绝的代码插件。</p></div>
+  </div>
+  <div class="admin-models" id="plgSubmissions"></div>
+
+  <div id="plgAdminBox" style="display:none">
+    <div class="admin-worker-head">
+      <div>
+        <h3>管理员审批</h3>
+        <p>高危插件必须显式强制批准；安装前自动备份旧版本，可一键回滚。</p>
+      </div>
+      <button class="reload" id="plgClearRestart" type="button" style="margin-left:auto">已重启 ComfyUI</button>
+      <button class="reload danger" id="plgDisableAll" type="button">禁用全部第三方插件</button>
+    </div>
+    <div class="admin-models" id="plgReview"></div>
+    <div class="admin-worker-head">
+      <div><h3>全部安全插件包</h3><p>管理员可以查看所有账号导入的 JSON 插件包并删除。</p></div>
+    </div>
+    <div class="admin-models" id="plgAllPacks"></div>
+  </div>
 </div>
 
 <div class="view" id="view-admin">
@@ -4403,6 +4494,7 @@ document.querySelectorAll(".tabs .tab").forEach(function (t) {
     document.getElementById("view-" + t.dataset.view).classList.add("on");
     if (t.dataset.view === "gal") { loadGallery(true); }
     if (t.dataset.view === "log") { loadLogs(true); }
+    if (t.dataset.view === "plugins") { loadPlugins(false); }
     if (t.dataset.view === "admin") { adminStart(); loadAdmin(true); loadAdminModels(true); }
     else { adminStop(); }
   };
@@ -5560,6 +5652,564 @@ fetch("/api/session", { cache: "no-store", credentials: "same-origin" })
   })
   .catch(function () {});
 
+/* ================= 插件中心 ================= */
+let plgState = null;
+let plgAdminState = null;
+let plgLoading = false;
+
+function plgT(zh, en) { return uiEn() ? en : zh; }
+
+function plgStatusMsg(text, bad) {
+  const el = document.getElementById("plgStatus");
+  if (!el) { return; }
+  el.className = "pf-status" + (bad ? " err" : "");
+  el.textContent = text || "";
+}
+
+function plgBadge(text, cls) {
+  return '<span class="aw-badge' + (cls ? " " + cls : "") + '">' +
+    esc(text) + "</span>";
+}
+
+function plgRiskBadge(level) {
+  const map = {
+    high: [plgT("高风险", "High risk"), "bad"],
+    medium: [plgT("中风险", "Medium risk"), "warn"],
+    low: [plgT("低风险", "Low risk"), "ok"],
+  };
+  const item = map[level] || map.low;
+  return plgBadge(item[0], item[1]);
+}
+
+function plgRiskText(item) {
+  if (!item) { return ""; }
+  const en = {
+    subprocess: "External process", os_system: "System command",
+    eval_exec: "Dynamic code", ctypes: "Native library",
+    torch_load: "Executable pickle", credentials: "Credential files",
+    persistence: "Registry / startup", network: "Network access",
+    delete: "File deletion", sys_path: "sys.path change"
+  };
+  return uiEn() ? (en[item.key] || item.label || item.key)
+    : (item.label || item.key || "");
+}
+
+function plgNodeStatus(status) {
+  const map = {
+    active: [plgT("启用中", "Active"), "ok"],
+    disabled: [plgT("已禁用", "Disabled"), "warn"],
+    modified: [plgT("文件被改动", "Modified"), "bad"],
+    removed: [plgT("已移除", "Removed"), "bad"],
+  };
+  const item = map[status] || [status || "-", ""];
+  return plgBadge(item[0], item[1]);
+}
+
+function plgSubStatus(status) {
+  const map = {
+    pending: [plgT("待审批", "Pending"), "warn"],
+    approved: [plgT("已通过", "Approved"), "ok"],
+    rejected: [plgT("已拒绝", "Rejected"), "bad"],
+    cancelled: [plgT("已取消", "Cancelled"), ""],
+  };
+  const item = map[status] || [status || "-", ""];
+  return plgBadge(item[0], item[1]);
+}
+
+function plgFindPack(id) {
+  return (plgState && plgState.packs || []).find(function (p) {
+    return p.id === id;
+  }) || null;
+}
+
+function plgPackCard(p, adminMode) {
+  const styles = p.styles || [];
+  const prompts = p.prompts || [];
+  const presets = p.presets || [];
+  let items = "";
+  styles.forEach(function (s, i) {
+    items += '<button type="button" class="plg-item" data-no-i18n data-plg-style="' +
+      esc(p.id) + '" data-idx="' + i + '">' + esc(s.name) + "</button>";
+  });
+  prompts.forEach(function (it, i) {
+    items += '<button type="button" class="plg-item prompt" data-no-i18n data-plg-prompt="' +
+      esc(p.id) + '" data-idx="' + i + '">' + esc(it.name) + "</button>";
+  });
+  presets.forEach(function (it, i) {
+    items += '<button type="button" class="plg-item" data-no-i18n data-plg-preset="' +
+      esc(p.id) + '" data-idx="' + i + '">' + esc(it.name) + "</button>";
+  });
+  const meta = [];
+  if (adminMode) { meta.push(plgT("账号 ", "Owner ") + (p.owner || "-")); }
+  meta.push(styles.length + plgT(" 个风格", " styles"));
+  meta.push(prompts.length + plgT(" 条提示词", " prompts"));
+  meta.push(presets.length + plgT(" 个预设", " presets"));
+  const actions = adminMode
+    ? '<button type="button" data-plg-del-any="' + esc(p.id) +
+      '" data-owner="' + esc(p.owner || "") + '" class="danger">' +
+      plgT("删除", "Delete") + "</button>"
+    : '<button type="button" data-plg-toggle="' + esc(p.id) + '">' +
+      plgT(p.enabled ? "停用" : "启用", p.enabled ? "Disable" : "Enable") +
+      '</button><button type="button" data-plg-del="' + esc(p.id) +
+      '" class="danger">' + plgT("删除", "Delete") + "</button>";
+  return '<div class="admin-worker"><div><div class="aw-name"><b data-no-i18n>' +
+    esc(p.name) + "</b>" + plgBadge("v" + (p.version || "1.0.0")) +
+    (p.enabled ? plgBadge(plgT("启用", "On"), "ok")
+      : plgBadge(plgT("停用", "Off"), "")) +
+    "</div><div class=\"aw-meta\">" + esc(meta.join(" · ")) +
+    (p.author ? " · " + plgT("作者 ", "By ") +
+      '<span data-no-i18n>' + esc(p.author) + "</span>" : "") +
+    (p.description ? " · <span data-no-i18n>" + esc(p.description) + "</span>" : "") +
+    '</div><div class="plg-items">' + (items ||
+      '<span class="plg-note">' + plgT("没有可用条目", "No items") +
+      "</span>") + '</div></div><div class="model-actions">' +
+    actions + "</div></div>";
+}
+
+function plgNodeCard(n, adminMode) {
+  const risk = (n.risk_items || []).map(plgRiskText).slice(0, 3).join("、");
+  let actions = "";
+  if (adminMode) {
+    if (n.can_disable) {
+      actions += '<button type="button" data-plg-node="disable" data-name="' +
+        esc(n.name) + '">' + plgT("禁用", "Disable") + "</button>";
+    }
+    if (n.can_enable) {
+      actions += '<button type="button" data-plg-node="enable" data-name="' +
+        esc(n.name) + '">' + plgT("启用", "Enable") + "</button>";
+    }
+    if (n.can_rollback) {
+      actions += '<button type="button" data-plg-node="rollback" data-name="' +
+        esc(n.name) + '">' + plgT("回滚", "Rollback") + "</button>";
+    }
+    if (n.status === "active" || n.status === "modified") {
+      actions += '<button type="button" data-plg-node="verify" data-name="' +
+        esc(n.name) + '">' + plgT("校验", "Verify") + "</button>";
+    }
+    actions += '<button type="button" data-plg-node="remove" data-name="' +
+      esc(n.name) + '" class="danger">' + plgT("移除", "Remove") + "</button>";
+  }
+  return '<div class="admin-worker"><div><div class="aw-name"><b data-no-i18n>' +
+    esc(n.name) + "</b>" + plgNodeStatus(n.status) + plgRiskBadge(n.risk_level) +
+    (n.backup_count ? plgBadge(plgT("备份 ", "Backups ") + n.backup_count, "") : "") +
+    '</div><div class="aw-meta">' +
+    (risk ? plgT("扫描提示：", "Scan hints: ") + esc(risk) :
+      plgT("静态扫描未发现高风险调用", "No high-risk calls found")) +
+    (n.approved_at ? " · " + new Date(n.approved_at * 1000).toLocaleString() : "") +
+    '</div></div><div class="model-actions">' + actions + "</div></div>";
+}
+
+function plgSubmissionCard(s, adminMode) {
+  const report = s.report || {};
+  const risk = (s.risk_items || []).map(plgRiskText).slice(0, 4).join("、");
+  const meta = [];
+  meta.push((s.size / 1024).toFixed(0) + " KB");
+  if (report.files) { meta.push(report.files + plgT(" 个文件", " files")); }
+  if (report.requirements && report.requirements.length) {
+    meta.push(plgT("依赖 ", "Deps ") + report.requirements.slice(0, 4).join(", "));
+  }
+  if (report.title) { meta.push(report.title); }
+  let actions = "";
+  if (adminMode && s.status === "pending") {
+    actions += '<button type="button" data-plg-sub="approve" data-id="' +
+      esc(s.id) + '" data-risk="' + esc(s.risk_level || "low") +
+      '" data-exists="' + (report.target_exists ? "1" : "0") + '">' +
+      plgT("批准安装", "Approve") + "</button>";
+    actions += '<button type="button" data-plg-sub="reject" data-id="' +
+      esc(s.id) + '" class="danger">' + plgT("拒绝", "Reject") + "</button>";
+  }
+  if (adminMode && s.zip_available) {
+    actions += '<a class="model-actions-link" href="/api/admin/plugins/submission/' +
+      encodeURIComponent(s.id) + '">' + plgT("下载 ZIP", "Download ZIP") + "</a>";
+  }
+  if (!adminMode && s.status === "pending") {
+    actions += '<button type="button" data-plg-sub="cancel" data-id="' +
+      esc(s.id) + '" class="danger">' + plgT("取消", "Cancel") + "</button>";
+  }
+  return '<div class="admin-worker"><div><div class="aw-name"><b data-no-i18n>' +
+    esc(s.name) + "</b>" + plgSubStatus(s.status) + plgRiskBadge(s.risk_level) +
+    (adminMode && s.owner ? plgBadge(plgT("账号 ", "Owner ") + s.owner, "") : "") +
+    '</div><div class="aw-meta">' + esc(meta.join(" · ")) +
+    (risk ? " · " + plgT("扫描提示：", "Scan hints: ") + esc(risk) : "") +
+    (s.reject_reason ? " · " + plgT("原因：", "Reason: ") +
+      '<span data-no-i18n>' + esc(s.reject_reason) + "</span>" : "") +
+    "</div></div><div class=\"model-actions\">" + actions + "</div></div>";
+}
+
+function renderPlg() {
+  if (!plgState) { return; }
+  const packsBox = document.getElementById("plgPacks");
+  const nodesBox = document.getElementById("plgNodes");
+  const subsBox = document.getElementById("plgSubmissions");
+  const packList = plgState.packs || [];
+  packsBox.innerHTML = packList.length
+    ? packList.map(function (p) { return plgPackCard(p, false); }).join("")
+    : '<div class="admin-empty">' + plgT(
+        "还没有插件包。导入一个 JSON，或先下载示例。",
+        "No plugin packs yet. Import a JSON file or download the example.") +
+      "</div>";
+  const nodes = (plgState.is_admin && plgAdminState)
+    ? (plgAdminState.nodes || []) : (plgState.nodes || []);
+  nodesBox.innerHTML = nodes.length
+    ? nodes.map(function (n) { return plgNodeCard(n, !!plgState.is_admin); }).join("")
+    : '<div class="admin-empty">' + plgT(
+        "还没有经插件中心管理的代码插件。",
+        "No code plugins managed by the plugin center yet.") + "</div>";
+  const subs = plgState.submissions || [];
+  subsBox.innerHTML = subs.length
+    ? subs.map(function (s) { return plgSubmissionCard(s, false); }).join("")
+    : '<div class="admin-empty">' + plgT("还没有提交记录。", "No submissions yet.") +
+      "</div>";
+  const canPack = !!(plgState.features && plgState.features.plugin_pack);
+  const fileInput = document.getElementById("plgFile");
+  if (fileInput) {
+    const row = fileInput.closest(".admin-model-tools");
+    if (row) { row.style.display = canPack ? "" : "none"; }
+  }
+  const sb = document.getElementById("plgSubmitBox");
+  if (sb) { sb.style.display = plgState.features && plgState.features.plugin_submit ? "" : "none"; }
+  const adminBox = document.getElementById("plgAdminBox");
+  if (adminBox) { adminBox.style.display = plgState.is_admin ? "" : "none"; }
+  if (plgState.is_admin && plgAdminState) {
+    const reviewBox = document.getElementById("plgReview");
+    const pending = (plgAdminState.submissions || []).filter(function (s) {
+      return s.status === "pending";
+    });
+    reviewBox.innerHTML = pending.length
+      ? pending.map(function (s) { return plgSubmissionCard(s, true); }).join("")
+      : '<div class="admin-empty">' + plgT("没有待审批插件。", "No pending submissions.") +
+        "</div>";
+    const allBox = document.getElementById("plgAllPacks");
+    const all = plgAdminState.packs || [];
+    allBox.innerHTML = all.length
+      ? all.map(function (p) { return plgPackCard(p, true); }).join("")
+      : '<div class="admin-empty">' + plgT("没有任何账号插件包。", "No user packs.") +
+        "</div>";
+  }
+  const notice = document.getElementById("plgNotice");
+  if (notice) {
+    let extra = "";
+    if (plgState.restart_required) {
+      extra = '<br><span style="color:#ffcf8a">' +
+        plgT("有插件变更，重启 ComfyUI 后才会生效。", "Plugin changes need a ComfyUI restart.") +
+        "</span>";
+    }
+    notice.innerHTML = '<span>' +
+      plgT("安全插件包只含风格、提示词模板和参数预设，不执行代码，只影响当前账号的界面。",
+           "Safe packs contain only styles, prompt templates and presets; they never run code and only affect your own UI.") +
+      "</span><br><span>" +
+      plgT("代码插件会进入隔离区，静态扫描只做风险提示；只有管理员审批后才写入 custom_nodes，并要求重启 ComfyUI。",
+           "Code plugins are quarantined; static scanning is only a hint. They are written to custom_nodes only after admin approval, and need a ComfyUI restart.") +
+      "</span>" + extra;
+  }
+}
+
+async function loadAdminPlugins() {
+  if (!plgState || !plgState.is_admin) { plgAdminState = null; return; }
+  const r = await fetch("/api/admin/plugins", { cache: "no-store" });
+  const j = await r.json().catch(function () { return {}; });
+  if (!r.ok || j.error) { throw new Error(j.error || ("HTTP " + r.status)); }
+  plgAdminState = j;
+}
+
+async function loadPlugins(force) {
+  if (plgLoading) { return; }
+  plgLoading = true;
+  try {
+    const r = await fetch("/api/plugins", { cache: "no-store" });
+    const j = await r.json().catch(function () { return {}; });
+    if (!r.ok || j.error) { throw new Error(j.error || ("HTTP " + r.status)); }
+    plgState = j;
+    await loadAdminPlugins();
+    renderPlg();
+    plgStatusMsg("");
+  } catch (e) {
+    plgStatusMsg(plgT("读取插件中心失败：", "Failed to load plugins: ") + e.message, true);
+  } finally {
+    plgLoading = false;
+  }
+}
+
+async function plgPost(body, adminMode) {
+  const url = adminMode ? "/api/admin/plugins" : "/api/plugins";
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {})
+  });
+  const j = await r.json().catch(function () { return {}; });
+  if (!r.ok || j.error) { throw new Error(j.error || ("HTTP " + r.status)); }
+  return j;
+}
+
+function plgApplyPrompt(packId, idx) {
+  const p = plgFindPack(packId);
+  const item = p && (p.prompts || [])[idx];
+  if (!item) { return; }
+  document.getElementById("p").value = item.text || "";
+  switchTab("gen");
+  document.getElementById("p").focus();
+  plgStatusMsg(plgT("已填入提示词：", "Prompt inserted: ") + item.name, false);
+}
+
+function plgApplyStyle(packId, idx) {
+  const p = plgFindPack(packId);
+  const item = p && (p.styles || [])[idx];
+  if (!item) { return; }
+  switchTab("gen");
+  let found = false;
+  document.querySelectorAll("#styles .chip").forEach(function (x) {
+    if (x.textContent === item.name) { x.click(); found = true; }
+  });
+  if (!found) {
+    // 同名冲突出现在插件名前缀里时，按包含关系再找一次
+    document.querySelectorAll("#styles .chip").forEach(function (x) {
+      if (!found && x.textContent.indexOf(item.name) >= 0) { x.click(); found = true; }
+    });
+  }
+  plgStatusMsg(found ? plgT("已应用风格：", "Style applied: ") + item.name
+    : plgT("没有找到这个风格按钮，请刷新页面", "Style chip not found; refresh the page"), !found);
+}
+
+function plgApplyPreset(packId, idx) {
+  const p = plgFindPack(packId);
+  const item = p && (p.presets || [])[idx];
+  if (!item) { return; }
+  if (curMode !== "txt") { setMode("txt"); }
+  if (item.size) { setCanvasSize(item.size); }
+  if (item.steps !== undefined) {
+    const el = document.getElementById("steps");
+    if (el) {
+      el.value = item.steps;
+      document.getElementById("stepsVal").textContent = item.steps;
+    }
+  }
+  if (item.cfg !== undefined) {
+    const el = document.getElementById("cfg");
+    if (el) {
+      el.value = item.cfg;
+      document.getElementById("cfgVal").textContent = Number(item.cfg).toFixed(1);
+    }
+  }
+  if (item.count !== undefined) {
+    curCount = item.count;
+    document.querySelectorAll("#counts .chip").forEach(function (x) {
+      x.classList.toggle("on", parseInt(x.dataset.n, 10) === curCount);
+    });
+  }
+  switchTab("gen");
+  updateModeBadge();
+  plgStatusMsg(plgT("已应用预设：", "Preset applied: ") + item.name, false);
+}
+
+function plgDownloadTemplate() {
+  const sample = {
+    schema: 1,
+    name: "我的风格包",
+    id: "my-style-pack",
+    version: "1.0.0",
+    author: "你的名字",
+    description: "示例：可以删掉不需要的部分",
+    styles: [{ name: "淡彩", suffix: "国漫淡彩，低饱和度，柔和光线" }],
+    prompts: [{ name: "雨夜少女", text: "杰作，最高画质，雨夜的青石巷，少女撑伞回头" }],
+    presets: [{ name: "快速草图", size: "512x512", steps: 8, cfg: 4, count: 1 }]
+  };
+  const blob = new Blob([JSON.stringify(sample, null, 2)], {
+    type: "application/json"
+  });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "plugin-pack-example.json";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function () {
+    URL.revokeObjectURL(a.href);
+    a.remove();
+  }, 1000);
+}
+
+function plgImportPackFile() {
+  const input = document.getElementById("plgFile");
+  const file = input && input.files && input.files[0];
+  if (!file) {
+    plgStatusMsg(plgT("先选一个 JSON 插件包", "Choose a JSON pack first"), true);
+    return;
+  }
+  if (file.size > 256 * 1024) {
+    plgStatusMsg(plgT("插件包超过 256KB", "Pack exceeds 256KB"), true);
+    return;
+  }
+  const fr = new FileReader();
+  fr.onload = async function () {
+    try {
+      const manifest = JSON.parse(String(fr.result || ""));
+      await plgPost({ action: "import_pack", manifest: manifest });
+      input.value = "";
+      await loadPlugins(true);
+      plgStatusMsg(plgT("插件包已导入，并已启用。", "Pack imported and enabled."), false);
+    } catch (e) {
+      plgStatusMsg(plgT("导入失败：", "Import failed: ") + e.message, true);
+    }
+  };
+  fr.readAsText(file);
+}
+
+function plgSubmitZip() {
+  const input = document.getElementById("plgZip");
+  const file = input && input.files && input.files[0];
+  if (!file) {
+    plgStatusMsg(plgT("先选一个 ZIP 文件", "Choose a ZIP file first"), true);
+    return;
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    plgStatusMsg(plgT("代码插件 ZIP 最大 20MB", "Code plugin ZIP is limited to 20MB"), true);
+    return;
+  }
+  const fr = new FileReader();
+  fr.onload = async function () {
+    try {
+      const b64 = String(fr.result || "").split(",")[1] || "";
+      await plgPost({
+        action: "submit_node",
+        filename: file.name,
+        zip_b64: b64
+      });
+      input.value = "";
+      await loadPlugins(true);
+      plgStatusMsg(plgT("已提交，等待管理员审批。", "Submitted; waiting for admin review."), false);
+    } catch (e) {
+      plgStatusMsg(plgT("提交失败：", "Submit failed: ") + e.message, true);
+    }
+  };
+  fr.readAsDataURL(file);
+}
+
+async function plgAdminAction(action, data) {
+  try {
+    const body = Object.assign({ action: action }, data || {});
+    await plgPost(body, true);
+    await loadPlugins(true);
+    plgStatusMsg(plgT("操作完成。", "Done."), false);
+  } catch (e) {
+    plgStatusMsg(plgT("操作失败：", "Action failed: ") + e.message, true);
+  }
+}
+
+document.getElementById("plgRefresh").onclick = function () { loadPlugins(true); };
+document.getElementById("plgTemplate").onclick = plgDownloadTemplate;
+document.getElementById("plgImport").onclick = plgImportPackFile;
+document.getElementById("plgSubmit").onclick = plgSubmitZip;
+document.getElementById("plgDisableAll").onclick = function () {
+  if (!confirm(plgT("禁用全部由插件中心管理的第三方插件？需要重启 ComfyUI 才生效。",
+                    "Disable all plugin-center managed third-party plugins? A ComfyUI restart is required."))) {
+    return;
+  }
+  plgAdminAction("disable_all");
+};
+document.getElementById("plgClearRestart").onclick = function () {
+  plgAdminAction("clear_restart");
+};
+
+document.getElementById("view-plugins").addEventListener("click", async function (e) {
+  const t = e.target.closest("button, a");
+  if (!t) { return; }
+  const styleId = t.getAttribute("data-plg-style");
+  const promptId = t.getAttribute("data-plg-prompt");
+  const presetId = t.getAttribute("data-plg-preset");
+  if (styleId) { plgApplyStyle(styleId, parseInt(t.dataset.idx, 10)); return; }
+  if (promptId) { plgApplyPrompt(promptId, parseInt(t.dataset.idx, 10)); return; }
+  if (presetId) { plgApplyPreset(presetId, parseInt(t.dataset.idx, 10)); return; }
+  const nodeAct = t.getAttribute("data-plg-node");
+  if (nodeAct) {
+    const name = t.getAttribute("data-name") || "";
+    if (nodeAct === "remove" &&
+        !confirm(plgT("移除插件 " + name + "？会移到回收站。",
+                      "Remove " + name + "? It will be moved to the recycle bin."))) {
+      return;
+    }
+    if (nodeAct === "rollback" &&
+        !confirm(plgT("回滚 " + name + " 到上一个备份？需要重启 ComfyUI。",
+                      "Roll back " + name + " to the last backup? A ComfyUI restart is required."))) {
+      return;
+    }
+    plgAdminAction(nodeAct, { name: name });
+    return;
+  }
+  const subAct = t.getAttribute("data-plg-sub");
+  if (subAct) {
+    const sid = t.getAttribute("data-id") || "";
+    if (subAct === "cancel") {
+      try {
+        await plgPost({ action: "cancel_submission", id: sid });
+        await loadPlugins(true);
+        plgStatusMsg(plgT("已取消提交。", "Submission cancelled."), false);
+      } catch (err) {
+        plgStatusMsg(plgT("取消失败：", "Cancel failed: ") + err.message, true);
+      }
+      return;
+    }
+    if (subAct === "reject") {
+      const reason = prompt(plgT("拒绝原因（可留空）：", "Rejection reason (optional):"), "");
+      if (reason === null) { return; }
+      plgAdminAction("reject", { id: sid, reason: reason || "" });
+      return;
+    }
+    if (subAct === "approve") {
+      const risk = t.getAttribute("data-risk") || "low";
+      const exists = t.getAttribute("data-exists") === "1";
+      let force = false;
+      let replace = false;
+      if (risk === "high") {
+        force = confirm(plgT("静态扫描发现高风险调用。确认你已审查代码并强制批准？",
+                             "Static scan found high-risk calls. Confirm you reviewed the code and force-approve?"));
+        if (!force) { return; }
+      }
+      if (exists) {
+        replace = confirm(plgT("custom_nodes 里已有同名插件。覆盖并备份旧版本？",
+                               "A plugin with this name already exists. Replace it and back up the old version?"));
+        if (!replace) { return; }
+      }
+      plgAdminAction("approve", { id: sid, force: force, replace: replace });
+      return;
+    }
+  }
+  const toggle = t.getAttribute("data-plg-toggle");
+  if (toggle) {
+    const p = plgFindPack(toggle);
+    if (!p) { return; }
+    try {
+      await plgPost({ action: "toggle_pack", id: p.id, enabled: !p.enabled });
+      await loadPlugins(true);
+    } catch (err) {
+      plgStatusMsg(plgT("切换失败：", "Toggle failed: ") + err.message, true);
+    }
+    return;
+  }
+  const del = t.getAttribute("data-plg-del");
+  if (del) {
+    if (!confirm(plgT("删除这个插件包？", "Delete this plugin pack?"))) { return; }
+    try {
+      await plgPost({ action: "delete_pack", id: del });
+      await loadPlugins(true);
+      plgStatusMsg(plgT("插件包已删除。", "Pack deleted."), false);
+    } catch (err) {
+      plgStatusMsg(plgT("删除失败：", "Delete failed: ") + err.message, true);
+    }
+    return;
+  }
+  const delAny = t.getAttribute("data-plg-del-any");
+  if (delAny) {
+    if (!confirm(plgT("删除这个账号的插件包？", "Delete this account's pack?"))) { return; }
+    plgAdminAction("delete_pack", {
+      id: delAny, owner: t.getAttribute("data-owner") || ""
+    });
+  }
+});
+
+document.addEventListener("mg-lang", function () {
+  if (plgState) { renderPlg(); }
+});
+
 /* ================= 平面管理员后台 ================= */
 const ADMIN_FEATURES = {
   txt2img: ["文生图", "Text to Image"],
@@ -5572,7 +6222,9 @@ const ADMIN_FEATURES = {
   gallery: ["图库浏览", "Browse gallery"],
   delete: ["删除图片", "Delete images"],
   organize: ["拼图 / 导出", "Collage / export"],
-  translate: ["中文翻译", "Chinese translation"]
+  translate: ["中文翻译", "Chinese translation"],
+  plugin_pack: ["安装安全插件", "Safe plugin packs"],
+  plugin_submit: ["提交代码插件", "Submit code plugins"]
 };
 let adminUsersAll = [];
 let adminSel = new Set();
@@ -8576,6 +9228,7 @@ function switchTab(name) {
   document.querySelectorAll(".view").forEach(function (v) { v.classList.remove("on"); });
   document.getElementById("view-" + name).classList.add("on");
   if (name !== "admin") { adminStop(); }
+  if (name === "plugins") { loadPlugins(false); }
 }
 
 function updateModeBadge() {

@@ -1926,6 +1926,10 @@ FEATURE_LABELS = {
     "delete": "删除图片",
     "organize": "拼图 / 导出",
     "translate": "中文翻译",
+    # 安全插件包只含 JSON，不执行代码；代码插件提交只进隔离区，
+    # 真正安装必须管理员审批。两者默认允许，管理员可以按账号关闭。
+    "plugin_pack": "安装安全插件",
+    "plugin_submit": "提交代码插件",
 }
 DEFAULT_FEATURES = {k: True for k in FEATURE_LABELS}
 

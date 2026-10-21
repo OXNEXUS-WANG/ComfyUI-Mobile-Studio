@@ -30,6 +30,7 @@ _model_uploads/
 _node_trash/
 _node_uploads/
 workflows/
+plugins/
 install_report.txt
 *.log
 

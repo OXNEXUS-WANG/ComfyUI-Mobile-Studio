@@ -45,7 +45,7 @@ Get-ChildItem $Stage -Recurse -File -Force -ErrorAction SilentlyContinue |
     Remove-Item -Force -ErrorAction SilentlyContinue
 $runtimeDirs = @("logs", "_restore_points", "generated", "web_uploads",
     "_backups", "_model_trash", "_model_uploads",
-    "_node_trash", "_node_uploads", "workflows")
+    "_node_trash", "_node_uploads", "workflows", "plugins")
 foreach ($name in $runtimeDirs) {
     Get-ChildItem $Stage -Recurse -Directory -Force -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -eq $name } |

@@ -32,6 +32,7 @@ import lan_share
 import license_guard
 import model_manager
 import node_manager
+import plugin_manager
 import workflow_manager
 import worker_bundle
 
@@ -54,6 +55,21 @@ def comfy_object_info_cached(max_age=30):
     except Exception:
         pass
     return _OBJECT_INFO_CACHE["v"]
+
+
+def plugin_styles_for(user):
+    """内置风格 + 当前账号启用的安全插件包风格。"""
+    merged = dict(STYLES)
+    try:
+        extra = plugin_manager.styles_for_user((user or {}).get("id") or "")
+    except Exception:
+        extra = {}
+    for name, suffix in extra.items():
+        key = name
+        while key in merged:
+            key = "插件·" + key
+        merged[key] = suffix
+    return merged
 
 
 def _models_payload():
@@ -1363,6 +1379,53 @@ class Handler(BaseHTTPRequestHandler):
                         "you": public_user(user)})
             return
 
+        if path == "/api/plugins":
+            activity_request("/api/plugins", "GET", throttle=1.0, silent=True)
+            user = self._current_user()
+            uid = (user or {}).get("id") or "admin"
+            try:
+                payload = plugin_manager.user_center(uid)
+            except Exception as exc:
+                self._json({"error": "读取插件中心失败：%s" % exc}, 500)
+                return
+            lim = user_limits(user)
+            feats = lim.get("features") or {}
+            payload["features"] = {
+                "plugin_pack": feature_allowed(user, "plugin_pack"),
+                "plugin_submit": feature_allowed(user, "plugin_submit"),
+            }
+            payload["is_admin"] = is_admin(user)
+            payload["restart_required"] = plugin_manager.restart_required()
+            self._json(payload)
+            return
+
+        if path.startswith("/api/admin/plugins/submission/"):
+            user = self._current_user()
+            if not is_admin(user):
+                self._json({"error": "只有管理员可以下载待审批插件"}, 403)
+                return
+            sid = urllib.request.unquote(
+                path[len("/api/admin/plugins/submission/"):])
+            try:
+                zip_path, name = plugin_manager.submission_zip(sid)
+            except ValueError as exc:
+                self._json({"error": str(exc)}, 404)
+                return
+            if not self._stream_file(zip_path, "application/zip", name):
+                self._json({"error": "文件不存在"}, 404)
+            return
+
+        if path == "/api/admin/plugins":
+            user = self._current_user()
+            if not is_admin(user):
+                self._json({"error": "只有管理员可以管理插件"}, 403)
+                return
+            try:
+                self._json(plugin_manager.admin_snapshot())
+            except Exception:
+                self._json({"error": "读取插件注册表失败，请查看服务日志"}, 500)
+            return
+
         if path == "/api/models":
             activity_request("/api/models", "GET", throttle=6.0, silent=True)
             user = self._current_user()
@@ -1380,7 +1443,7 @@ class Handler(BaseHTTPRequestHandler):
                         "upscalers": [UPSCALE_ANIME, UPSCALE_PHOTO_SHARP,
                                       UPSCALE_PHOTO],
                         "loras": list_loras(),
-                        "styles": STYLES,
+                        "styles": plugin_styles_for(user),
                         "samplers": [{"key": k, "label": v["label"]}
                                      for k, v in SAMPLERS.items()],
                         "default_sampler": DEFAULT_SAMPLER,
@@ -2725,6 +2788,154 @@ class Handler(BaseHTTPRequestHandler):
                         "queue": scheduler_snapshot()})
             return
 
+        if route == "/api/plugins":
+            user = self._current_user()
+            uid = (user or {}).get("id") or "admin"
+            action = str(data.get("action") or "")
+            try:
+                if action == "import_pack":
+                    if not self._require_feature(user, "plugin_pack"):
+                        return
+                    manifest = data.get("manifest")
+                    if manifest is None and data.get("content") is not None:
+                        raw = str(data.get("content") or "")
+                        if len(raw.encode("utf-8")) > plugin_manager.MAX_PACK_BYTES:
+                            self._json({"error": "插件包超过 256KB"}, 400)
+                            return
+                        try:
+                            manifest = json.loads(raw)
+                        except Exception:
+                            self._json({"error": "插件包不是合法 JSON"}, 400)
+                            return
+                    pack = plugin_manager.import_pack(uid, manifest)
+                    audit("security", "plugin_pack_import", user=user,
+                          ip=self.client_address[0], target=pack.get("id"))
+                    self._json({"ok": True, "pack": pack,
+                                "plugins": plugin_manager.user_center(uid),
+                                "restart_required": False})
+                    return
+                if action == "toggle_pack":
+                    if not self._require_feature(user, "plugin_pack"):
+                        return
+                    pack = plugin_manager.set_pack_enabled(
+                        uid, data.get("id"), bool(data.get("enabled", True)))
+                    self._json({"ok": True, "pack": pack,
+                                "plugins": plugin_manager.user_center(uid)})
+                    return
+                if action == "delete_pack":
+                    if not self._require_feature(user, "plugin_pack"):
+                        return
+                    plugin_manager.delete_pack(uid, data.get("id"))
+                    audit("security", "plugin_pack_delete", user=user,
+                          ip=self.client_address[0], target=str(data.get("id")))
+                    self._json({"ok": True,
+                                "plugins": plugin_manager.user_center(uid)})
+                    return
+                if action == "submit_node":
+                    if not self._require_feature(user, "plugin_submit"):
+                        return
+                    raw_b64 = str(data.get("zip_b64") or "")
+                    if not raw_b64:
+                        self._json({"error": "没有收到 ZIP 文件"}, 400)
+                        return
+                    if len(raw_b64) > (plugin_manager.MAX_SUBMIT_BYTES * 4 // 3) + 8192:
+                        self._json({"error": "代码插件 ZIP 最大 20MB"}, 400)
+                        return
+                    try:
+                        blob = base64.b64decode(raw_b64, validate=True)
+                    except Exception:
+                        self._json({"error": "ZIP 数据损坏"}, 400)
+                        return
+                    sub = plugin_manager.submit_node(
+                        uid, data.get("filename"), blob,
+                        admin=is_admin(user))
+                    audit("security", "plugin_submit", user=user,
+                          ip=self.client_address[0], target=sub.get("name"),
+                          size=sub.get("size"), risk=sub.get("risk_level"))
+                    self._json({"ok": True, "submission": sub,
+                                "plugins": plugin_manager.user_center(uid)})
+                    return
+                if action == "cancel_submission":
+                    plugin_manager.cancel_submission(
+                        uid, data.get("id"), admin=is_admin(user))
+                    self._json({"ok": True,
+                                "plugins": plugin_manager.user_center(uid)})
+                    return
+                self._json({"error": "未知操作"}, 400)
+            except ValueError as exc:
+                self._json({"error": str(exc)}, 400)
+            except Exception:
+                self._json({"error": "插件操作失败，请查看服务日志"}, 500)
+            return
+
+        if route == "/api/admin/plugins":
+            user = self._current_user()
+            if not is_admin(user):
+                self._json({"error": "只有管理员可以管理插件"}, 403)
+                return
+            action = str(data.get("action") or "")
+            try:
+                target = ""
+                if action == "approve":
+                    target = str(data.get("name") or data.get("id") or "")
+                    result = plugin_manager.approve_submission(
+                        data.get("id"), user,
+                        force=bool(data.get("force")),
+                        replace=bool(data.get("replace")))
+                    target = result.get("name") or target
+                elif action == "reject":
+                    result = plugin_manager.reject_submission(
+                        data.get("id"), user, data.get("reason") or "")
+                    target = data.get("id") or ""
+                elif action == "disable":
+                    result = plugin_manager.disable_node(
+                        str(data.get("name") or ""), user)
+                    target = result.get("name") or ""
+                elif action == "enable":
+                    result = plugin_manager.enable_node(
+                        str(data.get("name") or ""), user)
+                    target = result.get("name") or ""
+                elif action == "rollback":
+                    result = plugin_manager.rollback_node(
+                        str(data.get("name") or ""), user)
+                    target = result.get("name") or ""
+                elif action == "verify":
+                    result = plugin_manager.verify_node(
+                        str(data.get("name") or ""), user)
+                    target = result.get("name") or ""
+                elif action == "remove":
+                    result = plugin_manager.remove_managed_node(
+                        str(data.get("name") or ""), user)
+                    target = result.get("name") or ""
+                elif action == "disable_all":
+                    removed = plugin_manager.disable_all_managed(user)
+                    self._json({"ok": True, "disabled": removed,
+                                "restart_required": True})
+                    return
+                elif action == "clear_restart":
+                    plugin_manager.clear_restart_flag()
+                    self._json({"ok": True, "restart_required": False})
+                    return
+                elif action == "delete_pack":
+                    plugin_manager.delete_pack(
+                        data.get("owner") or "", data.get("id"))
+                    self._json({"ok": True,
+                                "snapshot": plugin_manager.admin_snapshot()})
+                    return
+                else:
+                    self._json({"error": "未知操作"}, 400)
+                    return
+                audit("security", "plugin_" + action, user=user,
+                      ip=self.client_address[0], target=target, ok=True)
+                self._json({"ok": True, "result": result,
+                            "snapshot": plugin_manager.admin_snapshot(),
+                            "restart_required": plugin_manager.restart_required()})
+            except ValueError as exc:
+                self._json({"error": str(exc)}, 400)
+            except Exception:
+                self._json({"error": "插件操作失败，请查看服务日志"}, 500)
+            return
+
         if route == "/api/admin/nodes":
             user = self._current_user()
             if not is_admin(user):
@@ -2736,6 +2947,8 @@ class Handler(BaseHTTPRequestHandler):
                     info = node_manager.import_path(
                         data.get("path"), data.get("name"),
                         replace=bool(data.get("replace")))
+                    plugin_manager.adopt_installed(
+                        info.get("name"), user.get("id") or "")
                     audit("security", "node_import", user=user,
                           ip=self.client_address[0], target=info.get("name"))
                     self._json({"ok": True, "node": info,
@@ -2753,6 +2966,7 @@ class Handler(BaseHTTPRequestHandler):
                 if action == "remove":
                     name = str(data.get("name") or "")
                     dest = node_manager.remove_node(name)
+                    plugin_manager.note_removed(node_manager.safe_node_name(name))
                     audit("security", "node_remove", user=user,
                           ip=self.client_address[0], target=name)
                     self._json({"ok": True, "trash": os.path.basename(dest),
@@ -2769,6 +2983,8 @@ class Handler(BaseHTTPRequestHandler):
                     info = node_manager.upload_finish(
                         data.get("upload_id"),
                         replace=bool(data.get("replace")))
+                    plugin_manager.adopt_installed(
+                        info.get("name"), user.get("id") or "")
                     audit("security", "node_import", user=user,
                           ip=self.client_address[0], target=info.get("name"))
                     self._json({"ok": True, "node": info,
@@ -3981,6 +4197,7 @@ def main():
     cleanup_stale_stages()
     load_jobs_state()
     lan_share.ensure_workers()
+    plugin_manager.ensure_plugins()
     ensure_queue_watchdog()
     ensure_guest_sweeper()
     expire_guests()
