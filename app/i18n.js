@@ -172,6 +172,9 @@
       'Sizes suited to the selected model are listed here; custom sizes above the model limit are scaled down automatically.',
     '按填写的宽高生成；不是 16 的倍数会自动对齐':
       'Generate at the entered width and height; values snap to multiples of 16.',
+    '8GB 显存上很可能失败，只建议试一次':
+      'Likely to fail on 8GB VRAM; try it only once.',
+    '视频时长（秒）': 'Video duration (seconds)',
     '这个底模的推荐画幅': 'Recommended size for this model',
     'Wan 1.3B 原生是 480p，可选多种画幅；像素量太大会自动等比缩小。时长越长约容易爆显存。':
       'Wan 1.3B is native 480p with several aspect choices; oversized frames are scaled down. Longer clips are more likely to run out of VRAM.',
