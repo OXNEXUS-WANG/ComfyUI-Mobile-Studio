@@ -73,6 +73,9 @@ body::after{content:'';position:fixed;inset:0;z-index:9;pointer-events:none;opac
 #scene.drag{cursor:grabbing}
 #links{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
 #planets{position:absolute;inset:0;pointer-events:none}
+/* 只画“从星球前方经过”的连线片段，让连线与星球有真实前后遮挡 */
+#linkFront{position:absolute;inset:0;width:100%;height:100%;
+  pointer-events:none;z-index:3400}
 
 .orbit{position:fixed;left:50%;top:50%;border:1px solid rgba(120,190,255,.10);
   border-radius:50%;pointer-events:none;z-index:1;transform:translate(-50%,-50%) rotateX(72deg)}
@@ -1295,7 +1298,7 @@ void main(){
   gl_FragColor = vec4(mapped, alpha);
 }
 </script>
-<script src="i18n.js?v=20261020r"></script>
+<script src="i18n.js?v=20261021b"></script>
 </head>
 <body>
 <canvas id="starCanvas"></canvas>
@@ -1364,6 +1367,7 @@ void main(){
     <g id="packetLayer"></g>
   </svg>
   <div id="planets"></div>
+  <canvas id="linkFront"></canvas>
 </div>
 
 <aside id="panel">
@@ -3498,6 +3502,103 @@ function project(n){
   return projectXYZ(n.x, n.y, n.z);
 }
 
+/* 连线穿过星球时，只把“比星球更靠近相机”的那一段画到星球上层。
+   SVG 本身仍在星球下层，所以背面自然被星球挡住；这里补的是正面。 */
+function drawLinkOcclusion(now){
+  if(!lfctx) return;
+  lfctx.clearRect(0, 0, vw, vh);
+  const planets = [];
+  for(const n of nodes){
+    if(n.hidden || !n.el || !n._p || !n._p.visible || n._display === 'none') continue;
+    if(!n._sr || n._sr <= 0) continue;
+    planets.push({x:n._p.x, y:n._p.y, r:n._sr * 1.02, z:n._p.z});
+  }
+  if(!planets.length) return;
+  // 屏幕空间网格：只检查连线包围盒附近的星球，手机端也不会每帧扫全部节点。
+  const CELL = 140;
+  const grid = new Map();
+  for(const pl of planets){
+    const x0 = Math.floor((pl.x - pl.r) / CELL);
+    const x1 = Math.floor((pl.x + pl.r) / CELL);
+    const y0 = Math.floor((pl.y - pl.r) / CELL);
+    const y1 = Math.floor((pl.y + pl.r) / CELL);
+    for(let cx=x0; cx<=x1; cx++){
+      for(let cy=y0; cy<=y1; cy++){
+        const key = cx + ',' + cy;
+        let arr = grid.get(key);
+        if(!arr){ arr = []; grid.set(key, arr); }
+        arr.push(pl);
+      }
+    }
+  }
+  let seenToken = 0;
+  const samples = 7;
+  links.forEach(l => {
+    const p1 = l.a._p, p2 = l.b._p;
+    if(!p1 || !p2 || !p1.visible || !p2.visible) return;
+    if(!l.elBase || l.elBase.style.display === 'none') return;
+    if(l.elBase.classList.contains('dim')) return;
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const curve = l.kind === 'api' ? 13 : l.kind === 'cross' ? 42 : 26;
+    const mx = (p1.x + p2.x) / 2 - dy / len * curve;
+    const my = (p1.y + p2.y) / 2 + dx / len * curve;
+    const minx = Math.min(p1.x, mx, p2.x), maxx = Math.max(p1.x, mx, p2.x);
+    const miny = Math.min(p1.y, my, p2.y), maxy = Math.max(p1.y, my, p2.y);
+    const fronts = [];
+    seenToken++;
+    const gx0 = Math.floor(minx / CELL), gx1 = Math.floor(maxx / CELL);
+    const gy0 = Math.floor(miny / CELL), gy1 = Math.floor(maxy / CELL);
+    for(let gx=gx0; gx<=gx1; gx++){
+      for(let gy=gy0; gy<=gy1; gy++){
+        const arr = grid.get(gx + ',' + gy);
+        if(!arr) continue;
+        for(const pl of arr){
+          if(pl._seen === seenToken) continue;
+          pl._seen = seenToken;
+          const rr = pl.r + 2;
+          for(let i = 0; i <= samples; i++){
+            const t = i / samples, u = 1 - t;
+            const x = u*u*p1.x + 2*u*t*mx + t*t*p2.x;
+            const y = u*u*p1.y + 2*u*t*my + t*t*p2.y;
+            const ddx = x - pl.x, ddy = y - pl.y;
+            if(ddx*ddx + ddy*ddy > rr*rr) continue;
+            const z = p1.z + (p2.z - p1.z) * t;
+            if(z < pl.z - 1){ fronts.push(pl); break; }
+          }
+        }
+      }
+    }
+    if(!fronts.length) return;
+    lfctx.save();
+    lfctx.beginPath();
+    fronts.forEach(pl => {
+      lfctx.moveTo(pl.x + pl.r, pl.y);
+      lfctx.arc(pl.x, pl.y, pl.r, 0, Math.PI * 2);
+    });
+    lfctx.clip();
+    const isFlow = l.kind === 'flow' || l.kind === 'flowbranch';
+    const isWf = l.kind === 'wf';
+    let alpha = parseFloat(l.elBase.getAttribute('stroke-opacity') || '0.3');
+    if(l.elBase.classList.contains('live')) alpha = Math.min(0.95, alpha * 1.8);
+    const lit = l.elBase.classList.contains('lit') ||
+                l.elBase.classList.contains('live');
+    lfctx.globalAlpha = alpha;
+    lfctx.strokeStyle = l.color || '#7fe3ff';
+    lfctx.lineWidth = isFlow ? 1.5 : (isWf ? 1.3 : 1);
+    lfctx.lineCap = 'round';
+    lfctx.setLineDash(isFlow ? [3, 9] : (isWf ? [2, 11] : []));
+    lfctx.lineDashOffset = (isFlow || isWf) ? -((now * 0.06) % 12) : 0;
+    lfctx.shadowBlur = lit ? 8 : 0;
+    lfctx.shadowColor = lfctx.strokeStyle;
+    lfctx.beginPath();
+    lfctx.moveTo(p1.x, p1.y);
+    lfctx.quadraticCurveTo(mx, my, p2.x, p2.y);
+    lfctx.stroke();
+    lfctx.restore();
+  });
+}
+
 let frameCount = 0, lastFpsT = performance.now(), fpsCount = 0;
 let lastZoomRefresh = 1, lastFrameT = 0, lastSizeK = 0, lastLod = null;
 function loop(now){
@@ -3579,6 +3680,9 @@ function loop(now){
     // 手机总览里 12 个分类容易糊成一团，分类球再缩一点
     if(compactView && n.kind === 'cat') scale *= 0.78;
     if(compactView && n.kind === 'core') scale *= 0.86;
+    // 供连线遮挡使用：屏幕半径和相机深度
+    n._sr = n.size * scale * 0.5;
+    n._zc = p.z;
     // 远处星球压暗、降饱和；近处保持明亮，强化纵深
     const isFar = p.z > 220 && n.kind !== 'cat' && n.kind !== 'core';
     if(n._far !== isFar){
@@ -3652,6 +3756,7 @@ function loop(now){
         l.elFlow.setAttribute('d', d);
       }
     });
+    drawLinkOcclusion(now);
     updateOrbits();
   }
   if((frameCount & 1) === 0) updateJobPackets(now);
@@ -5658,10 +5763,26 @@ function buildLegend(){
 /* ---------- 星空 ---------- */
 const starCanvas = document.getElementById('starCanvas');
 const sctx = starCanvas.getContext('2d');
+const linkFrontCanvas = document.getElementById('linkFront');
+const lfctx = linkFrontCanvas.getContext('2d');
+let lfDpr = 1;
 let stars = [];
+function resizeLinkFront(){
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  const cw = Math.round(vw * dpr), ch = Math.round(vh * dpr);
+  if(linkFrontCanvas.width !== cw || linkFrontCanvas.height !== ch){
+    linkFrontCanvas.width = cw;
+    linkFrontCanvas.height = ch;
+  }
+  if(lfDpr !== dpr){
+    lfDpr = dpr;
+    lfctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+}
 function renderStars(){
   const dpr = Math.min(2, devicePixelRatio || 1);
   vw = innerWidth; vh = innerHeight;
+  resizeLinkFront();
   const cw = Math.round(vw * dpr), ch = Math.round(vh * dpr);
   // 手机地址栏伸缩会反复触发 resize；尺寸没变时不要重设 canvas，
   // 否则会清空星星并短暂闪白。
@@ -8148,3 +8269,4 @@ setTimeout(() => document.getElementById('boot').classList.add('gone'), 850);
 </script>
 </body>
 </html>
+

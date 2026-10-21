@@ -96,8 +96,8 @@ commit、模型 revision 和 7zr 哈希都已锁定，不会自动追最新版�
 
 ## 2. 安装
 
-1. 分享版从 GitHub Releases 下载 `ComfyUI-Mobile-Studio-v1.1.2-Share.zip`；
-   商用客户使用 `ComfyUI-Mobile-Studio-v1.1.2-Commercial.zip`。
+1. 分享版从 GitHub Releases 下载 `ComfyUI-Mobile-Studio-v1.1.3-Share.zip`；
+   商用客户使用 `ComfyUI-Mobile-Studio-v1.1.3-Commercial.zip`。
 2. 解压到一个目录（不要在压缩包里直接运行）。
 3. 双击 `安装.bat`（或 `install.bat`）。
 4. 按提示操作：
@@ -359,12 +359,14 @@ https://192.168.137.1:8800
 | 备份配置/图库元数据 | 双击 `备份数据.bat` |
 | 连图片/视频一起备份 | `python tools\backup.py --images` |
 | 恢复（先停服务） | 双击 `恢复数据.bat`，输入 ZIP 路径 |
-| 单元测试（117 项） | 双击 `运行测试.bat` |
+| 单元测试（135 项） | 双击 `运行测试.bat` |
 | 在线冒烟 | `set MGS_TEST_PASSWORD=...` 后运行 `python tests\run_tests.py` |
 | 无第二台机器的 worker 验收 | `python tests\worker_lan_sim.py` |
 
-备份默认不含图片，恢复前会自动再备份当前状态。任务状态写入 `jobs_state.json`，
-服务重启后最近任务仍可查询，被中断的任务会明确标为“服务重启，任务已中断”。
+备份默认不含图片，恢复前会自动再备份当前状态。任务状态写入 `jobs_state.json`；
+排队中的任务在服务重启后会自动重排，尚未提交给 ComfyUI 的运行任务可安全重试，
+已经提交的任务不会重复执行。`一键启动.bat` 以守护模式运行，ComfyUI 或网页服务
+异常退出后会自动重启（后台可关闭，默认每小时最多 6 次）。
 
 ## 8. 多机器算力共享
 

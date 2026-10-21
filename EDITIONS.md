@@ -16,10 +16,10 @@
 构建：
 
 ```powershell
-.\build_release.ps1 -Version 1.1.2 -Edition share
+.\build_release.ps1 -Version 1.1.3 -Edition share
 ```
 
-输出：`dist\ComfyUI-Mobile-Studio-v1.1.2-Share.zip`
+输出：`dist\ComfyUI-Mobile-Studio-v1.1.3-Share.zip`
 
 ## 商用版（Commercial）
 
@@ -37,10 +37,10 @@
 构建：
 
 ```powershell
-.\build_release.ps1 -Version 1.1.2 -Edition commercial
+.\build_release.ps1 -Version 1.1.3 -Edition commercial
 ```
 
-输出：`dist\ComfyUI-Mobile-Studio-v1.1.2-Commercial.zip`
+输出：`dist\ComfyUI-Mobile-Studio-v1.1.3-Commercial.zip`
 
 ## 账号与多机额度
 
@@ -69,3 +69,4 @@
 - 商业版的具体价格、支持、部署数量以正式订单/合同为准；
 - 两个版本都使用 `installer/versions.lock.json` 做版本锁定，不自动追最新；
 - 商业发行前建议让律师审核 EULA、GPL 条款和模型许可。
+
