@@ -46,6 +46,7 @@ import model_manager
 import model_profiles
 import monitor_center
 import queue_control
+import runtime_settings
 import system_state
 import teams
 
@@ -301,6 +302,12 @@ JOBS_STATE_LOCK = threading.Lock()
 JOBS_STATE_META = {"last_write": 0.0, "loaded": False}
 JOBS_KEEP_SECONDS = 7 * 86400
 JOBS_KEEP_MAX = 120
+# 只给“还没提交给 ComfyUI”的任务保存恢复参数；提交成功后立即删除。
+# 这里会短暂包含提示词和临时输入文件名，但不会进入 jobs_state.json 或日志。
+JOBS_RESUME_FILE = os.path.join(ROOT, "jobs_resume.json")
+JOBS_RESUME_LOCK = threading.RLock()
+JOBS_RESUME_MAX = 60
+RECOVERY_PENDING = []
 
 # --------------------------------------------------------------------- 多账号排队
 # ComfyUI 在 8GB 显存上只能一次跑一个任务。所有账号的任务先进这里，
@@ -1183,7 +1190,8 @@ JOB_STATE_KEYS = (
     "hires", "pag", "turbo", "loras", "inpaint", "img2img", "frames",
     "steps", "cfg", "sampler", "count", "pixels", "user_id", "username",
     "user_name", "worker_id", "worker_name", "worker_kind", "retry_count",
-    "dispatch_state", "recovered",
+    "dispatch_state", "recovered", "recovery_attempts", "comfy_prompt_id",
+    "auto",
 )
 
 
@@ -1237,6 +1245,55 @@ def persist_jobs(force=False, min_interval=1.5):
             pass
 
 
+def _read_resume_map():
+    try:
+        with open(JOBS_RESUME_FILE, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        rows = data.get("jobs") if isinstance(data, dict) else None
+        return rows if isinstance(rows, dict) else {}
+    except Exception:
+        return {}
+
+
+def _write_resume_map(rows):
+    payload = {"version": 1, "saved_at": time.time(), "jobs": rows}
+    tmp = JOBS_RESUME_FILE + ".tmp"
+    with JOBS_RESUME_LOCK:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, ensure_ascii=False, separators=(",", ":"))
+        os.replace(tmp, JOBS_RESUME_FILE)
+
+
+def save_job_resume(jid, payload):
+    """保存尚未提交任务的恢复参数；提交成功后必须调用 drop_job_resume。"""
+    if not jid or not isinstance(payload, dict):
+        return
+    with JOBS_RESUME_LOCK:
+        rows = _read_resume_map()
+        rows[jid] = payload
+        if len(rows) > JOBS_RESUME_MAX:
+            ordered = sorted(rows.items(),
+                             key=lambda kv: float(kv[1].get("created") or 0),
+                             reverse=True)[:JOBS_RESUME_MAX]
+            rows = dict(ordered)
+        _write_resume_map(rows)
+
+
+def drop_job_resume(jid):
+    if not jid:
+        return
+    with JOBS_RESUME_LOCK:
+        rows = _read_resume_map()
+        if jid in rows:
+            rows.pop(jid, None)
+            _write_resume_map(rows)
+
+
+def load_job_resume_map():
+    with JOBS_RESUME_LOCK:
+        return _read_resume_map()
+
+
 def load_jobs_state():
     """启动时恢复最近任务；被中断的排队/运行任务明确标成错误。"""
     if JOBS_STATE_META.get("loaded"):
@@ -1251,7 +1308,12 @@ def load_jobs_state():
     except Exception:
         return
     cutoff = time.time() - JOBS_KEEP_SECONDS
+    settings = runtime_settings.load()
+    resumes = load_job_resume_map()
+    RECOVERY_PENDING.clear()
     restored = 0
+    drop_ids = []
+    now = time.time()
     for rec in rows:
         if not isinstance(rec, dict):
             continue
@@ -1262,16 +1324,172 @@ def load_jobs_state():
             continue
         status = str(rec.get("status") or "")
         if status in ("queued", "running"):
-            rec["status"] = "error"
-            rec["error"] = "服务重启，任务已中断；请重新提交。"
-            rec["dispatch_state"] = "interrupted"
-            rec["finished_at"] = time.time()
-            rec["recovered"] = True
+            resume = resumes.get(jid)
+            kind = str(rec.get("kind") or "gen")
+            uid = str(rec.get("user_id") or "admin")
+            user = get_user(uid)
+            retryable = (bool(resume) and kind == "gen"
+                         and not rec.get("auto"))
+            attempts = int(rec.get("recovery_attempts") or 0)
+            if not user or not user_is_active(user):
+                rec["status"] = "error"
+                rec["error"] = "账号已停用或删除，任务不再自动恢复。"
+                rec["dispatch_state"] = "interrupted"
+                rec["finished_at"] = now
+            elif (status == "queued" and retryable
+                  and settings.get("recovery_queued", True)):
+                if attempts >= 3:
+                    rec["status"] = "error"
+                    rec["error"] = "任务多次恢复失败，已停止自动重试；请重新提交。"
+                    rec["dispatch_state"] = "interrupted"
+                    rec["finished_at"] = now
+                    drop_ids.append(jid)
+                else:
+                    rec["status"] = "queued"
+                    rec["recovered"] = True
+                    rec["recovery_attempts"] = attempts + 1
+                    rec["queued_at"] = now
+                    rec["started"] = 0
+                    rec["elapsed"] = 0
+                    rec["dispatch_state"] = "recovered"
+                    RECOVERY_PENDING.append(jid)
+            elif (status == "running" and not rec.get("comfy_prompt_id")
+                  and retryable
+                  and settings.get("recovery_running_without_prompt", True)):
+                if attempts >= 3:
+                    rec["status"] = "error"
+                    rec["error"] = "任务多次恢复失败，已停止自动重试；请重新提交。"
+                    rec["dispatch_state"] = "interrupted"
+                    rec["finished_at"] = now
+                    drop_ids.append(jid)
+                else:
+                    rec["status"] = "queued"
+                    rec["recovered"] = True
+                    rec["recovery_attempts"] = attempts + 1
+                    rec["queued_at"] = now
+                    rec["started"] = 0
+                    rec["elapsed"] = 0
+                    rec["dispatch_state"] = "recovered"
+                    RECOVERY_PENDING.append(jid)
+            else:
+                rec["status"] = "error"
+                if status == "running" and rec.get("comfy_prompt_id"):
+                    rec["error"] = ("服务重启时任务已经提交给 ComfyUI；"
+                                    "为避免重复出图不再自动重试，请先查看图库。")
+                elif not resume:
+                    rec["error"] = "服务重启，任务恢复数据缺失；请重新提交。"
+                else:
+                    rec["error"] = "服务重启，任务已中断；请重新提交。"
+                rec["dispatch_state"] = "interrupted"
+                rec["finished_at"] = now
+                rec["recovered"] = True
+                drop_ids.append(jid)
         with JOBS_LOCK:
             JOBS[jid] = rec
         restored += 1
+    for jid in list(resumes.keys()):
+        if jid not in JOBS:
+            drop_ids.append(jid)
+    for jid in drop_ids:
+        drop_job_resume(jid)
     if restored:
         persist_jobs(force=True)
+
+
+def _fail_recovered_job(jid, message, resume=None):
+    with JOBS_LOCK:
+        job = JOBS.get(jid)
+        if job:
+            job["status"] = "error"
+            job["error"] = message
+            job["dispatch_state"] = "interrupted"
+            job["finished_at"] = time.time()
+    if resume:
+        cleanup_stage(resume.get("user_id") or "admin",
+                      resume.get("stage_id"))
+    drop_job_resume(jid)
+    scheduler_cancel_job(jid)
+    persist_jobs(force=True)
+
+
+def recover_queued_jobs():
+    """把 load_jobs_state 标记的待恢复任务重新排队并启动执行线程。
+
+    只恢复 kind=gen 且保存了恢复参数、临时输入还在的任务；已经提交给
+    ComfyUI 的 running 任务不会重试，避免重复出图。
+    """
+    pending = list(RECOVERY_PENDING)
+    RECOVERY_PENDING.clear()
+    if not pending:
+        return 0
+    resumes = load_job_resume_map()
+    started = 0
+    for jid in pending:
+        resume = resumes.get(jid)
+        with JOBS_LOCK:
+            job = dict(JOBS.get(jid) or {})
+        if not job or job.get("status") != "queued":
+            continue
+        if not resume:
+            _fail_recovered_job(jid, "任务恢复数据缺失；请重新提交。")
+            continue
+        uid = resume.get("user_id") or "admin"
+        user = get_user(uid)
+        if not user or not user_is_active(user):
+            _fail_recovered_job(jid, "账号已停用或删除，任务不再恢复。", resume)
+            continue
+        ckpt = str(resume.get("ckpt") or "")
+        available = {m.get("name") for m in list_models()}
+        if not ckpt or ckpt not in available:
+            _fail_recovered_job(jid, "恢复失败：底模文件不存在，请重新提交。", resume)
+            continue
+        init_image = resume.get("init_image")
+        init_mask = resume.get("init_mask")
+        if init_image and not os.path.isfile(os.path.join(INPUT_DIR, init_image)):
+            _fail_recovered_job(jid, "恢复失败：参考图临时文件已清理，请重新提交。", resume)
+            continue
+        if init_mask and not os.path.isfile(os.path.join(INPUT_DIR, init_mask)):
+            _fail_recovered_job(jid, "恢复失败：蒙版临时文件已清理，请重新提交。", resume)
+            continue
+        queue_err = scheduler_enqueue(jid)
+        if queue_err:
+            _fail_recovered_job(jid, "恢复排队失败：%s" % queue_err, resume)
+            continue
+        try:
+            threading.Thread(
+                target=run_job,
+                args=(jid, resume.get("prompt", ""),
+                      resume.get("negative", ""),
+                      int(resume.get("width") or 832),
+                      int(resume.get("height") or 1216),
+                      int(resume.get("steps") or 20),
+                      float(resume.get("cfg") or 6.0),
+                      int(resume.get("seed") or 0),
+                      int(resume.get("count") or 1),
+                      init_image, init_mask,
+                      float(resume.get("denoise") or 1.0),
+                      ckpt, resume.get("kind") or "gen",
+                      resume.get("loras") or [],
+                      bool(resume.get("hires")),
+                      resume.get("prompt_en") or "",
+                      resume.get("sampler") or DEFAULT_SAMPLER,
+                      int(resume.get("frames") or 16),
+                      bool(resume.get("pag", True)),
+                      bool(resume.get("turbo")),
+                      resume.get("char_tags"),
+                      resume.get("prompt_display") or "",
+                      resume.get("stage_id"), uid),
+                daemon=True,
+                name="run-job-recovered-%s" % jid).start()
+            started += 1
+            audit("activity", "job_recovered", user=user,
+                  ip="", job_id=jid, kind=resume.get("kind") or "gen",
+                  model=os.path.basename(ckpt))
+            activity_request("job", phase="recovered", job_id=jid,
+                             user_id=uid, silent=True)
+        except Exception as exc:
+            _fail_recovered_job(jid, "恢复启动失败：%s" % exc, resume)
+    return started
 
 
 def reload_jobs_state():
@@ -1280,6 +1498,10 @@ def reload_jobs_state():
         JOBS.clear()
     JOBS_STATE_META["loaded"] = False
     load_jobs_state()
+    pending = list(RECOVERY_PENDING)
+    RECOVERY_PENDING.clear()
+    for jid in pending:
+        _fail_recovered_job(jid, "系统回滚，任务未恢复；请重新提交。")
     with JOBS_LOCK:
         return dict(JOBS)
 
@@ -4407,6 +4629,7 @@ def remote_job_started(jid, worker_id, attempt, prompt_id):
             job["dispatch_state"] = "running"
             job["submitted_at"] = time.time()
             job["elapsed"] = 0
+    drop_job_resume(jid)
     with WS_LOCK:
         WS_PROGRESS.setdefault(cpid, {"value": 0, "max": 0})
     return {"ok": True, "cancel": bool(rec.get("cancel"))}, ""
@@ -4869,6 +5092,8 @@ def run_job(job_id, prompt, negative, width, height, steps, cfg, seed,
                 JOBS[job_id].setdefault("finished_at", time.time())
             snapshot = dict(JOBS[job_id])
         persist_jobs(force=snapshot.get("status") in ("done", "error"))
+        if snapshot.get("status") in ("done", "error"):
+            drop_job_resume(job_id)
         if "status" in kw and snapshot.get("status") in ("done", "error",
                                                          "cancelled"):
             try:
@@ -5056,6 +5281,8 @@ def run_job(job_id, prompt, negative, width, height, steps, cfg, seed,
                     (os.path.basename(ckpt or "") or "出图"))
         remember_workflow(wf, title=wf_title)
         update(comfy_prompt_id=pid, submitted_at=time.time())
+        # 已经提交给 ComfyUI，不能再自动重试，否则可能重复出图。
+        drop_job_resume(job_id)
         activity_request("ComfyUI /prompt", "POST", job_id=job_id,
                          mode=job_meta["mode"], model=job_meta["model"],
                          user_id=user_id or "admin",
@@ -6785,76 +7012,120 @@ def check_feature(user, key):
     return "管理员暂时关闭了你的「%s」功能。" % FEATURE_LABELS.get(key, key)
 
 
-def traffic_quota_message(user):
-    """普通账号的每日 / 每月流量额度；管理员不受限。"""
+def _quota(kind, label, used, limit, unit, reset=None, action=None):
+    return {
+        "kind": kind, "label": label,
+        "used": round(float(used), 2) if isinstance(used, float) else int(used),
+        "limit": int(limit), "unit": unit,
+        "reset": reset, "action": action,
+    }
+
+
+def traffic_quota_detail(user):
+    """普通账号的每日 / 每月流量额度；返回 (提示, 结构化配额)。"""
     if is_admin(user):
-        return None
+        return None, None
     uid = (user or {}).get("id") or ""
     lim = user_limits(user)
     snap = usage_snapshot(uid)
     daily = int(lim.get("daily_traffic_mb") or 0)
+    used_mb = snap["traffic_today"] / 1048576.0
     if daily > 0 and snap["traffic_today"] >= daily * 1048576:
-        return "今天的流量额度用完了（每天 %d MB）。" % daily
+        return ("今天的流量额度用完了（每天 %d MB）。" % daily,
+                _quota("daily_traffic_mb", "今日流量", used_mb, daily, "MB",
+                       reset="daily"))
     monthly = int(lim.get("monthly_traffic_mb") or 0)
+    used_month = snap["traffic_month"] / 1048576.0
     if monthly > 0 and snap["traffic_month"] >= monthly * 1048576:
-        return "本月流量额度用完了（每月 %d MB）。" % monthly
-    return None
+        return ("本月流量额度用完了（每月 %d MB）。" % monthly,
+                _quota("monthly_traffic_mb", "本月流量", used_month, monthly,
+                       "MB", reset="monthly"))
+    return None, None
 
 
-def check_user_limits(user, ckpt, is_video=False, steps=0, count=1,
-                      kind="gen", eta=0):
-    """返回中文拦截原因；None 表示放行。管理员不受限。
+def traffic_quota_message(user):
+    return traffic_quota_detail(user)[0]
+
+
+def check_user_limits_detail(user, ckpt, is_video=False, steps=0, count=1,
+                             kind="gen", eta=0):
+    """返回 (中文拦截原因, 结构化配额)；放行时返回 (None, None)。
 
     eta 是本次任务的预计 GPU 秒数；用于按 GPU 时间配额预检查。
     """
     if is_admin(user):
-        return None
+        return None, None
     lim = user_limits(user)
     if kind == "upscale" and not feature_allowed(user, "upscale"):
-        return "管理员暂时关闭了你的「放大」功能。"
+        return "管理员暂时关闭了你的「放大」功能。", None
     if is_video and not feature_allowed(user, "video"):
-        return "管理员暂时关闭了你的「视频生成」功能。"
+        return "管理员暂时关闭了你的「视频生成」功能。", None
     if kind == "auto" and not feature_allowed(user, "auto"):
-        return "管理员暂时关闭了你的「挂机造图」功能。"
+        return "管理员暂时关闭了你的「挂机造图」功能。", None
     allowed = (lim.get("allowed_models") or []) if not is_video else []
     if allowed:
         base = os.path.basename(str(ckpt or ""))
         if base not in allowed and os.path.splitext(base)[0] not in allowed:
-            return "当前底模不在管理员允许的模型列表里。"
+            return "当前底模不在管理员允许的模型列表里。", None
     max_steps = int(lim.get("max_steps") or 0)
     if max_steps > 0 and steps > max_steps:
-        return "步数超过上限（管理员限制 %d 步）。" % max_steps
+        return ("步数超过上限（管理员限制 %d 步）。" % max_steps,
+                _quota("max_steps", "单次步数", steps, max_steps, "步",
+                       action="settings"))
     max_count = int(lim.get("max_count") or 0)
     if kind == "gen" and max_count > 0 and count > max_count:
-        return "一次生成张数超过上限（管理员限制 %d 张）。" % max_count
+        return ("一次生成张数超过上限（管理员限制 %d 张）。" % max_count,
+                _quota("max_count", "单次张数", count, max_count, "张",
+                       action="settings"))
     usage = user_usage(user.get("id"))
     max_concurrent = int(lim.get("max_concurrent") or 0)
     active_jobs = usage.get("active", usage.get("running", 0))
     if max_concurrent > 0 and active_jobs >= max_concurrent:
-        return "你已经有 %d 个任务在排队或运行，等完成再提交。" % active_jobs
+        return ("你已经有 %d 个任务在排队或运行，等完成再提交。" % active_jobs,
+                _quota("max_concurrent", "同时任务", active_jobs,
+                       max_concurrent, "个", reset="active"))
     daily = int(lim.get("daily_images") or 0)
     if daily > 0 and usage["today"] + count > daily:
-        return "今天的出图额度用完了（每天 %d 张）。" % daily
+        return ("今天的出图额度用完了（每天 %d 张）。" % daily,
+                _quota("daily_images", "今日出图", usage["today"], daily,
+                       "张", reset="daily", action="gallery"))
     max_images = int(lim.get("max_images") or 0)
     if max_images > 0 and usage["images"] + count > max_images:
-        return "图库数量到上限了（最多 %d 张），先删一些旧图。" % max_images
+        return ("图库数量到上限了（最多 %d 张），先删一些旧图。" % max_images,
+                _quota("max_images", "图库数量", usage["images"], max_images,
+                       "张", action="gallery"))
     max_storage = int(lim.get("max_storage_mb") or 0)
     if max_storage > 0 and usage["bytes"] >= max_storage * 1048576:
-        return "占用空间到上限了（最多 %d MB），先清理旧图。" % max_storage
+        return ("占用空间到上限了（最多 %d MB），先清理旧图。" % max_storage,
+                _quota("max_storage_mb", "图库空间",
+                       usage["bytes"] / 1048576.0, max_storage, "MB",
+                       action="gallery"))
     try:
         eta = max(0.0, float(eta or 0))
     except Exception:
         eta = 0.0
     daily_gpu = int(lim.get("daily_gpu_seconds") or 0)
     if daily_gpu > 0 and usage["gpu_seconds_today"] + eta > daily_gpu:
-        return "今天的 GPU 时间额度用完了（每天 %d 秒）。" % daily_gpu
+        return ("今天的 GPU 时间额度用完了（每天 %d 秒）。" % daily_gpu,
+                _quota("daily_gpu_seconds", "今日 GPU 时间",
+                       usage["gpu_seconds_today"], daily_gpu, "秒",
+                       reset="daily"))
     monthly_gpu = int(lim.get("monthly_gpu_seconds") or 0)
     if monthly_gpu > 0 and usage["gpu_seconds_month"] + eta > monthly_gpu:
-        return "本月的 GPU 时间额度用完了（每月 %d 秒）。" % monthly_gpu
-    traffic_msg = traffic_quota_message(user)
+        return ("本月的 GPU 时间额度用完了（每月 %d 秒）。" % monthly_gpu,
+                _quota("monthly_gpu_seconds", "本月 GPU 时间",
+                       usage["gpu_seconds_month"], monthly_gpu, "秒",
+                       reset="monthly"))
+    traffic_msg, traffic_info = traffic_quota_detail(user)
     if traffic_msg:
-        return traffic_msg
-    return None
+        return traffic_msg, traffic_info
+    return None, None
+
+
+def check_user_limits(user, ckpt, is_video=False, steps=0, count=1,
+                      kind="gen", eta=0):
+    return check_user_limits_detail(
+        user, ckpt, is_video, steps, count, kind, eta)[0]
 
 
 # --------------------------------------------------------------------- 实时进度

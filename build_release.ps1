@@ -35,7 +35,8 @@ Get-ChildItem $Stage -Recurse -File -Filter "*.pyc" -Force -ErrorAction Silently
 # 运行期状态、日志和密钥绝不进发布包（.gitignore 不作用于 Compress-Archive）
 $runtimeFiles = @(
     "users.json", "users.json.bak", "sessions.json", "workers.json", "usage.json",
-    "jobs_state.json", "local_llm.json", "monitor.json",
+    "jobs_state.json", "jobs_resume.json", "supervisor.json",
+    "supervisor_status.json", "local_llm.json", "monitor.json",
     "monitor_alerts.json", "monitor_trends.json", "cleanup.json",
     "queue_control.json", "teams.json", "team_prompts.json",
     "license.json", "cert.pem", "key.pem", "worker_agent.json", "access.json"

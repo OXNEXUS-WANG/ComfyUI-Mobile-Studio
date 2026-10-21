@@ -75,6 +75,18 @@ textarea:focus {
 }
 textarea::placeholder { color: var(--tx3); }
 input[type=range] { accent-color: var(--ac); }
+.prompt-count {
+  display: flex; justify-content: flex-end; gap: 8px;
+  margin: -3px 4px 7px; color: var(--tx3);
+  font: 500 10.5px var(--mono); letter-spacing: .2px;
+}
+.prompt-count.warn { color: #ffcf8a; }
+.prompt-count.over { color: #ff8f9c; }
+.input-note {
+  margin: -2px 4px 8px; padding: 7px 10px; border-radius: 9px;
+  color: #9fe8ff; background: rgba(80,170,255,.10);
+  border: 1px solid rgba(127,227,255,.22); font-size: 12px;
+}
 
 /* ---------- 分组标签 ---------- */
 .seclabel {
@@ -1292,7 +1304,8 @@ img.result, video.result {
 
 /* 任务完工弹窗 */
 #donePop, #profilePop, #adminSetPop, #guestPop, #createUserPop,
-#systemSettingsPop, #systemResetPop, #workerJoinPop, #workerEditPop {
+#systemSettingsPop, #systemResetPop, #workerJoinPop, #workerEditPop,
+#quotaPop {
   position: fixed; inset: 0; z-index: 100; display: none;
   align-items: center; justify-content: center; padding: 18px;
   background: rgba(4,7,13,.68);
@@ -1300,7 +1313,7 @@ img.result, video.result {
 }
 #donePop.on, #profilePop.on, #adminSetPop.on, #guestPop.on,
 #createUserPop.on, #systemSettingsPop.on, #systemResetPop.on,
-#workerJoinPop.on, #workerEditPop.on { display: flex; }
+#workerJoinPop.on, #workerEditPop.on, #quotaPop.on { display: flex; }
 #teamPop {
   position: fixed; inset: 0; z-index: 100; display: none;
   align-items: center; justify-content: center; padding: 18px;
@@ -1318,6 +1331,21 @@ img.result, video.result {
 }
 @keyframes dpRise { from { opacity: 0; transform: translateY(12px) scale(.985); } }
 #donePop.err .dp-card { border-color: rgba(255,143,156,.4); }
+.quota-card { border-color: rgba(255,190,110,.38); }
+.quota-meter {
+  height: 9px; border-radius: 9px; overflow: hidden; margin: 12px 2px 8px;
+  background: rgba(255,255,255,.08);
+}
+.quota-meter i {
+  display: block; height: 100%; width: 0; border-radius: inherit;
+  background: linear-gradient(90deg, #ffb86b, #ff8f9c);
+  transition: width .45s ease;
+}
+.quota-stats {
+  display: flex; justify-content: space-between; gap: 10px;
+  color: var(--tx2); font: 500 11.5px var(--mono); margin: 0 2px 12px;
+}
+.quota-note { color: var(--tx3); font-size: 12px; line-height: 1.65; margin: 0 2px 6px; }
 .dp-head { display: flex; align-items: flex-start; gap: 10px; padding: 2px 2px 10px; }
 .dp-ico {
   width: 34px; height: 34px; flex: 0 0 auto; border-radius: 11px;
@@ -1593,8 +1621,10 @@ img.result, video.result {
 </div>
 
 <div class="seclabel">提示词 <span>中文直接写，自动翻成英文</span></div>
-<textarea id="p" placeholder="用中文描述你想画的画面...">杰作，最高画质，一个女孩，独自一人，银色的长头发，红色的眼睛，黑色的哥特连衣裙，微笑，站在夜晚的城堡前，月光，精细的背景</textarea>
+<textarea id="p" maxlength="2000" placeholder="用中文描述你想画的画面...">杰作，最高画质，一个女孩，独自一人，银色的长头发，红色的眼睛，黑色的哥特连衣裙，微笑，站在夜晚的城堡前，月光，精细的背景</textarea>
+<div class="prompt-count" id="pCount">0 / 2000</div>
 <div class="qhint">内置 6700+ 角色名 + 3800+ 作品名：写「初音未来」「雷电将军」「芙莉莲」会自动换成模型认识的英文标签，画指定角色时很有用。</div>
+<div class="input-note" id="inputNotice" style="display:none"></div>
 
 <div class="seclabel">画面比例 <span>画幅跟着底模走，也能自己填</span></div>
 <div class="row tight" id="sizes"></div>
@@ -1772,7 +1802,8 @@ img.result, video.result {
 
   <div class="seclabel">负面提示词 <span>不想出现的东西</span></div>
   <div class="fld">
-    <textarea id="neg" placeholder="留空用默认"></textarea>
+    <textarea id="neg" maxlength="2000" placeholder="留空用默认"></textarea>
+    <div class="prompt-count" id="negCount">0 / 2000</div>
     <div class="qhint" style="margin-bottom:0">这里写你不想要的东西，比如「模糊、水印、多余的手指」；留空就用默认负面词。</div>
   </div>
 
@@ -2182,6 +2213,23 @@ img.result, video.result {
   </div>
 </div>
 
+<div id="quotaPop" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="dp-card quota-card">
+    <div class="dp-head">
+      <div class="dp-ico" style="background:rgba(255,180,90,.14);color:#ffcf8a">⏳</div>
+      <div style="min-width:0">
+        <div class="dp-title" id="quotaTitle">额度已用完</div>
+        <div class="dp-sub" id="quotaSub">先看看下面的用量，再决定什么时候继续。</div>
+      </div>
+      <button class="dp-close" id="quotaClose" type="button" title="关闭窗口">×</button>
+    </div>
+    <div class="quota-meter"><i id="quotaBar"></i></div>
+    <div class="quota-stats"><span id="quotaUsed">—</span><span id="quotaLimit">—</span></div>
+    <div class="quota-note" id="quotaNote"></div>
+    <div class="dp-actions" id="quotaActions"></div>
+  </div>
+</div>
+
 <div id="systemSettingsPop" role="dialog" aria-modal="true" aria-hidden="true">
   <div class="dp-card sys-settings-card">
     <div class="dp-head">
@@ -2293,6 +2341,29 @@ img.result, video.result {
     </div>
     <div class="admin-model-hint" id="adminCleanupInfo"></div>
     <div class="pf-status" id="adminCleanupStatus"></div>
+
+    <div class="admin-worker-head">
+      <div>
+        <h3>异常自动恢复</h3>
+        <p>守护进程监控 ComfyUI 和网页服务，异常退出自动重启；重启后自动恢复排队任务。</p>
+      </div>
+      <button class="reload" id="adminSupRefresh" type="button">刷新</button>
+    </div>
+    <div class="admin-worker-settings admin-llm admin-supervisor">
+      <label><input type="checkbox" id="adminSupEnabled"> 启用守护</label>
+      <label><input type="checkbox" id="adminSupComfy"> 自动重启 ComfyUI</label>
+      <label><input type="checkbox" id="adminSupWeb"> 自动重启网页服务</label>
+      <label><input type="checkbox" id="adminSupRecoveryQueued"> 重启后恢复排队任务</label>
+      <label><input type="checkbox" id="adminSupRecoveryRunning"> 重试未提交的运行任务</label>
+      <label>每小时最多重启<input id="adminSupMax" type="number" min="1" max="100"></label>
+      <label>检查间隔秒<input id="adminSupCheck" type="number" min="2" max="60"></label>
+    </div>
+    <div class="admin-worker-settings">
+      <button class="reload" id="adminSupSave" type="button">保存守护设置</button>
+      <span id="adminSupHint">守护进程由「一键启动」开启；未开启时这里只保存设置。</span>
+    </div>
+    <div class="admin-model-hint" id="adminSupStatus"></div>
+    <div class="pf-status" id="adminSupMsg"></div>
 
     <div class="admin-worker-head">
       <div>
@@ -3817,6 +3888,144 @@ function uiEn() {
   return !!(window.MGI18N && MGI18N.isEnglish());
 }
 function uiT(zh, en) { return uiEn() ? en : zh; }
+
+/* 提示词字数提示 + 后端清理结果通知 */
+let inputNoticeTimer = null;
+function inputNotice(text) {
+  const el = document.getElementById("inputNotice");
+  if (!el) { return; }
+  if (!text) { el.style.display = "none"; return; }
+  el.textContent = text;
+  el.style.display = "block";
+  clearTimeout(inputNoticeTimer);
+  inputNoticeTimer = setTimeout(function () { el.style.display = "none"; }, 6000);
+}
+function wirePromptCounter(inputId, countId, max) {
+  const el = document.getElementById(inputId);
+  const ctr = document.getElementById(countId);
+  if (!el || !ctr) { return; }
+  const update = function () {
+    const n = Array.from(el.value || "").length;
+    ctr.textContent = n + " / " + max;
+    ctr.classList.toggle("warn", n >= max * 0.9 && n < max);
+    ctr.classList.toggle("over", n >= max);
+  };
+  el.addEventListener("input", update);
+  update();
+}
+function showInputCleaned(info) {
+  if (!info) { return; }
+  const parts = [];
+  const p = info.prompt || {};
+  const n = info.negative || {};
+  if (p.removed) {
+    parts.push(uiT("提示词已清理 " + p.removed + " 个不可见字符",
+                   "Removed " + p.removed + " invisible character(s) from the prompt"));
+  }
+  if (p.truncated) {
+    parts.push(uiT("提示词超过 " + (p.limit || 2000) + " 字，已截断",
+                   "Prompt was truncated to " + (p.limit || 2000) + " characters"));
+  }
+  if (n.removed) {
+    parts.push(uiT("负面提示词已清理 " + n.removed + " 个不可见字符",
+                   "Removed " + n.removed + " invisible character(s) from the negative prompt"));
+  }
+  if (n.truncated) {
+    parts.push(uiT("负面提示词超过 " + (n.limit || 2000) + " 字，已截断",
+                   "Negative prompt was truncated to " + (n.limit || 2000) + " characters"));
+  }
+  if (parts.length) { inputNotice(parts.join("；")); }
+}
+wirePromptCounter("p", "pCount", 2000);
+wirePromptCounter("neg", "negCount", 2000);
+
+/* 额度用完：用弹窗解释清楚，不直接甩一行报错 */
+function closeQuota() {
+  const pop = document.getElementById("quotaPop");
+  if (pop) { pop.classList.remove("on"); pop.setAttribute("aria-hidden", "true"); }
+}
+function quotaResetText(reset) {
+  if (reset === "daily") {
+    return uiT("今天 24:00 后自动恢复。", "Resets after midnight tonight.");
+  }
+  if (reset === "monthly") {
+    return uiT("下个月 1 日后自动恢复。", "Resets on the 1st of next month.");
+  }
+  if (reset === "active") {
+    return uiT("当前任务结束后自动恢复。", "Available again when the current job finishes.");
+  }
+  return "";
+}
+function showQuota(j) {
+  const q = (j && j.quota) || {};
+  const title = document.getElementById("quotaTitle");
+  const sub = document.getElementById("quotaSub");
+  const usedEl = document.getElementById("quotaUsed");
+  const limitEl = document.getElementById("quotaLimit");
+  const noteEl = document.getElementById("quotaNote");
+  const bar = document.getElementById("quotaBar");
+  const actions = document.getElementById("quotaActions");
+  const used = Number(q.used || 0);
+  const limit = Number(q.limit || 0);
+  const unit = q.unit || "";
+  const pct = limit > 0 ? Math.max(0, Math.min(100, used / limit * 100)) : 100;
+  if (title) {
+    title.textContent = q.kind === "max_concurrent"
+      ? uiT("现在还不能提交", "Not ready to submit")
+      : uiT("额度已用完", "Quota reached");
+  }
+  if (sub) { sub.textContent = (j && j.error) || uiT("暂时不能再提交新任务。", "You cannot submit a new job right now."); }
+  if (bar) { bar.style.width = pct.toFixed(1) + "%"; }
+  if (usedEl) {
+    usedEl.textContent = q.limit
+      ? uiT("已用 " + used + " " + unit, "Used " + used + " " + unit)
+      : "";
+  }
+  if (limitEl) {
+    limitEl.textContent = q.limit
+      ? uiT("上限 " + limit + " " + unit, "Limit " + limit + " " + unit)
+      : "";
+  }
+  let note = quotaResetText(q.reset);
+  if (!note) {
+    if (q.action === "gallery") {
+      note = uiT("可以先清理一些旧图，或联系管理员提高上限。",
+                 "Delete some old images or ask the admin for a higher limit.");
+    } else if (q.kind === "max_steps" || q.kind === "max_count") {
+      note = uiT("可以把参数调低，或联系管理员提高上限。",
+                 "Lower the setting or ask the admin for a higher limit.");
+    }
+  }
+  if (noteEl) { noteEl.textContent = note; }
+  if (actions) {
+    actions.innerHTML = "";
+    if (q.action === "gallery") {
+      const go = document.createElement("button");
+      go.type = "button";
+      go.className = "reload";
+      go.textContent = uiT("去清理图库", "Open gallery");
+      go.onclick = function () {
+        closeQuota();
+        const tab = document.querySelector('.tabs .tab[data-view="gal"]');
+        if (tab) { tab.click(); }
+      };
+      actions.appendChild(go);
+    }
+    const ok = document.createElement("button");
+    ok.type = "button";
+    ok.className = "ghost";
+    ok.textContent = uiT("知道了", "Got it");
+    ok.onclick = closeQuota;
+    actions.appendChild(ok);
+  }
+  const pop = document.getElementById("quotaPop");
+  if (pop) { pop.classList.add("on"); pop.setAttribute("aria-hidden", "false"); }
+}
+function showApiError(j, fallback) {
+  if (j && j.quota) { showQuota(j); return true; }
+  show((j && j.error) || fallback || "请求失败", "err");
+  return false;
+}
 function jobLabelText(job) {
   const label = syncJobLabel(job);
   if (!uiEn() || !window.MGI18N) { return label; }
@@ -4249,7 +4458,8 @@ async function submitGenerate(extra) {
     body: JSON.stringify(body)
   });
   const j = await r.json();
-  if (j.error) { show(j.error, "err"); setBusy(false); return null; }
+  if (j.error) { showApiError(j); setBusy(false); return null; }
+  if (j.input_cleaned) { showInputCleaned(j.input_cleaned); }
   if (j.eta) { etaSeconds = j.eta; }
   if (j.job_id) { jobPrompts.set(j.job_id, body.prompt || ""); }
   return j.job_id;
@@ -4827,7 +5037,7 @@ async function loadTeamDetail(tid) {
     }).join("");
   }
   if (editor) {
-    html += '<textarea class="input" id="teamPromptText" rows="3" ' +
+    html += '<textarea class="input" id="teamPromptText" rows="3" maxlength="4000" ' +
       'placeholder="' + uiT("写一条团队共享提示词…", "Write a shared prompt…") + '"></textarea>' +
       '<div class="row"><div class="chip" id="teamPromptAdd">' +
       uiT("添加共享提示词", "Add shared prompt") + "</div></div>";
@@ -5286,7 +5496,7 @@ async function doUpscale(factor) {
       body: JSON.stringify({ name: it.name, factor: factor })
     });
     const j = await r.json();
-    if (j.error) { show(j.error, "err"); setBusy(false); return; }
+    if (j.error) { showApiError(j); setBusy(false); return; }
     poll(j.job_id);
   } catch (e) { show("失败：" + e.message, "err"); setBusy(false); }
 }
@@ -7121,6 +7331,91 @@ async function doSystemReset() {
   }
   if (btn) { btn.disabled = false; }
 }
+let supervisorData = null;
+function renderSupervisor(j) {
+  supervisorData = j || {};
+  const s = (j && j.settings) || {};
+  const st = (j && j.status) || {};
+  const set = function (id, value) {
+    const el = document.getElementById(id);
+    if (el) { el.checked = !!value; }
+  };
+  set("adminSupEnabled", s.enabled);
+  set("adminSupComfy", s.auto_restart_comfy);
+  set("adminSupWeb", s.auto_restart_web);
+  set("adminSupRecoveryQueued", s.recovery_queued);
+  set("adminSupRecoveryRunning", s.recovery_running_without_prompt);
+  const max = document.getElementById("adminSupMax");
+  if (max) { max.value = s.max_restarts_per_hour || 6; }
+  const check = document.getElementById("adminSupCheck");
+  if (check) { check.value = s.check_seconds || 5; }
+
+  const box = document.getElementById("adminSupStatus");
+  if (!box) { return; }
+  if (!j || !j.running) {
+    box.innerHTML = '<span class="aw-badge warn">' + esc(adminT("守护未运行", "Supervisor offline")) +
+      '</span><div class="aw-meta">' + esc(adminT(
+        "双击「一键启动.bat」会以守护模式运行；设置已保存，下次启动生效。",
+        "Start with 一键启动.bat to run in watch mode; saved settings apply next launch.")) + "</div>";
+    return;
+  }
+  const rr = st.restarts_last_hour || {};
+  const parts = [
+    '<span class="aw-badge ok">' + esc(adminT("守护运行中", "Supervisor running")) + "</span>",
+    '<span class="aw-badge ' + (st.comfy_alive ? "ok" : "bad") + '">ComfyUI ' +
+      esc(st.comfy_alive ? adminT("在线", "online") : adminT("离线", "offline")) + "</span>",
+    '<span class="aw-badge ' + (st.web_alive ? "ok" : "bad") + '">' +
+      esc(adminT("网页", "Web")) + " " +
+      esc(st.web_alive ? adminT("在线", "online") : adminT("离线", "offline")) + "</span>",
+  ];
+  let meta = adminT("本小时重启：ComfyUI " + (rr.comfy || 0) + " 次 · 网页 " +
+                    (rr.web || 0) + " 次",
+                    "Restarts this hour: ComfyUI " + (rr.comfy || 0) +
+                    " · web " + (rr.web || 0));
+  if (st.last_error) { meta += " · " + st.last_error; }
+  box.innerHTML = parts.join(" ") + '<div class="aw-meta">' + esc(meta) + "</div>";
+}
+async function loadSupervisor() {
+  try {
+    const r = await fetch("/api/supervisor", { cache: "no-store" });
+    const j = await r.json();
+    if (!r.ok || j.error) { throw new Error(j.error || ("HTTP " + r.status)); }
+    renderSupervisor(j);
+  } catch (e) {
+    const box = document.getElementById("adminSupStatus");
+    if (box) { box.textContent = adminT("读取守护状态失败：", "Failed to read supervisor: ") + adminErrText(e); }
+  }
+}
+async function saveSupervisor() {
+  const msg = document.getElementById("adminSupMsg");
+  if (msg) { msg.className = "pf-status"; msg.textContent = adminT("正在保存…", "Saving…"); }
+  const val = function (id, fallback) {
+    const el = document.getElementById(id);
+    if (!el) { return fallback; }
+    return el.type === "checkbox" ? !!el.checked : (parseInt(el.value, 10) || fallback);
+  };
+  const body = { settings: {
+    enabled: val("adminSupEnabled", true),
+    auto_restart_comfy: val("adminSupComfy", true),
+    auto_restart_web: val("adminSupWeb", true),
+    recovery_queued: val("adminSupRecoveryQueued", true),
+    recovery_running_without_prompt: val("adminSupRecoveryRunning", true),
+    max_restarts_per_hour: val("adminSupMax", 6),
+    check_seconds: val("adminSupCheck", 5),
+  } };
+  try {
+    const r = await fetch("/api/supervisor", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const j = await r.json();
+    if (!r.ok || j.error) { throw new Error(j.error || ("HTTP " + r.status)); }
+    if (msg) { msg.className = "pf-status"; msg.textContent = adminT("守护设置已保存", "Supervisor settings saved"); }
+    loadSupervisor();
+  } catch (e) {
+    if (msg) { msg.className = "pf-status err"; msg.textContent = adminT("保存失败：", "Save failed: ") + adminErrText(e); }
+  }
+}
 function openSystemSettings() {
   const pop = document.getElementById("systemSettingsPop");
   if (!pop) { return; }
@@ -7129,6 +7424,7 @@ function openSystemSettings() {
   pop.classList.add("on");
   pop.setAttribute("aria-hidden", "false");
   loadAdmin(false);
+  loadSupervisor();
 }
 function closeSystemSettings() {
   const pop = document.getElementById("systemSettingsPop");
@@ -8010,7 +8306,14 @@ async function adminSaveSet() {
   const tab = document.getElementById("adminTab");
   const search = document.getElementById("adminSearch");
   if (search) {
-    search.oninput = function () { adminRenderUsers(); adminUpdateSel(); };
+    let searchTimer = null;
+    search.oninput = function () {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(function () {
+        adminRenderUsers();
+        adminUpdateSel();
+      }, 250);
+    };
   }
   document.getElementById("adminRefresh").onclick = function () { loadAdmin(true); };
   const usageExport = document.getElementById("adminUsageExport");
@@ -8144,6 +8447,10 @@ async function adminSaveSet() {
   });
   const settingsBtn = document.getElementById("adminSettingsBtn");
   if (settingsBtn) { settingsBtn.onclick = openSystemSettings; }
+  const supRefresh = document.getElementById("adminSupRefresh");
+  if (supRefresh) { supRefresh.onclick = loadSupervisor; }
+  const supSave = document.getElementById("adminSupSave");
+  if (supSave) { supSave.onclick = saveSupervisor; }
   const licenseOpen = document.getElementById("adminLicenseOpen");
   if (licenseOpen) {
     licenseOpen.onclick = function () {
@@ -8160,6 +8467,14 @@ async function adminSaveSet() {
   if (settingsPop) {
     settingsPop.addEventListener("click", function (e) {
       if (e.target === settingsPop) { closeSystemSettings(); }
+    });
+  }
+  const quotaClose = document.getElementById("quotaClose");
+  if (quotaClose) { quotaClose.onclick = closeQuota; }
+  const quotaPop = document.getElementById("quotaPop");
+  if (quotaPop) {
+    quotaPop.addEventListener("click", function (e) {
+      if (e.target === quotaPop) { closeQuota(); }
     });
   }
   const createBtn = document.getElementById("adminCreateUser");
@@ -9240,7 +9555,7 @@ document.getElementById("autoBtn").onclick = async function () {
       body: JSON.stringify(body)
     });
     const j = await r.json();
-    if (j.error) { show(j.error, "err"); return; }
+    if (j.error) { showApiError(j); return; }
     show("开始挂机，共 " + j.target + " 张。切到图库刷新可以看到。", "done");
     autoTimer = setInterval(pollAuto, 3000);
     pollAuto();

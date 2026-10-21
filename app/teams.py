@@ -12,6 +12,8 @@ import secrets
 import threading
 import time
 
+import input_guard
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
 TEAMS_FILE = os.path.join(ROOT, "teams.json")
 PROMPTS_FILE = os.path.join(ROOT, "team_prompts.json")
@@ -340,9 +342,9 @@ def add_prompt(tid, text, by="", name=""):
     team = get_team(tid)
     if not team:
         raise ValueError("团队不存在")
-    text = str(text or "").strip()[:MAX_PROMPT_CHARS]
+    text, _info = input_guard.clean_text(text, MAX_PROMPT_CHARS)
     if not text:
-        raise ValueError("提示词不能为空")
+        raise ValueError("提示词不能为空（或只包含不可见字符）")
     data = load_prompts()
     rows = data["teams"].setdefault(tid, [])
     if len(rows) >= MAX_PROMPTS:

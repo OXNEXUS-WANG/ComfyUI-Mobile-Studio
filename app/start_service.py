@@ -12,8 +12,15 @@ import sys
 import time
 import urllib.request
 import webbrowser
+from collections import deque
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
+# 便携版 python313._pth 不会自动把脚本目录加进 sys.path。
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+import runtime_settings  # noqa: E402
+
 PY = os.path.join(ROOT, "python_embeded", "python.exe")
 WEB_PORT = 8800
 COMFY_PORT = 8188
@@ -108,6 +115,137 @@ def wait_until(ok, seconds, label):
     return False
 
 
+def _restart_log(line):
+    try:
+        folder = os.path.join(ROOT, "logs")
+        os.makedirs(folder, exist_ok=True)
+        path = os.path.join(folder, "supervisor-%s.log" %
+                            time.strftime("%Y-%m-%d"))
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write("%s %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), line))
+    except Exception:
+        pass
+
+
+def _start_comfy():
+    env = os.environ.copy()
+    env["PATH"] = (os.path.join(ROOT, "git", "cmd") + ";" +
+                   os.path.join(ROOT, "git", "bin") + ";" +
+                   env.get("PATH", ""))
+    env["ARGOS_CHUNK_TYPE"] = "MINISBD"
+    return spawn([
+        PY, "-s", os.path.join("ComfyUI", "main.py"),
+        "--windows-standalone-build",
+        "--reserve-vram", "0.8",
+        "--preview-method", "auto",
+    ], env)
+
+
+def _start_web():
+    return spawn([PY, "-s", "mobile_web.py"])
+
+
+def supervise(comfy_child=None, web_child=None):
+    """--watch：监控 8188/8800，崩溃后按设置自动重启。"""
+    log("[4/4] 守护模式已开启：异常退出会自动重启（关闭本窗口即停止守护）。")
+    history = {"comfy": deque(), "web": deque()}
+    backoff = {"comfy": 5.0, "web": 5.0}
+    next_try = {"comfy": 0.0, "web": 0.0}
+    consecutive = {"comfy": 0, "web": 0}
+    stable_since = {"comfy": time.time(), "web": time.time()}
+    last_restart = {"comfy": 0.0, "web": 0.0}
+    last_error = ""
+
+    def alive(kind, child, port):
+        # 先看端口：另一个实例已经接手时，即使旧子进程退出了也不能再启一个。
+        if port_open(port):
+            return True
+        proc = child if child is not None else None
+        if proc is not None:
+            return proc.poll() is None
+        # 没记录子进程时按命令行判断；进程在但端口未开 = 正在加载，不算崩溃。
+        return proc_running("ComfyUI\\main.py" if kind == "comfy"
+                            else "mobile_web.py")
+
+    def can_restart(kind, settings):
+        now = time.time()
+        q = history[kind]
+        while q and now - q[0] > 3600:
+            q.popleft()
+        return len(q) < int(settings.get("max_restarts_per_hour") or 6)
+
+    def restart(kind, settings):
+        nonlocal last_error
+        now = time.time()
+        if now < next_try[kind]:
+            return None
+        if not can_restart(kind, settings):
+            last_error = "每小时重启次数已达上限"
+            return None
+        try:
+            child = _start_comfy() if kind == "comfy" else _start_web()
+        except Exception as exc:
+            last_error = "重启 %s 失败：%s" % (kind, exc)
+            _restart_log(last_error)
+            next_try[kind] = now + backoff[kind]
+            backoff[kind] = min(120.0, backoff[kind] * 2)
+            return None
+        history[kind].append(now)
+        last_restart[kind] = now
+        consecutive[kind] += 1
+        next_try[kind] = now + backoff[kind]
+        backoff[kind] = min(120.0, backoff[kind] * 2)
+        last_error = ""
+        _restart_log("已重启 %s（第 %d 次，进程 %s）" %
+                     (kind, consecutive[kind], getattr(child, "pid", "?")))
+        log("      [守护] 已重启 %s，进程 %s" %
+            ("ComfyUI" if kind == "comfy" else "网页服务",
+             getattr(child, "pid", "?")))
+        return child
+
+    while True:
+        settings = runtime_settings.load()
+        now = time.time()
+        comfy_alive = alive("comfy", comfy_child, COMFY_PORT)
+        web_alive = alive("web", web_child, WEB_PORT)
+
+        # 连续稳定 5 分钟后重置退避，避免一次偶发崩溃长期影响。
+        for kind, ok in (("comfy", comfy_alive), ("web", web_alive)):
+            if ok:
+                if now - stable_since[kind] > 300:
+                    backoff[kind] = 5.0
+                    consecutive[kind] = 0
+            else:
+                stable_since[kind] = now
+
+        if settings.get("enabled", True):
+            if not comfy_alive and settings.get("auto_restart_comfy", True):
+                child = restart("comfy", settings)
+                if child is not None:
+                    comfy_child = child
+            if not web_alive and settings.get("auto_restart_web", True):
+                child = restart("web", settings)
+                if child is not None:
+                    web_child = child
+
+        runtime_settings.write_status(
+            running=True, enabled=bool(settings.get("enabled", True)),
+            auto_restart_comfy=bool(settings.get("auto_restart_comfy", True)),
+            auto_restart_web=bool(settings.get("auto_restart_web", True)),
+            comfy_alive=bool(comfy_alive), web_alive=bool(web_alive),
+            restarts_last_hour={
+                "comfy": len(history["comfy"]),
+                "web": len(history["web"]),
+            },
+            last_restart={
+                "comfy": last_restart["comfy"],
+                "web": last_restart["web"],
+            },
+            last_error=last_error, updated=time.time())
+
+        time.sleep(max(2, int(settings.get("check_seconds") or 5)))
+
+
 def main():
     os.chdir(ROOT)
     no_browser = "--no-browser" in sys.argv
@@ -122,22 +260,14 @@ def main():
     comfy_proc = comfy_port or proc_running(r"ComfyUI\main.py")
     web_proc = web_port or proc_running("mobile_web.py")
 
+    comfy_child = web_child = None
+
     # ---------- ComfyUI ----------
     if comfy_proc:
         log("[1/3] ComfyUI 已经在运行，跳过启动。")
     else:
         log("[1/3] 正在启动 ComfyUI …")
-        env = os.environ.copy()
-        env["PATH"] = (os.path.join(ROOT, "git", "cmd") + ";" +
-                       os.path.join(ROOT, "git", "bin") + ";" +
-                       env.get("PATH", ""))
-        env["ARGOS_CHUNK_TYPE"] = "MINISBD"
-        spawn([
-            PY, "-s", os.path.join("ComfyUI", "main.py"),
-            "--windows-standalone-build",
-            "--reserve-vram", "0.8",
-            "--preview-method", "auto",
-        ], env)
+        comfy_child = _start_comfy()
         log("      已在新窗口启动（最小化）。")
 
     # ---------- 手机网页服务 ----------
@@ -145,7 +275,7 @@ def main():
         log("[2/3] 手机出图网页服务已经在运行，跳过启动。")
     else:
         log("[2/3] 正在启动手机出图网页服务 …")
-        spawn([PY, "-s", "mobile_web.py"])
+        web_child = _start_web()
         log("      已在新窗口启动（最小化）。")
 
     # ---------- 等网页服务 ----------
@@ -178,6 +308,8 @@ def main():
             log("打开浏览器失败：%s" % exc)
             log("请手动打开 %s" % WEB_URL)
     time.sleep(0.8)
+    if "--watch" in sys.argv:
+        supervise(comfy_child, web_child)
     return 0
 
 
@@ -185,6 +317,11 @@ if __name__ == "__main__":
     try:
         sys.exit(main())
     except KeyboardInterrupt:
+        try:
+            runtime_settings.write_status(running=False,
+                                          updated=time.time())
+        except Exception:
+            pass
         sys.exit(130)
     except Exception as exc:
         print("启动失败：%s" % exc)

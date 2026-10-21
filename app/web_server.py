@@ -31,6 +31,8 @@ from app_core import _stage_to_input
 import lan_share
 import license_guard
 import model_manager
+import input_guard
+import runtime_settings
 import edition_policy
 import node_manager
 import plugin_manager
@@ -189,13 +191,14 @@ class Handler(BaseHTTPRequestHandler):
         return False
 
     def _require_traffic(self, user):
-        msg = traffic_quota_message(user)
+        msg, quota = traffic_quota_detail(user)
         if not msg:
             return True
         audit("security", "limit_denied", user=user,
               ip=self.client_address[0], ok=False, operation="traffic",
               error=msg, route=self.path.split("?")[0])
-        self._json({"error": msg, "traffic": True}, 403)
+        self._json({"error": msg, "traffic": True,
+                    "code": "quota_exhausted", "quota": quota}, 403)
         return False
 
     def _set_cookie_header(self, tok, max_age):
@@ -1781,6 +1784,26 @@ class Handler(BaseHTTPRequestHandler):
             })
             return
 
+        if path == "/api/supervisor":
+            user = self._current_user()
+            if not is_admin(user):
+                self._json({"error": "只有管理员可以查看守护设置"}, 403)
+                return
+            settings = runtime_settings.load()
+            status = runtime_settings.read_status()
+            updated = float(status.get("updated") or 0)
+            age = max(0.0, time.time() - updated) if updated else None
+            timeout = max(15, int(settings.get("check_seconds") or 5) * 3)
+            running = bool(status.get("running")) and age is not None and age <= timeout
+            self._json({
+                "settings": settings,
+                "status": status,
+                "running": running,
+                "age": round(age, 1) if age is not None else None,
+                "recovery_pending": len(RECOVERY_PENDING),
+            })
+            return
+
         if path == "/api/monitor/overview":
             user = self._current_user()
             if not is_admin(user):
@@ -3191,6 +3214,25 @@ class Handler(BaseHTTPRequestHandler):
                         "user": public_user(current)})
             return
 
+        if route == "/api/supervisor":
+            user = self._current_user()
+            if not is_admin(user):
+                self._json({"error": "只有管理员可以修改守护设置"}, 403)
+                return
+            try:
+                saved = runtime_settings.save(data.get("settings") or {})
+            except Exception as exc:
+                self._json({"error": "保存失败：%s" % exc}, 500)
+                return
+            activity_request("/api/supervisor", "POST", silent=True)
+            audit("security", "supervisor_settings", user=user,
+                  ip=self.client_address[0], ok=True,
+                  enabled=saved.get("enabled"),
+                  auto_restart_comfy=saved.get("auto_restart_comfy"),
+                  auto_restart_web=saved.get("auto_restart_web"))
+            self._json({"ok": True, "settings": saved})
+            return
+
         if route == "/api/users":
             user = self._current_user()
             if not is_admin(user):
@@ -3318,13 +3360,16 @@ class Handler(BaseHTTPRequestHandler):
             user = self._current_user()
             if not self._require_feature(user, "translate"):
                 return
-            text = data.get("text")
-            activity_request("/api/translate", "POST",
-                             chars=len(text or "") if isinstance(text, str) else 0)
+            text, text_info = input_guard.clean_text(data.get("text"), 4000)
+            activity_request("/api/translate", "POST", chars=len(text))
+            if not text:
+                self._json({"error": "要翻译的内容是空的"}, 400)
+                return
             if USE_PROMPT_OPTIMIZER:
-                self._json({"text": optimize_prompt(text), "provider": "tags"})
+                self._json({"text": optimize_prompt(text), "provider": "tags",
+                            "input_cleaned": text_info})
             else:
-                cleaned, tags = extract_char_tags(text or "")
+                cleaned, tags = extract_char_tags(text)
                 out, provider, err = translate_text_for_user(cleaned, user)
                 if not out and has_chinese(cleaned):
                     self._json({"error": err or "翻译失败，请检查翻译组件",
@@ -3333,6 +3378,7 @@ class Handler(BaseHTTPRequestHandler):
                 if tags:
                     out = ", ".join(tags) + ", " + (out or "")
                 self._json({"text": out, "provider": provider,
+                            "input_cleaned": text_info,
                             "fallback": provider == "argos"
                             and normalize_translation_mode(
                                 (user or {}).get("translation_mode")) == "local"})
@@ -3448,12 +3494,23 @@ class Handler(BaseHTTPRequestHandler):
                 sampler = preset.get("sampler") or DEFAULT_SAMPLER
             if preset.get("vpred"):
                 sampler = "euler"
+            auto_prompt, auto_prompt_info = input_guard.clean_text(
+                data.get("prompt"), input_guard.MAX_PROMPT_CHARS)
+            if not auto_prompt:
+                self._json({"error": "提示词是空的（或只包含不可见字符）"}, 400)
+                return
+            auto_negative, auto_neg_info = input_guard.clean_text(
+                data.get("negative"), input_guard.MAX_PROMPT_CHARS)
             params = {
-                "prompt": (data.get("prompt") or "").strip()[:2000],
-                "negative": (data.get("negative") or "").strip()[:2000]
+                "prompt": auto_prompt,
+                "negative": auto_negative
                             or (ANIMA_NEGATIVE if ckpt == ANIMA_MODEL
                                 else NOOB_NEGATIVE if ckpt == NOOB_MODEL
                                 else DEFAULT_NEGATIVE),
+                "input_cleaned": {
+                    "prompt": auto_prompt_info,
+                    "negative": auto_neg_info,
+                },
                 "w": max(512, min(1536, w)), "h": max(512, min(1536, h)),
                 "steps": max(4, min(60, int(data.get("steps")
                                             or preset.get("steps", 28)))),
@@ -3498,13 +3555,15 @@ class Handler(BaseHTTPRequestHandler):
             if not is_admin(user) and not lim.get("allow_auto", True):
                 self._json({"error": "管理员关闭了你的挂机造图权限。"}, 403)
                 return
-            limit_msg = check_user_limits(user, ckpt, False,
-                                          params["steps"], count, "auto")
+            limit_msg, quota = check_user_limits_detail(
+                user, ckpt, False, params["steps"], count, "auto")
             if limit_msg:
                 audit("security", "limit_denied", user=user,
                       ip=self.client_address[0], ok=False,
                       operation="auto", error=limit_msg)
-                self._json({"error": limit_msg}, 403)
+                self._json({"error": limit_msg,
+                            "code": "quota_exhausted" if quota else "limit_denied",
+                            "quota": quota}, 403)
                 return
             try:
                 http_json("/system_stats", timeout=8)
@@ -3527,7 +3586,8 @@ class Handler(BaseHTTPRequestHandler):
             threading.Thread(target=auto_loop,
                              args=(params, count, interval, uid),
                              daemon=True).start()
-            self._json({"ok": True, "running": True, "target": count})
+            self._json({"ok": True, "running": True, "target": count,
+                        "input_cleaned": params.get("input_cleaned")})
             return
 
         if route != "/api/generate":
@@ -3610,11 +3670,11 @@ class Handler(BaseHTTPRequestHandler):
         tr_status = translation_status(user)
         tr_ready = bool(tr_status.get("ready"))
         tr_error = ""
-        prompt = (data.get("prompt") or "").strip()
+        prompt, prompt_info = input_guard.clean_text(
+            data.get("prompt"), input_guard.MAX_PROMPT_CHARS)
         if not prompt:
-            self._json({"error": "提示词是空的"}, 400)
+            self._json({"error": "提示词是空的（或只包含不可见字符）"}, 400)
             return
-        prompt = prompt[:2000]
 
         # 中文先在这里转成 danbooru 标签，比让 ComfyUI 内部翻成自然英语准得多。
         # 万一词表和翻译都搞不定（还是中文），就留空退回原来的翻译节点。
@@ -3627,7 +3687,10 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 prompt_en = ""      # 优化失败就退回 ComfyUI 里的翻译节点
 
-        negative = (data.get("negative") or "").strip()[:2000] or DEFAULT_NEGATIVE
+        negative, negative_info = input_guard.clean_text(
+            data.get("negative"), input_guard.MAX_PROMPT_CHARS)
+        if not negative:
+            negative = DEFAULT_NEGATIVE
         if USE_PROMPT_OPTIMIZER and has_chinese(negative):
             try:
                 cand = optimize_prompt(negative, quality=False)
@@ -3799,13 +3862,15 @@ class Handler(BaseHTTPRequestHandler):
 
         eta_est = (max(60, frames * 5) if is_video
                    else round(estimate_seconds(ckpt, steps, count), 1))
-        limit_msg = check_user_limits(user, ckpt, is_video, steps, count,
-                                      "gen", eta=eta_est)
+        limit_msg, quota = check_user_limits_detail(
+            user, ckpt, is_video, steps, count, "gen", eta=eta_est)
         if limit_msg:
             audit("security", "limit_denied", user=user,
                   ip=self.client_address[0], ok=False,
                   operation="generate", error=limit_msg)
-            self._json({"error": limit_msg}, 403)
+            self._json({"error": limit_msg,
+                        "code": "quota_exhausted" if quota else "limit_denied",
+                        "quota": quota}, 403)
             return
         lim = user_limits(user)
         max_upload = max(1, int(lim.get("max_upload_mb") or 20)) * 1048576
@@ -3904,11 +3969,27 @@ class Handler(BaseHTTPRequestHandler):
                          "worker_name": "",
                          "worker_kind": "",
                          "dispatch_state": ""}
+        save_job_resume(jid, {
+            "created": time.time(),
+            "prompt": prompt, "negative": negative,
+            "width": int(w), "height": int(h),
+            "steps": int(steps), "cfg": float(cfg), "seed": int(seed),
+            "count": int(count),
+            "init_image": init_image, "init_mask": init_mask,
+            "denoise": float(denoise), "ckpt": ckpt, "kind": kind,
+            "loras": loras, "hires": bool(hires),
+            "prompt_en": prompt_en, "sampler": sampler,
+            "frames": int(frames), "pag": bool(pag),
+            "turbo": bool(turbo), "char_tags": char_tags,
+            "prompt_display": prompt_raw, "stage_id": stage_id,
+            "user_id": uid,
+        })
         queue_err = scheduler_enqueue(jid)
         if queue_err:
             with JOBS_LOCK:
                 JOBS.pop(jid, None)
             cleanup_stage(uid, stage_id)
+            drop_job_resume(jid)
             audit("security", "limit_denied", user=user,
                   ip=self.client_address[0], ok=False,
                   operation="queue", error=queue_err)
@@ -3956,6 +4037,10 @@ class Handler(BaseHTTPRequestHandler):
                     "queue_state": info.get("queue_state"),
                     "queue_reason": info.get("queue_reason"),
                     "queue_slot": info.get("queue_slot"),
+                    "input_cleaned": {
+                        "prompt": prompt_info,
+                        "negative": negative_info,
+                    },
                     "lora_skipped": [x["name"] for x in lora_skipped]})
 
     # ------------------------------------------------------------ 放大
@@ -3984,13 +4069,15 @@ class Handler(BaseHTTPRequestHandler):
         meta = read_meta(name)
         ckpt = meta.get("model") or DEFAULT_CHECKPOINT
         eta_est = 60 if factor == 4 else 45
-        limit_msg = check_user_limits(user, ckpt, False, 0, 1, "upscale",
-                                      eta=eta_est)
+        limit_msg, quota = check_user_limits_detail(
+            user, ckpt, False, 0, 1, "upscale", eta=eta_est)
         if limit_msg:
             audit("security", "limit_denied", user=user,
                   ip=self.client_address[0], ok=False,
                   operation="upscale", error=limit_msg)
-            self._json({"error": limit_msg}, 403)
+            self._json({"error": limit_msg,
+                        "code": "quota_exhausted" if quota else "limit_denied",
+                        "quota": quota}, 403)
             return
         activity_request("/api/upscale", "POST", factor=factor,
                          user=user.get("username"))
@@ -4205,6 +4292,8 @@ def main():
     lan_share.ensure_workers()
     plugin_manager.ensure_plugins()
     ensure_queue_watchdog()
+    threading.Thread(target=recover_queued_jobs, daemon=True,
+                     name="job-recovery").start()
     ensure_guest_sweeper()
     expire_guests()
     threading.Thread(target=monitor_loop, daemon=True,

@@ -1832,7 +1832,51 @@
     '条连线': 'links',
     '个接口': 'APIs',
     '个底模': 'base models',
-    '作品': 'works'
+    '作品': 'works',
+
+    /* 异常恢复 / 守护进程 */
+    '异常自动恢复': 'Automatic recovery',
+    '守护进程监控 ComfyUI 和网页服务，异常退出自动重启；重启后自动恢复排队任务。':
+      'The supervisor watches ComfyUI and the web service, restarts them after a crash, and recovers queued jobs.',
+    '启用守护': 'Enable supervisor',
+    '自动重启 ComfyUI': 'Restart ComfyUI automatically',
+    '自动重启网页服务': 'Restart web service automatically',
+    '重启后恢复排队任务': 'Recover queued jobs after restart',
+    '重试未提交的运行任务': 'Retry running jobs that were never submitted',
+    '每小时最多重启': 'Max restarts per hour',
+    '检查间隔秒': 'Check interval (seconds)',
+    '保存守护设置': 'Save supervisor settings',
+    '守护进程由「一键启动」开启；未开启时这里只保存设置。':
+      'The supervisor starts with 一键启动.bat; otherwise these settings are only saved.',
+    '守护未运行': 'Supervisor offline',
+    '双击「一键启动.bat」会以守护模式运行；设置已保存，下次启动生效。':
+      'Start with 一键启动.bat to run in watch mode; saved settings apply next launch.',
+    '守护运行中': 'Supervisor running',
+    '读取守护状态失败：': 'Could not read supervisor: ',
+    '守护设置已保存': 'Supervisor settings saved',
+    '本小时重启：ComfyUI ': 'Restarts this hour: ComfyUI ',
+
+    /* 额度提示 */
+    '额度已用完': 'Quota reached',
+    '现在还不能提交': 'Not ready to submit',
+    '暂时不能再提交新任务。': 'You cannot submit a new job right now.',
+    '先看看下面的用量，再决定什么时候继续。':
+      'Check the usage below before trying again.',
+    '去清理图库': 'Open gallery',
+    '知道了': 'Got it',
+    '今天 24:00 后自动恢复。': 'Resets after midnight tonight.',
+    '下个月 1 日后自动恢复。': 'Resets on the 1st of next month.',
+    '当前任务结束后自动恢复。': 'Available again when the current job finishes.',
+    '可以先清理一些旧图，或联系管理员提高上限。':
+      'Delete some old images or ask the admin for a higher limit.',
+    '可以把参数调低，或联系管理员提高上限。':
+      'Lower the setting or ask the admin for a higher limit.',
+    '提示词已清理 ': 'Removed ',
+    ' 个不可见字符': ' invisible character(s) from the prompt',
+    '提示词超过 ': 'Prompt was truncated to ',
+    ' 字，已截断': ' characters',
+    '负面提示词已清理 ': 'Removed ',
+    '负面提示词超过 ': 'Negative prompt was truncated to '
   });
 
   /* 动态句子的英文模板（按顺序匹配） */
@@ -2050,6 +2094,18 @@
       'Image count exceeds the limit ($1).'],
     [/^你已经有\s*(\d+)\s*个任务在跑，等完成再提交。$/,
       'You already have $1 running jobs; wait for one to finish.'],
+    [/^本小时重启：ComfyUI\s*(\d+)\s*次\s*·\s*网页\s*(\d+)\s*次$/,
+      'Restarts this hour: ComfyUI $1 · web $2'],
+    [/^已用\s*([\d.]+)\s*(张|MB|秒|步|个)$/, 'Used $1 $2'],
+    [/^上限\s*([\d.]+)\s*(张|MB|秒|步|个)$/, 'Limit $1 $2'],
+    [/^提示词已清理\s*(\d+)\s*个不可见字符$/,
+      'Removed $1 invisible character(s) from the prompt'],
+    [/^提示词超过\s*(\d+)\s*字，已截断$/,
+      'Prompt was truncated to $1 characters'],
+    [/^负面提示词已清理\s*(\d+)\s*个不可见字符$/,
+      'Removed $1 invisible character(s) from the negative prompt'],
+    [/^负面提示词超过\s*(\d+)\s*字，已截断$/,
+      'Negative prompt was truncated to $1 characters'],
     [/^错误次数太多，(\d+)\s*秒后再试$/, 'Too many attempts; try again in $1s'],
     [/^任务不存在$/, 'Job not found'],
     [/^已取消$/, 'Cancelled']

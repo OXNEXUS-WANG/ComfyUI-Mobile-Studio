@@ -22,6 +22,7 @@ CONFIG_FILES = (
     "monitor.json",
     "cleanup.json",
     "queue_control.json",
+    "supervisor.json",
     "teams.json",
     "team_prompts.json",
 )
