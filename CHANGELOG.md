@@ -34,8 +34,8 @@
 - **持久化**：新增 `trainings.json`、`training_settings.json`、`loras.json`，
   纳入还原点、备份/恢复和离线迁移白名单；`.gitignore`、发布脚本、离线包
   全部排除训练器、训练数据和 LoRA 状态。
-- **测试**：新增训练 profile、manager、UI 三组测试；完整套件 **172 项通过
-  （5 项跳过）**。新增 SDXL 硬件不足时拒绝提交的回归测试。
+- **测试**：新增训练 profile、manager、UI 三组测试；完整套件 **173 项通过
+  （5 项跳过）**。新增 SDXL 硬件不足时拒绝提交、空项目文件不复活旧备份的回归测试。
 - **已知限制**：SDXL 在 8GB/16GB 机器上不可用；NoobAI v-pred 训练未验证；
   训练与出图共用本机 GPU，训练期间没有远程 worker 时出图会等待。
 
