@@ -156,6 +156,18 @@ def choose_offline_target(local_root):
     return payload, bundle
 
 
+def _retry_delay(exc, attempt):
+    """429 / 5xx 短暂失败时等待几秒再试同一镜像；404 等直接换源。"""
+    if isinstance(exc, urllib.error.HTTPError) and exc.code in (
+            429, 500, 502, 503, 504):
+        try:
+            retry_after = int(exc.headers.get("Retry-After") or 0)
+        except Exception:
+            retry_after = 0
+        return min(30, max(2, retry_after or 3 * (attempt + 1)))
+    return 0
+
+
 def download_one(urls, dest, expected, label):
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -172,50 +184,57 @@ def download_one(urls, dest, expected, label):
 
     last_error = ""
     for base in urls:
-        try:
-            have = part.stat().st_size if part.is_file() else 0
-            headers = {"User-Agent": UA, "Accept": "*/*"}
-            if have:
-                headers["Range"] = "bytes=%d-" % have
-            req = urllib.request.Request(base, headers=headers)
-            print("  下载 %s" % label)
-            print("    %s" % base)
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                status = getattr(resp, "status", 200)
-                mode = "ab" if (have and status == 206) else "wb"
-                if mode == "wb":
-                    have = 0
-                total = expected or int(resp.headers.get("Content-Length") or 0)
-                if total and have:
-                    total = max(total, have)
-                done = have
-                started = time.time()
-                last_print = 0.0
-                with open(part, mode) as fh:
-                    while True:
-                        chunk = resp.read(1024 * 1024)
-                        if not chunk:
-                            break
-                        fh.write(chunk)
-                        done += len(chunk)
-                        now = time.time()
-                        if now - last_print >= 1.0:
-                            last_print = now
-                            pct = ("%.1f%%" % (done * 100.0 / total)) if total else human(done)
-                            speed = done / max(0.1, now - started)
-                            print("    %s  %s  %s/s" % (pct, human(done), human(speed)),
-                                  end="\r", flush=True)
-                print()
-            size = part.stat().st_size if part.is_file() else 0
-            if expected and size != expected:
-                raise IOError("下载大小不对：%s / %s" % (size, expected))
-            os.replace(part, dest)
-            print("  [完成] %s (%s)" % (label, human(size)))
-            return True
-        except Exception as exc:
-            last_error = "%s: %s" % (type(exc).__name__, exc)
-            print("\n  [失败] %s" % last_error)
-            # 尝试下一个镜像；已下载的 .part 保留，继续断点续传
+        for attempt in range(3):
+            try:
+                have = part.stat().st_size if part.is_file() else 0
+                headers = {"User-Agent": UA, "Accept": "*/*"}
+                if have:
+                    headers["Range"] = "bytes=%d-" % have
+                req = urllib.request.Request(base, headers=headers)
+                print("  下载 %s" % label)
+                print("    %s" % base)
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    status = getattr(resp, "status", 200)
+                    mode = "ab" if (have and status == 206) else "wb"
+                    if mode == "wb":
+                        have = 0
+                    total = expected or int(resp.headers.get("Content-Length") or 0)
+                    if total and have:
+                        total = max(total, have)
+                    done = have
+                    started = time.time()
+                    last_print = 0.0
+                    with open(part, mode) as fh:
+                        while True:
+                            chunk = resp.read(1024 * 1024)
+                            if not chunk:
+                                break
+                            fh.write(chunk)
+                            done += len(chunk)
+                            now = time.time()
+                            if now - last_print >= 1.0:
+                                last_print = now
+                                pct = ("%.1f%%" % (done * 100.0 / total)) if total else human(done)
+                                speed = done / max(0.1, now - started)
+                                print("    %s  %s  %s/s" % (pct, human(done), human(speed)),
+                                      end="\r", flush=True)
+                    print()
+                size = part.stat().st_size if part.is_file() else 0
+                if expected and size != expected:
+                    raise IOError("下载大小不对：%s / %s" % (size, expected))
+                os.replace(part, dest)
+                print("  [完成] %s (%s)" % (label, human(size)))
+                return True
+            except Exception as exc:
+                last_error = "%s: %s" % (type(exc).__name__, exc)
+                print("\n  [失败] %s" % last_error)
+                delay = _retry_delay(exc, attempt)
+                if delay and attempt < 2:
+                    print("  [重试] %d 秒后再试同一镜像（已下载部分会保留）…" % delay)
+                    time.sleep(delay)
+                    continue
+                # 尝试下一个镜像；已下载的 .part 保留，继续断点续传
+                break
     print("  [放弃] %s：%s" % (label, last_error))
     return False
 
