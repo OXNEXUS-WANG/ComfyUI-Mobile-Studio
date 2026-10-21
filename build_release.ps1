@@ -36,7 +36,8 @@ Get-ChildItem $Stage -Recurse -File -Filter "*.pyc" -Force -ErrorAction Silently
 $runtimeFiles = @(
     "users.json", "users.json.bak", "sessions.json", "workers.json", "usage.json",
     "jobs_state.json", "jobs_resume.json", "supervisor.json",
-    "supervisor_status.json", "local_llm.json", "monitor.json",
+    "supervisor_status.json", "time_state.json", "trusted_time.key",
+    "local_llm.json", "monitor.json",
     "monitor_alerts.json", "monitor_trends.json", "cleanup.json",
     "queue_control.json", "teams.json", "team_prompts.json",
     "license.json", "cert.pem", "key.pem", "worker_agent.json", "access.json"

@@ -49,6 +49,7 @@ import queue_control
 import runtime_settings
 import system_state
 import teams
+import trusted_time
 
 COMFY = "http://127.0.0.1:8188"
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -804,8 +805,8 @@ def reload_usage():
 
 
 def _usage_keys(now=None):
-    now = now or time.time()
-    lt = time.localtime(now)
+    now = now or trusted_time.now()
+    lt = trusted_time.localtime(now)
     return (time.strftime("%Y-%m-%d", lt), time.strftime("%Y-%m", lt))
 
 
@@ -844,7 +845,7 @@ def _usage_bucket(uid, period):
 
 
 def _prune_usage_locked(now=None):
-    now = now or time.time()
+    now = now or trusted_time.now()
     try:
         cutoff_day = time.strftime("%Y-%m-%d", time.localtime(now - 90 * 86400))
         cutoff_month = time.strftime("%Y-%m", time.localtime(now - 366 * 86400))
@@ -984,11 +985,11 @@ def audit(category, action, user=None, ip="", ok=True, user_id=None, **detail):
     """追加一条持久日志。category 只能是 activity / security。"""
     if category not in ("activity", "security"):
         category = "activity"
-    now = time.time()
+    now = trusted_time.now()
     uid, username, name, role = _audit_user(user, user_id)
     rec = {
         "ts": round(now, 3),
-        "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now)),
+        "time": trusted_time.strftime("%Y-%m-%d %H:%M:%S", now),
         "category": category,
         "action": str(action or "")[:80],
         "ok": bool(ok),
@@ -1005,7 +1006,7 @@ def audit(category, action, user=None, ip="", ok=True, user_id=None, **detail):
             os.makedirs(LOG_DIR, exist_ok=True)
             path = os.path.join(
                 LOG_DIR, "%s-%s.jsonl" %
-                (category, time.strftime("%Y-%m-%d", time.localtime(now))))
+                (category, trusted_time.strftime("%Y-%m-%d", now)))
             with open(path, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
     except Exception:
@@ -2424,7 +2425,7 @@ def user_expired(user, now=None):
     if not user or not user.get("guest"):
         return False
     exp = user_expires_at(user)
-    return bool(exp and (now or time.time()) >= exp)
+    return bool(exp and (now or trusted_time.now()) >= exp)
 
 
 def user_is_active(user, now=None):
@@ -2462,7 +2463,7 @@ def public_user(user, include_limits=True):
             user.get("translation_mode")),
         "guest": bool(user.get("guest")),
         "expires_at": user_expires_at(user),
-        "expires_in": max(0, int(user_expires_at(user) - time.time()))
+        "expires_in": max(0, int(user_expires_at(user) - trusted_time.now()))
         if user.get("guest") and user_expires_at(user) else 0,
         "expired": user_expired(user),
         "created": user.get("created", ""),
@@ -2691,7 +2692,7 @@ def create_guest(created_by=None, hours=GUEST_DEFAULT_HOURS):
     user = create_user(username, password, name="临时游客",
                        role="user", limits=guest_limits())
     uid = user.get("id")
-    expires = time.time() + hours * 3600
+    expires = trusted_time.now() + hours * 3600
     with USERS_LOCK:
         target = USERS.get(uid)
         if not target:
@@ -2699,7 +2700,7 @@ def create_guest(created_by=None, hours=GUEST_DEFAULT_HOURS):
         target["guest"] = True
         target["expires_at"] = expires
         target["guest_created_by"] = str((created_by or {}).get("id") or "")
-        target["guest_created"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        target["guest_created"] = trusted_time.strftime("%Y-%m-%d %H:%M:%S")
         _save_users_locked()
         target = dict(target)
     return {"user": target, "password": password,
@@ -2718,7 +2719,7 @@ def renew_guest(uid, hours=GUEST_DEFAULT_HOURS):
         if not user_is_active(user):
             if _active_accounts_locked() >= edition_policy.max_accounts():
                 raise ValueError(edition_policy.quota_message("accounts"))
-        user["expires_at"] = time.time() + hours * 3600
+        user["expires_at"] = trusted_time.now() + hours * 3600
         user["enabled"] = True
         user.pop("expired_at", None)
         user.pop("guest_expired", None)
@@ -2728,7 +2729,7 @@ def renew_guest(uid, hours=GUEST_DEFAULT_HOURS):
 
 def expire_guests(now=None):
     """把到期游客标记为禁用并踢掉会话；保留账号文件和图片归属。"""
-    now = now or time.time()
+    now = now or trusted_time.now()
     expired = []
     with USERS_LOCK:
         changed = False
@@ -2737,8 +2738,8 @@ def expire_guests(now=None):
                     and user_expired(user, now)):
                 user["enabled"] = False
                 user["guest_expired"] = True
-                user["expired_at"] = time.strftime(
-                    "%Y-%m-%d %H:%M:%S", time.localtime(now))
+                user["expired_at"] = trusted_time.strftime(
+                    "%Y-%m-%d %H:%M:%S", now)
                 expired.append((uid, user.get("username") or uid))
                 changed = True
         if changed:
@@ -2813,7 +2814,7 @@ def certificate_days_left():
         with open(CERT_FILE, "rb") as fh:
             cert = x509.load_pem_x509_certificate(fh.read())
         expiry = cert.not_valid_after_utc.timestamp()
-        return max(0, round((expiry - time.time()) / 86400, 1))
+        return max(0, round((expiry - trusted_time.now()) / 86400, 1))
     except Exception:
         return None
 
@@ -6947,7 +6948,7 @@ def user_usage(uid):
     """用户图库用量：图片数、占用字节、今天新增、正在跑的任务数。"""
     uid = safe_uid(uid) or "admin"
     root = user_gallery_root(uid)
-    today = time.strftime("%Y-%m-%d")
+    today = trusted_time.strftime("%Y-%m-%d")
     images = 0
     total = 0
     today_count = 0
@@ -6977,6 +6978,9 @@ def user_usage(uid):
             elif job.get("status") == "queued":
                 queued += 1
     snap = usage_snapshot(uid)
+    # 文件 mtime 会被系统时间影响；用量账本按可信时间记账，取两者较大值，
+    # 防止把时钟往回拨后“今天”的图片数突然归零。
+    today_count = max(today_count, int(snap["today"].get("images") or 0))
     return {
         "images": images, "bytes": total, "today": today_count,
         "running": running, "queued": queued, "active": running + queued,

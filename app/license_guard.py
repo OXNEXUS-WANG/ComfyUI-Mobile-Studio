@@ -15,6 +15,8 @@ import subprocess
 import time
 import uuid
 
+import trusted_time
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
 EDITION_FILE = os.path.join(ROOT, "EDITION")
 LICENSE_FILE = os.path.join(ROOT, "license.json")
@@ -261,7 +263,7 @@ def status(force=False):
                 out["machine_code"]):
             out["error"] = "授权码不属于这台机器"
         else:
-            now = time.time()
+            now = trusted_time.now()
             if out["issued"] and out["issued"] > now + 86400:
                 out["error"] = "授权签发时间异常，请检查系统时间"
             elif out["expires"] and out["expires"] < now:
@@ -293,13 +295,13 @@ def activate(code):
             machine_code()):
         raise ValueError("授权码不属于这台机器")
     expires = int(payload.get("expires") or 0)
-    if expires and expires < time.time():
+    if expires and expires < trusted_time.now():
         raise ValueError("授权已过期")
     issued = int(payload.get("issued") or 0)
-    if issued and issued > time.time() + 86400:
+    if issued and issued > trusted_time.now() + 86400:
         raise ValueError("授权签发时间异常")
     data = {"version": 1, "code": normalized,
-            "activated_at": time.time()}
+            "activated_at": trusted_time.now()}
     tmp = LICENSE_FILE + ".tmp"
     with open(tmp, "w", encoding="utf-8") as fh:
         json.dump(data, fh, ensure_ascii=False, indent=2)

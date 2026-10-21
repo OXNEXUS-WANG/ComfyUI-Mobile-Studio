@@ -33,6 +33,7 @@ import license_guard
 import model_manager
 import input_guard
 import runtime_settings
+import trusted_time
 import edition_policy
 import node_manager
 import plugin_manager
@@ -1804,6 +1805,14 @@ class Handler(BaseHTTPRequestHandler):
             })
             return
 
+        if path == "/api/time":
+            user = self._current_user()
+            if not is_admin(user):
+                self._json({"error": "只有管理员可以查看时间同步"}, 403)
+                return
+            self._json(trusted_time.status())
+            return
+
         if path == "/api/monitor/overview":
             user = self._current_user()
             if not is_admin(user):
@@ -3233,6 +3242,23 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"ok": True, "settings": saved})
             return
 
+        if route == "/api/time":
+            user = self._current_user()
+            if not is_admin(user):
+                self._json({"error": "只有管理员可以同步时间"}, 403)
+                return
+            action = str(data.get("action") or "sync")
+            if action != "sync":
+                self._json({"error": "未知操作"}, 400)
+                return
+            ok = trusted_time.sync_now()
+            status = trusted_time.status()
+            audit("security", "time_sync", user=user,
+                  ip=self.client_address[0], ok=ok,
+                  source=status.get("source"), offset=status.get("offset"))
+            self._json({"ok": ok, "status": status})
+            return
+
         if route == "/api/users":
             user = self._current_user()
             if not is_admin(user):
@@ -4282,6 +4308,9 @@ def main():
         print("!! 手机出图服务已经在运行了（端口 %d 被占用）。" % PORT)
         print("   去找一下已经开着的那个窗口，不用重复启动。")
         return 4        # 启动脚本看到 4 会直接关窗口，不会停在 pause
+
+    # 可信时间：授权/额度/游客到期都使用它，启动时先建立基线。
+    trusted_time.ensure_started()
 
     # 图片隔离：旧图库按模型分目录 → 再按用户分目录；旧上传移出 input
     migrate_gallery_to_model_folders()

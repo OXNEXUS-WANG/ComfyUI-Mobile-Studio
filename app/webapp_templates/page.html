@@ -1449,7 +1449,7 @@ img.result, video.result {
   }
 }
 </style>
-<script src="/i18n.js?v=20261021b"></script>
+<script src="/i18n.js?v=20261021c"></script>
 </head>
 <body>
 <button id="langBtn" type="button" data-lang-toggle>EN</button>
@@ -2364,6 +2364,20 @@ img.result, video.result {
     </div>
     <div class="admin-model-hint" id="adminSupStatus"></div>
     <div class="pf-status" id="adminSupMsg"></div>
+
+    <div class="admin-worker-head">
+      <div>
+        <h3>时间同步</h3>
+        <p>在线时用 NTP / HTTPS Date 校准授权和额度使用的时间；断网时用上次可信时间加单调时钟，并检测系统时间回拨。</p>
+      </div>
+      <button class="reload" id="adminTimeRefresh" type="button">刷新</button>
+    </div>
+    <div class="admin-model-hint" id="adminTimeStatus"></div>
+    <div class="admin-worker-settings">
+      <button class="reload" id="adminTimeSync" type="button">立即同步</button>
+      <span id="adminTimeHint">同步不会修改系统时间，只影响授权、额度、游客到期和日志时间。</span>
+    </div>
+    <div class="pf-status" id="adminTimeMsg"></div>
 
     <div class="admin-worker-head">
       <div>
@@ -7421,6 +7435,78 @@ async function saveSupervisor() {
     if (msg) { msg.className = "pf-status err"; msg.textContent = adminT("保存失败：", "Save failed: ") + adminErrText(e); }
   }
 }
+function renderTimeStatus(j) {
+  const box = document.getElementById("adminTimeStatus");
+  if (!box) { return; }
+  if (!j || !j.ready) {
+    box.textContent = adminT("时间同步尚未初始化", "Time sync is not initialized");
+    return;
+  }
+  let source = j.source || "wall";
+  let sourceText = adminT("本机时间", "System clock");
+  let cls = "warn";
+  if (source.indexOf("ntp:") === 0) {
+    sourceText = "NTP · " + source.slice(4); cls = "ok";
+  } else if (source.indexOf("http:") === 0) {
+    sourceText = "HTTPS Date · " + source.slice(5); cls = "ok";
+  } else if (source === "monotonic") {
+    sourceText = adminT("单调时钟（离线）", "Monotonic clock (offline)");
+  } else if (source === "rollback") {
+    sourceText = adminT("检测到系统时间回拨", "Clock rollback detected");
+    cls = "bad";
+  }
+  const offset = Number(j.offset || 0);
+  const when = new Date(Number(j.trusted || 0) * 1000).toLocaleString();
+  let meta = adminT("可信时间：" + when + " · 偏差 " + offset.toFixed(1) + " 秒",
+                    "Trusted time: " + when + " · offset " + offset.toFixed(1) + "s");
+  if (j.last_sync_text) {
+    meta += " · " + adminT("上次在线同步：" + j.last_sync_text,
+                           "Last online sync: " + j.last_sync_text);
+  }
+  if (j.rollback_count) {
+    meta += " · " + adminT("回拨次数：" + j.rollback_count,
+                           "Rollbacks: " + j.rollback_count);
+  }
+  if (j.error) { meta += " · " + j.error; }
+  box.innerHTML = '<span class="aw-badge ' + cls + '">' + esc(sourceText) +
+    '</span><div class="aw-meta">' + esc(meta) + '</div>';
+}
+async function loadTimeStatus() {
+  try {
+    const r = await fetch("/api/time", { cache: "no-store" });
+    const j = await r.json();
+    if (!r.ok || j.error) { throw new Error(j.error || ("HTTP " + r.status)); }
+    renderTimeStatus(j);
+  } catch (e) {
+    const box = document.getElementById("adminTimeStatus");
+    if (box) { box.textContent = adminT("读取时间状态失败：", "Failed to read time status: ") + adminErrText(e); }
+  }
+}
+async function syncTimeNow() {
+  const msg = document.getElementById("adminTimeMsg");
+  const btn = document.getElementById("adminTimeSync");
+  if (btn) { btn.disabled = true; }
+  if (msg) { msg.className = "pf-status"; msg.textContent = adminT("正在同步…", "Syncing…"); }
+  try {
+    const r = await fetch("/api/time", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "sync" }),
+    });
+    const j = await r.json();
+    if (!r.ok || j.error) { throw new Error(j.error || ("HTTP " + r.status)); }
+    renderTimeStatus(j.status || {});
+    if (msg) {
+      msg.className = "pf-status" + (j.ok ? "" : " err");
+      msg.textContent = j.ok
+        ? adminT("时间同步成功", "Time synced")
+        : adminT("在线校时失败，继续使用上次可信时间", "Online sync failed; keeping the last trusted time");
+    }
+  } catch (e) {
+    if (msg) { msg.className = "pf-status err"; msg.textContent = adminT("同步失败：", "Sync failed: ") + adminErrText(e); }
+  } finally {
+    if (btn) { btn.disabled = false; }
+  }
+}
 function openSystemSettings() {
   const pop = document.getElementById("systemSettingsPop");
   if (!pop) { return; }
@@ -7430,6 +7516,7 @@ function openSystemSettings() {
   pop.setAttribute("aria-hidden", "false");
   loadAdmin(false);
   loadSupervisor();
+  loadTimeStatus();
 }
 function closeSystemSettings() {
   const pop = document.getElementById("systemSettingsPop");
@@ -8456,6 +8543,10 @@ async function adminSaveSet() {
   if (supRefresh) { supRefresh.onclick = loadSupervisor; }
   const supSave = document.getElementById("adminSupSave");
   if (supSave) { supSave.onclick = saveSupervisor; }
+  const timeRefresh = document.getElementById("adminTimeRefresh");
+  if (timeRefresh) { timeRefresh.onclick = loadTimeStatus; }
+  const timeSync = document.getElementById("adminTimeSync");
+  if (timeSync) { timeSync.onclick = syncTimeNow; }
   const licenseOpen = document.getElementById("adminLicenseOpen");
   if (licenseOpen) {
     licenseOpen.onclick = function () {

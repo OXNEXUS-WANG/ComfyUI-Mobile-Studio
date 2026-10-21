@@ -1856,6 +1856,14 @@
     '守护设置已保存': 'Supervisor settings saved',
     '本小时重启：ComfyUI ': 'Restarts this hour: ComfyUI ',
 
+    /* 时间同步 */
+    '时间同步': 'Time sync',
+    '在线时用 NTP / HTTPS Date 校准授权和额度使用的时间；断网时用上次可信时间加单调时钟，并检测系统时间回拨。':
+      'Uses NTP / HTTPS Date while online; when offline it keeps the last trusted time plus a monotonic clock and detects clock rollback.',
+    '立即同步': 'Sync now',
+    '同步不会修改系统时间，只影响授权、额度、游客到期和日志时间。':
+      'Syncing does not change the system clock; it only affects licensing, quotas, guest expiry, and log time.',
+
     /* 额度提示 */
     '额度已用完': 'Quota reached',
     '现在还不能提交': 'Not ready to submit',
