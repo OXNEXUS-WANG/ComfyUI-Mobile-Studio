@@ -4,6 +4,7 @@
 桌面快捷方式指向同目录的 一键启动.bat。
 已经在运行的服务会跳过，不会重复开窗口。
 """
+import json
 import os
 import socket
 import ssl
@@ -15,6 +16,11 @@ import webbrowser
 from collections import deque
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
+# 系统 Python 的 PYTHONHOME/PYTHONPATH 会污染便携版解释器。
+for _key in ("PYTHONHOME", "PYTHONPATH", "PYTHONSTARTUP", "PYTHONUSERBASE",
+             "PIP_TARGET", "PIP_USER"):
+    os.environ.pop(_key, None)
+os.environ["PYTHONNOUSERSITE"] = "1"
 # 便携版 python313._pth 不会自动把脚本目录加进 sys.path。
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
@@ -78,6 +84,188 @@ def proc_running(marker):
         except Exception:
             pass
     return False
+
+
+def url_json(url, timeout=2.0):
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "starter"})
+        ctx = ssl._create_unverified_context() if url.startswith("https://") else None
+        if ctx is not None:
+            resp = urllib.request.urlopen(req, timeout=timeout, context=ctx)
+        else:
+            resp = urllib.request.urlopen(req, timeout=timeout)
+        with resp:
+            raw = resp.read(65536)
+        return json.loads(raw.decode("utf-8", "replace"))
+    except Exception:
+        return None
+
+
+def web_is_ours():
+    for base in (WEB_BASE, "http://127.0.0.1:%d" % WEB_PORT):
+        data = url_json(base + "/api/session", timeout=2.0)
+        if isinstance(data, dict) and "authed" in data and "need_login" in data:
+            return True
+    return False
+
+
+def comfy_is_comfy():
+    data = url_json(COMFY_CHECK, timeout=2.0)
+    return isinstance(data, dict) and ("system" in data or "devices" in data)
+
+
+def port_owner(port):
+    try:
+        import psutil
+        for conn in psutil.net_connections(kind="inet"):
+            try:
+                if (conn.status == psutil.CONN_LISTEN and conn.laddr and
+                        conn.laddr.port == port):
+                    pid = conn.pid or 0
+                    if not pid:
+                        return {"pid": 0, "name": "unknown", "exe": "",
+                                "cmdline": ""}
+                    p = psutil.Process(pid)
+                    try:
+                        exe = p.exe()
+                    except Exception:
+                        exe = ""
+                    try:
+                        cmdline = " ".join(p.cmdline() or [])
+                    except Exception:
+                        cmdline = ""
+                    return {"pid": pid, "name": p.name(), "exe": exe,
+                            "cmdline": cmdline}
+            except Exception:
+                continue
+    except Exception:
+        pass
+    try:
+        out = subprocess.check_output(
+            ["netstat", "-ano"], stderr=subprocess.DEVNULL)
+        text = out.decode("mbcs", "replace")
+        for line in text.splitlines():
+            parts = line.split()
+            if (len(parts) >= 5 and parts[0].upper() == "TCP" and
+                    parts[1].endswith(":" + str(port)) and
+                    parts[3].upper() == "LISTENING"):
+                pid = int(parts[4])
+                name = "unknown"
+                exe = ""
+                try:
+                    import psutil
+                    p = psutil.Process(pid)
+                    name = p.name()
+                    try:
+                        exe = p.exe()
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+                return {"pid": pid, "name": name, "exe": exe,
+                        "cmdline": ""}
+    except Exception:
+        pass
+    return None
+
+
+def owner_is_ours(owner):
+    if not owner:
+        return False
+    exe = os.path.normcase(os.path.abspath(owner.get("exe") or ""))
+    root = os.path.normcase(os.path.abspath(ROOT))
+    return bool(exe) and (exe == root or exe.startswith(root + os.sep))
+
+
+def owner_text(owner):
+    if not owner:
+        return "未知程序"
+    parts = ["%s (PID %s)" % (owner.get("name") or "unknown",
+                              owner.get("pid") or "?")]
+    if owner.get("exe"):
+        parts.append(owner["exe"])
+    if owner.get("cmdline"):
+        parts.append(owner["cmdline"][:180])
+    return "\n".join(parts)
+
+
+def can_dialog():
+    if "--no-browser" in sys.argv:
+        return False
+    try:
+        return bool(sys.stdin and sys.stdin.isatty())
+    except Exception:
+        return False
+
+
+def show_message(text, title="手机出图", error=False, yes_no=False):
+    try:
+        import ctypes
+        flags = 0x40000  # MB_TOPMOST
+        flags |= 0x10 if error else 0x40
+        if yes_no:
+            flags |= 0x04
+        return ctypes.windll.user32.MessageBoxW(
+            None, text, title, flags) == 6
+    except Exception:
+        print(text)
+        return False
+
+
+def check_port_conflicts():
+    """启动前区分：本项目的旧实例、兼容的 ComfyUI、完全不认识的外部程序。"""
+    comfy_open = port_open(COMFY_PORT)
+    web_open = port_open(WEB_PORT)
+    web_ours = web_is_ours() if web_open else False
+    # 服务刚启动时端口已开但 /api/session 还没就绪，按命令行认作本项目的服务
+    if web_open and not web_ours and proc_running("mobile_web.py"):
+        web_ours = True
+    comfy_ok = comfy_is_comfy() if comfy_open else False
+    if comfy_open and not comfy_ok and proc_running(r"ComfyUI\main.py"):
+        comfy_ok = True
+
+    if web_open and not web_ours:
+        owner = port_owner(WEB_PORT)
+        text = ("端口 8800 被其他程序占用：\n%s\n\n"
+                "手机出图网页服务无法启动。请关闭占用 8800 的程序，"
+                "或在它的设置里改端口后重试。" % owner_text(owner))
+        log(text)
+        if can_dialog():
+            show_message(text, "手机出图 · 端口冲突", error=True)
+        return False
+
+    if web_open and web_ours:
+        owner = port_owner(WEB_PORT)
+        if owner and owner.get("exe") and not owner_is_ours(owner):
+            text = ("8800 端口上已经有一个手机出图实例，但不是当前目录：\n%s\n\n"
+                    "请先关闭那个实例，再启动当前安装。" % owner_text(owner))
+            log(text)
+            if can_dialog():
+                show_message(text, "手机出图 · 实例冲突", error=True)
+            return False
+
+    if comfy_open and not comfy_ok:
+        owner = port_owner(COMFY_PORT)
+        text = ("端口 8188 被其他程序占用：\n%s\n\n"
+                "ComfyUI 无法启动。请关闭占用 8188 的程序后重试。"
+                % owner_text(owner))
+        log(text)
+        if can_dialog():
+            show_message(text, "手机出图 · ComfyUI 端口冲突", error=True)
+        return False
+
+    if comfy_open:
+        owner = port_owner(COMFY_PORT)
+        if owner and owner.get("exe") and not owner_is_ours(owner):
+            text = ("检测到另一个 ComfyUI 正在 8188 运行：\n%s\n\n"
+                    "将直接复用它，不会重复启动。如果它不是本安装目录的 ComfyUI，"
+                    "可能缺少本项目的模型或自定义节点，出图会失败。\n\n"
+                    "是否继续？" % owner_text(owner))
+            log(text)
+            if can_dialog() and not show_message(
+                    text, "手机出图 · 已有 ComfyUI", yes_no=True):
+                return False
+    return True
 
 
 def spawn(args, env=None):
@@ -254,6 +442,13 @@ def main():
     log("=" * 48)
     log("目录：%s" % ROOT)
     log("")
+
+    if not check_port_conflicts():
+        log("")
+        log("启动已取消：请先处理上面的端口/程序冲突。")
+        if not no_browser:
+            input("按回车关闭…")
+        return 2
 
     comfy_port = port_open(COMFY_PORT)
     web_port = port_open(WEB_PORT)

@@ -4265,11 +4265,25 @@ def already_running():
                     with urllib.request.urlopen(url, timeout=1.5,
                                                 context=ctx) as r:
                         if r.status == 200:
-                            return True
+                            try:
+                                data = json.loads(
+                                    r.read(8192).decode("utf-8", "replace"))
+                            except Exception:
+                                data = None
+                            if (isinstance(data, dict) and "authed" in data
+                                    and "need_login" in data):
+                                return True
                 else:
                     with urllib.request.urlopen(url, timeout=1.5) as r:
                         if r.status == 200:
-                            return True
+                            try:
+                                data = json.loads(
+                                    r.read(8192).decode("utf-8", "replace"))
+                            except Exception:
+                                data = None
+                            if (isinstance(data, dict) and "authed" in data
+                                    and "need_login" in data):
+                                return True
             except Exception:
                 pass
     return False

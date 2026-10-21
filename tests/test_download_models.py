@@ -90,13 +90,16 @@ class DownloadModelsTests(unittest.TestCase):
         self.assertEqual(self.dest.read_bytes(), _Handler.payload)
         self.assertFalse(part.exists())
 
-    def test_wrong_size_is_rejected_and_repair_on_retry(self):
+    def test_wrong_size_is_backed_up_and_repaired(self):
         self.dest.write_bytes(b"short")
         ok = download_models.download_one(
             [self.url], self.dest, len(_Handler.payload), "size")
         self.assertTrue(ok)
         self.assertEqual(self.dest.stat().st_size, len(_Handler.payload))
         self.assertEqual(self.dest.read_bytes(), _Handler.payload)
+        backups = list(self.dest.parent.glob("model.bin.bak-*"))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(backups[0].read_bytes(), b"short")
 
     def test_existing_complete_file_is_skipped(self):
         self.dest.write_bytes(_Handler.payload)

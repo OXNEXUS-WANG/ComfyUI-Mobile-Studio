@@ -168,6 +168,25 @@ def _retry_delay(exc, attempt):
     return 0
 
 
+def backup_mismatched(dest):
+    """同名但大小不同：保留用户原文件，不直接删除。"""
+    dest = Path(dest)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    backup = dest.with_name(dest.name + ".bak-" + stamp)
+    n = 2
+    while backup.exists():
+        backup = dest.with_name(dest.name + ".bak-" + stamp + "-" + str(n))
+        n += 1
+    try:
+        dest.replace(backup)
+        print("  [备份] 同名文件大小不同，已保留为 %s" % backup.name)
+        return True
+    except OSError as exc:
+        print("  [失败] 无法备份同名文件 %s：%s" % (dest, exc))
+        print("         文件可能正被 ComfyUI 占用；请关闭 ComfyUI 后重试。")
+        return False
+
+
 def download_one(urls, dest, expected, label):
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -177,10 +196,8 @@ def download_one(urls, dest, expected, label):
         return True
     part = Path(str(dest) + ".part")
     if dest.is_file() and expected and dest.stat().st_size != expected:
-        try:
-            dest.unlink()
-        except OSError:
-            pass
+        if not backup_mismatched(dest):
+            return False
 
     last_error = ""
     for base in urls:

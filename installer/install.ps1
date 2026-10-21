@@ -10,7 +10,8 @@
     [switch]$SkipComfyUI,
     [string]$ComfyUIDir = "",
     [switch]$AllowUpdates,
-    [switch]$NoShortcut
+    [switch]$NoShortcut,
+    [switch]$NoDialog
 )
 
 $PkgRoot = Split-Path -Parent $PSScriptRoot
@@ -71,6 +72,378 @@ function Step($n, $msg) {
 function Warn($msg) { Say ("  !! " + $msg) "Yellow" }
 function Ok($msg) { Say ("  [OK] " + $msg) "Green" }
 function Fail($msg) { throw $msg }
+
+# ---------------------------------------------------- 环境冲突辅助
+$script:StageName = "启动"
+$script:Adaptations = New-Object System.Collections.ArrayList
+$script:Conflicts = New-Object System.Collections.ArrayList
+$script:Dialogs = $false
+if (-not $NoDialog -and -not $Yes) {
+    try {
+        Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+        $script:Dialogs = [Environment]::UserInteractive
+    } catch { $script:Dialogs = $false }
+}
+
+function Add-Adaptation($msg) {
+    [void]$script:Adaptations.Add($msg)
+    Warn ("已自动适配：" + $msg)
+}
+
+function Add-Conflict($msg) {
+    [void]$script:Conflicts.Add($msg)
+    Warn ("环境冲突：" + $msg)
+}
+
+function Show-Gui($text, $title, $buttons = "OK", $icon = "Warning") {
+    if (-not $script:Dialogs) { return "No" }
+    try {
+        $b = [System.Windows.Forms.MessageBoxButtons]::OK
+        if ($buttons -eq "YesNo") { $b = [System.Windows.Forms.MessageBoxButtons]::YesNo }
+        elseif ($buttons -eq "YesNoCancel") { $b = [System.Windows.Forms.MessageBoxButtons]::YesNoCancel }
+        $i = [System.Windows.Forms.MessageBoxIcon]::Warning
+        if ($icon -eq "Error") { $i = [System.Windows.Forms.MessageBoxIcon]::Error }
+        elseif ($icon -eq "Question") { $i = [System.Windows.Forms.MessageBoxIcon]::Question }
+        elseif ($icon -eq "Information") { $i = [System.Windows.Forms.MessageBoxIcon]::Information }
+        return [System.Windows.Forms.MessageBox]::Show($text, $title, $b, $i).ToString()
+    } catch { return "No" }
+}
+
+function Use-ConsoleChoice($message) {
+    if ($Yes -or $NoDialog) { return $false }
+    $ans = Read-Host ("  " + $message + " [Y/n]")
+    return ($ans -notmatch '^[nN]')
+}
+
+function Clear-PythonEnv {
+    $keys = @("PYTHONHOME", "PYTHONPATH", "PYTHONSTARTUP", "PYTHONUSERBASE",
+              "PIP_TARGET", "PIP_USER")
+    $found = @()
+    foreach ($k in $keys) {
+        $item = Get-Item ("Env:" + $k) -ErrorAction SilentlyContinue
+        if ($item -and $item.Value) {
+            $found += ($k + "=" + $item.Value)
+            Remove-Item ("Env:" + $k) -ErrorAction SilentlyContinue
+        }
+    }
+    $env:PYTHONNOUSERSITE = "1"
+    $env:PIP_DISABLE_PIP_VERSION_CHECK = "1"
+    if ($found.Count -gt 0) {
+        Add-Adaptation ("已临时清理外部 Python 环境变量：" + ($found -join "; "))
+    }
+}
+
+function Get-PortOwner($port) {
+    $ownerPid = 0
+    try {
+        $conn = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction Stop |
+            Select-Object -First 1
+        if ($conn) { $ownerPid = [int]$conn.OwningProcess }
+    } catch { }
+    if (-not $ownerPid) {
+        try {
+            $lines = & netstat -ano 2>$null |
+                Select-String (":" + $port + "\s") |
+                Select-String "LISTENING"
+            if ($lines) {
+                $parts = ($lines[0].ToString().Trim() -split "\s+")
+                $ownerPid = [int]$parts[$parts.Length - 1]
+            }
+        } catch { }
+    }
+    if (-not $ownerPid) { return $null }
+    $proc = Get-Process -Id $ownerPid -ErrorAction SilentlyContinue
+    $cmd = ""
+    $path = ""
+    try {
+        $ci = Get-CimInstance Win32_Process -Filter ("ProcessId=" + $ownerPid) -ErrorAction Stop
+        $cmd = [string]$ci.CommandLine
+        $path = [string]$ci.ExecutablePath
+    } catch { }
+    if (-not $path -and $proc) { try { $path = $proc.Path } catch { } }
+    $name = "unknown"
+    if ($proc) { $name = $proc.ProcessName }
+    return [pscustomobject]@{
+        Port = [int]$port
+        Pid = [int]$ownerPid
+        Name = $name
+        Path = $path
+        CommandLine = $cmd
+    }
+}
+
+function Test-OwnProcess($owner) {
+    if (-not $owner) { return $false }
+    if (-not $InstallDir) { return $false }
+    $root = $InstallDir.ToLower().TrimEnd('\')
+    $path = ([string]$owner.Path).ToLower()
+    $cmd = ([string]$owner.CommandLine).ToLower()
+    if ($path -and $path.StartsWith($root + "\")) { return $true }
+    if ($cmd -and $cmd.Contains($root + "\")) { return $true }
+    return $false
+}
+
+function Stop-OwnProcess($owner, $label) {
+    if (-not $owner) { return $true }
+    $detail = "  程序: " + $owner.Name + " (PID " + $owner.Pid + ")"
+    if ($owner.Path) { $detail += "`n  " + $owner.Path }
+    $msg = "检测到 $label 正在运行：`n$detail`n`n安装需要先停止它，否则文件会被占用。"
+    $stop = $false
+    if ($script:Dialogs) {
+        $stop = (Show-Gui ($msg + "`n`n是否自动停止？") "运行中的程序" "YesNo" "Question") -eq "Yes"
+    } elseif ($Yes) {
+        $stop = $true
+    } else {
+        $stop = Use-ConsoleChoice ($msg + "`n  是否自动停止？")
+    }
+    if (-not $stop) { return $false }
+    try {
+        Stop-Process -Id $owner.Pid -Force -ErrorAction Stop
+        for ($i = 0; $i -lt 20; $i++) {
+            Start-Sleep -Milliseconds 250
+            if (-not (Get-Process -Id $owner.Pid -ErrorAction SilentlyContinue)) { break }
+        }
+        Add-Adaptation ("已停止 " + $label + "（PID " + $owner.Pid + "）")
+        return $true
+    } catch {
+        Warn ("停止 " + $label + " 失败：" + $_.Exception.Message)
+        return $false
+    }
+}
+
+function New-AltInstallDir {
+    $base = $InstallDir.TrimEnd('\')
+    $alt = $base + "-Mobile-Studio"
+    $n = 2
+    while (Test-Path $alt) {
+        $alt = $base + "-Mobile-Studio" + $n
+        $n++
+    }
+    return $alt
+}
+
+function Resolve-DirectoryConflict($reason) {
+    if ($Yes -or $NoDialog) {
+        throw ($reason + "`n请换一个空目录后重新运行安装器。")
+    }
+    $alt = New-AltInstallDir
+    $msg = $reason + "`n`n建议改用新目录：`n" + $alt +
+           "`n`n是否使用这个新目录继续安装？"
+    $ok = $false
+    if ($script:Dialogs) {
+        $ok = (Show-Gui $msg "安装目录冲突" "YesNo" "Warning") -eq "Yes"
+    } else {
+        $ok = Use-ConsoleChoice $msg
+    }
+    if (-not $ok) { throw ("用户取消安装：目录冲突（" + $InstallDir + "）。") }
+    Add-Adaptation ("安装目录改为 " + $alt)
+    return $alt
+}
+
+function Test-WritableDir($dir) {
+    try {
+        New-Item -ItemType Directory -Force -Path $dir -ErrorAction Stop | Out-Null
+        $probe = Join-Path $dir (".mgs_write_" + [guid]::NewGuid().ToString("N") + ".tmp")
+        try {
+            [IO.File]::WriteAllText($probe, "ok")
+            Remove-Item $probe -Force -ErrorAction Stop
+            return $true
+        } catch { return $false }
+    } catch { return $false }
+}
+
+function Resolve-PortConflicts {
+    foreach ($port in @(8188, 8800)) {
+        $owner = Get-PortOwner $port
+        if (-not $owner) { continue }
+        $label = "ComfyUI（8188）"
+        if ($port -eq 8800) { $label = "手机网页服务（8800）" }
+        if (Test-OwnProcess $owner) {
+            if (Stop-OwnProcess $owner $label) { continue }
+            throw ("安装需要先停止 " + $label + "（PID " + $owner.Pid + "）。" +
+                   "`n请关闭后重新运行安装器。")
+        }
+        Add-Conflict ("端口 " + $port + " 被 " + $owner.Name +
+                      "（PID " + $owner.Pid + "）占用")
+        $detail = "  程序: " + $owner.Name + " (PID " + $owner.Pid + ")"
+        if ($owner.Path) { $detail += "`n  " + $owner.Path }
+        $msg = "端口 $port 被其他程序占用：`n$detail`n`n" +
+               "安装可以继续，但启动后 $label 无法使用。`n" +
+               "建议先关闭该程序，或在它的设置里改端口。`n`n" +
+               "是否继续安装（稍后自行处理端口）？"
+        $cont = $false
+        if ($script:Dialogs) {
+            $cont = (Show-Gui $msg "端口冲突" "YesNo" "Warning") -eq "Yes"
+        } elseif ($Yes -or $NoDialog) {
+            $cont = $true
+            Warn $msg
+        } else {
+            $cont = Use-ConsoleChoice $msg
+        }
+        if (-not $cont) {
+            throw ("用户取消安装：端口 " + $port + " 被 " + $owner.Name + " 占用。")
+        }
+        Add-Adaptation ("端口 " + $port + " 被外部程序占用，安装继续；启动前需要关闭它")
+    }
+}
+
+function Resolve-TargetProcesses {
+    if (-not (Test-Path $InstallDir)) { return }
+    $root = $InstallDir.ToLower().TrimEnd('\')
+    $seen = @{}
+    $procs = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object {
+            $exe = ([string]$_.ExecutablePath).ToLower()
+            $cmd = ([string]$_.CommandLine).ToLower()
+            ($exe -and $exe.StartsWith($root + "\python_embeded\")) -or
+            ($cmd -and ($cmd.Contains("mobile_web.py") -or
+                       $cmd.Contains("comfyui\main.py") -or
+                       $cmd.Contains("comfyui/main.py") -or
+                       $cmd.Contains("start_service.py")))
+        })
+    # 守护进程必须先停，否则它会在安装过程中把网页/ComfyUI 又拉起来
+    $ordered = @()
+    $ordered += @($procs | Where-Object {
+        ([string]$_.CommandLine).ToLower().Contains("start_service.py") })
+    $ordered += @($procs | Where-Object {
+        -not ([string]$_.CommandLine).ToLower().Contains("start_service.py") })
+    foreach ($p in $ordered) {
+        if ([int]$p.ProcessId -eq $PID) { continue }
+        if ($seen.ContainsKey([int]$p.ProcessId)) { continue }
+        $seen[[int]$p.ProcessId] = $true
+        $owner = [pscustomobject]@{
+            Port = 0
+            Pid = [int]$p.ProcessId
+            Name = $p.Name
+            Path = [string]$p.ExecutablePath
+            CommandLine = [string]$p.CommandLine
+        }
+        if (-not (Test-OwnProcess $owner)) { continue }
+        if (-not (Stop-OwnProcess $owner "安装目录里的程序")) {
+            throw ("安装目录里的程序正在运行（" + $p.Name + "，PID " +
+                   $p.ProcessId + "），无法继续。")
+        }
+    }
+}
+
+function Backup-ExistingNode($path, $label) {
+    if (-not (Test-Path $path)) { return $true }
+    $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+    $backup = Join-Path $InstallDir ("_node_trash\installer-" + $stamp + "\" + $label)
+    try {
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $backup) | Out-Null
+        Move-Item $path $backup -Force -ErrorAction Stop
+        Add-Adaptation ("已备份旧的 " + $label + " 到 " + $backup)
+        return $true
+    } catch {
+        Warn ("无法备份旧的 " + $label + "：" + $_.Exception.Message)
+        return $false
+    }
+}
+
+function Get-ProblemAdvice($err) {
+    $m = [string]$err
+    if ($m -match "目录不是空|不像本程序|目录冲突") {
+        return "1. 换一个空目录，或安装器建议的 -Mobile-Studio 子目录。`n2. 如果这是旧安装，请选择包含 ComfyUI\main.py 和 python_embeded\python.exe 的目录。`n3. 不要把安装目录指向桌面、下载或项目源码目录。"
+    }
+    if ($m -match "便携 Python|python_embeded") {
+        return "1. 把 python_embeded 改名备份，再重新运行安装器。`n2. 关闭杀毒软件，检查它是否隔离了 python.exe。`n3. 仍不行就换目录重装，现有模型/账号可以手动复制回去。"
+    }
+    if ($m -match "端口|占用|PID") {
+        return "1. 关闭占用 8188/8800 的程序，或在它的设置里改端口。`n2. 重新运行安装器。`n3. 点『是』打开日志和诊断报告，里面有 PID 和路径。"
+    }
+    if ($m -match "下载失败|网络|curl|超时|SSL|证书") {
+        return "1. 检查网络/代理，确认能访问 gh-proxy.com、hf-mirror.com。`n2. 重新运行安装器，已下载的部分会断点续传。`n3. 模型可以稍后双击『模型下载.bat』补装。"
+    }
+    if ($m -match "拒绝访问|Access|权限|只读|写入") {
+        return "1. 换一个普通目录（如 D:\AI\...），不要装到 Program Files/Windows。`n2. 关闭杀毒软件的文件夹保护，或以管理员身份运行。`n3. 检查目录是否被另一个程序占用。"
+    }
+    if ($m -match "空间") {
+        return "1. 清理安装盘，或换到剩余空间至少 20GB 的盘。`n2. 或重新运行并选择不下载模型。"
+    }
+    if ($m -match "解压|压缩包|7z|损坏") {
+        return "1. 删除安装目录里的 _downloads 后重试。`n2. 检查磁盘空间和杀毒软件隔离。`n3. 核对安装包 SHA256。"
+    }
+    if ($m -match "依赖|pip|Python|python") {
+        return "1. 检查网络，安装器会先走清华 PyPI 再走官方源。`n2. 确认没有设置 PYTHONHOME/PYTHONPATH（安装器会尝试清理）。`n3. 若 python_embeded 损坏，把安装目录改名后重装。"
+    }
+    return "1. 点『是』打开安装日志和诊断报告，查看最后的红色报错。`n2. 换一个空目录重新安装。`n3. 关闭杀毒软件后重试。"
+}
+
+function Write-ProblemReport($err) {
+    $dir = $env:TEMP
+    if ($InstallDir) {
+        try {
+            if (Test-Path (Split-Path -Qualifier $InstallDir)) { $dir = $InstallDir }
+        } catch { }
+    }
+    try { New-Item -ItemType Directory -Force -Path $dir | Out-Null } catch { $dir = $env:TEMP }
+    $path = Join-Path $dir "install_problem.txt"
+    $lines = @()
+    $lines += "ComfyUI Mobile Studio 安装诊断"
+    $lines += ("时间: " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
+    $lines += ("阶段: " + $script:StageName)
+    $lines += ("错误: " + [string]$err)
+    $lines += ("安装目录: " + $InstallDir)
+    $lines += ("系统: " + [Environment]::OSVersion.VersionString)
+    $lines += ("PowerShell: " + $PSVersionTable.PSVersion.ToString())
+    $lines += ("64 位系统: " + [Environment]::Is64BitOperatingSystem)
+    $lines += ("管理员: " + (Test-Admin))
+    $gpuVar = Get-Variable -Name GpuText -Scope Script -ErrorAction SilentlyContinue
+    if ($gpuVar) { $lines += ("显卡: " + $gpuVar.Value) }
+    $freeVar = Get-Variable -Name freeGB -Scope Script -ErrorAction SilentlyContinue
+    if ($freeVar) { $lines += ("可用空间: " + $freeVar.Value + " GB") }
+    $lines += ("日志: " + $LogFile)
+    $lines += ""
+    $lines += "自动适配:"
+    if ($script:Adaptations.Count -eq 0) {
+        $lines += "  （无）"
+    } else {
+        foreach ($x in $script:Adaptations) { $lines += ("  - " + $x) }
+    }
+    $lines += "环境冲突:"
+    if ($script:Conflicts.Count -eq 0) {
+        $lines += "  （无）"
+    } else {
+        foreach ($x in $script:Conflicts) { $lines += ("  - " + $x) }
+    }
+    $lines += ""
+    $lines += "端口占用:"
+    foreach ($p in @(8188, 8800)) {
+        $o = Get-PortOwner $p
+        if ($o) {
+            $lines += ("  " + $p + " <- " + $o.Name + " (PID " + $o.Pid + ") " + $o.Path)
+        } else {
+            $lines += ("  " + $p + " 空闲")
+        }
+    }
+    $lines += ""
+    $lines += "建议排查:"
+    $lines += (Get-ProblemAdvice $err)
+    Set-Content -Path $path -Value $lines -Encoding UTF8
+    return $path
+}
+
+function Show-ProblemDialog($err) {
+    $report = Write-ProblemReport $err
+    $advice = Get-ProblemAdvice $err
+    $text = "安装没有完成：`n" + [string]$err + "`n`n建议这样排查：`n" + $advice +
+            "`n`n诊断报告：`n" + $report + "`n安装日志：`n" + $LogFile
+    if ($script:Dialogs) {
+        $r = Show-Gui $text "手机出图 · 安装遇到问题" "YesNo" "Error"
+        if ($r -eq "Yes") {
+            if (Test-Path $LogFile) {
+                Start-Process notepad.exe -ArgumentList ('"' + $LogFile + '"')
+            }
+            if (Test-Path $report) {
+                Start-Process explorer.exe -ArgumentList ('/select,"' + $report + '"')
+            }
+        }
+    } else {
+        Say ""
+        Say $text "Yellow"
+    }
+}
 
 function Test-Admin {
     try {
@@ -302,7 +675,13 @@ function Install-NodeZip($name, $urls) {
     Expand-Zip $zip $tmp
     $root = Get-ZipTop $tmp
     $dest = Join-Path $InstallDir ("ComfyUI\custom_nodes\" + $name)
-    if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+    if (Test-Path $dest) {
+        if (-not (Backup-ExistingNode $dest $name)) {
+            Warn ("保留现有节点，跳过覆盖：" + $name)
+            Add-Conflict ("自定义节点 " + $name + " 正在使用，未覆盖")
+            return
+        }
+    }
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dest) | Out-Null
     Move-Item $root $dest
     Ok ($name + " 已安装")
@@ -324,7 +703,12 @@ function Install-CustomNodes {
     Expand-Zip $subZip $tmp
     $subRoot = Get-ZipTop $tmp
     $subDest = Join-Path $InstallDir "ComfyUI\custom_nodes\ComfyUI_UltimateSDUpscale\repositories\ultimate_sd_upscale"
-    if (Test-Path $subDest) { Remove-Item $subDest -Recurse -Force }
+    if (Test-Path $subDest) {
+        if (-not (Backup-ExistingNode $subDest "ultimate_sd_upscale")) {
+            Warn "保留现有 UltimateSDUpscale 子模块，跳过覆盖"
+            return
+        }
+    }
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $subDest) | Out-Null
     Move-Item $subRoot $subDest
     Ok "UltimateSDUpscale 子模块已安装"
@@ -509,7 +893,8 @@ function Set-AdminPassword {
         }
     }
     if ($preserve) {
-        & $py (Join-Path $InstallDir "installer\bootstrap.py") --root $InstallDir --no-cert
+        & $py (Join-Path $InstallDir "installer\bootstrap.py") --root $InstallDir
+        if ($LASTEXITCODE -ne 0) { Fail "检查/续期 HTTPS 证书失败" }
         return
     }
     $env:MGS_ADMIN_PASSWORD = $pw
@@ -561,6 +946,19 @@ function Write-Report {
     $lines += ("管理员账号: admin")
     $lines += ("本机地址: https://127.0.0.1:8800")
     $lines += ("手机地址: https://192.168.137.1:8800（连接电脑热点后）")
+    $lines += ""
+    $lines += "自动适配:"
+    if ($script:Adaptations.Count -eq 0) {
+        $lines += "  （无）"
+    } else {
+        foreach ($x in $script:Adaptations) { $lines += ("  - " + $x) }
+    }
+    $lines += "环境冲突:"
+    if ($script:Conflicts.Count -eq 0) {
+        $lines += "  （无）"
+    } else {
+        foreach ($x in $script:Conflicts) { $lines += ("  - " + $x) }
+    }
     $lines += "注意：本报告不包含密码。"
     Set-Content -Path (Join-Path $InstallDir "install_report.txt") -Value $lines -Encoding utf8
 }
@@ -571,7 +969,9 @@ try {
 } catch { }
 
 try {
+    Clear-PythonEnv
     Step "1" "环境检测"
+    $script:StageName = "环境检测"
     if (-not [Environment]::Is64BitOperatingSystem) { Fail "只支持 64 位 Windows。" }
     $osv = [Environment]::OSVersion.Version
     if ($osv.Major -lt 10) { Fail "需要 Windows 10 或 Windows 11。" }
@@ -598,32 +998,128 @@ try {
             if ($typed) { $InstallDir = $typed }
         }
     }
-    $InstallDir = [IO.Path]::GetFullPath($InstallDir)
+    $InstallDir = [IO.Path]::GetFullPath($InstallDir).TrimEnd('\')
+    if ($InstallDir -match '^[A-Za-z]:$') {
+        Fail ("不能直接安装到盘符根目录：" + $InstallDir +
+              "`n请使用子目录，例如 D:\AI\ComfyUI_windows_portable。")
+    }
+
+    # 路径本身也可能和便携 Python / 自定义节点冲突
+    if ($InstallDir -match '^\\\\') {
+        Fail ("不支持 UNC 网络路径：" + $InstallDir +
+              "`n请安装到本机磁盘（例如 D:\AI\ComfyUI_windows_portable）。")
+    }
+    if ($InstallDir -match '[^\x00-\x7F]') {
+        Warn "安装目录包含中文或其他非 ASCII 字符；少数自定义节点可能无法读取。"
+        Add-Conflict "安装目录包含非 ASCII 字符：$InstallDir"
+    }
+    if ($InstallDir.Length -gt 180) {
+        Warn "安装路径较长，Windows 可能无法处理部分深层文件。"
+        Add-Conflict "安装路径较长（$($InstallDir.Length) 字符）"
+    }
+    if ($InstallDir -match '(?i)^[A-Z]:\\(Windows|Program Files)') {
+        Warn "不建议安装到 Windows 或 Program Files；权限和杀毒软件容易拦截。"
+        Add-Conflict "安装目录位于系统目录：$InstallDir"
+    }
+
     $Upgrade = $false
-    if ((Test-Path (Join-Path $InstallDir "ComfyUI\main.py")) -and
-        (Test-Path (Join-Path $InstallDir "python_embeded\python.exe"))) {
+    $hasComfy = Test-Path (Join-Path $InstallDir "ComfyUI\main.py")
+    $hasPy = Test-Path (Join-Path $InstallDir "python_embeded\python.exe")
+    if ($hasComfy -and $hasPy) {
         $Upgrade = $true
         Say ("  检测到已有安装：" + $InstallDir) "Yellow"
         if (-not $Yes) {
             $ans = Read-Host "  继续升级并保留模型/账号？[Y/n]"
             if ($ans -match "^[nN]") { Say "已取消"; exit 0 }
         }
+        $pyPath = Join-Path $InstallDir "python_embeded\python.exe"
+        $pyCheck = ""
+        try {
+            $pyCheck = (& $pyPath -c "import sys; print('PYOK', sys.version_info[0], sys.version_info[1])" | Out-String)
+        } catch {
+            Fail ("安装目录里的便携 Python 无法运行：" + $_.Exception.Message +
+                  "`n可能被杀毒软件隔离或文件损坏。" +
+                  "`n请先把 python_embeded 改名备份，再重新运行安装器；" +
+                  "或换一个目录安装。")
+        }
+        if ($LASTEXITCODE -ne 0 -or $pyCheck -notmatch 'PYOK') {
+            Fail ("安装目录里的便携 Python 无法运行。可能被杀毒软件隔离或文件损坏。" +
+                  "`n请先把 python_embeded 改名备份，再重新运行安装器；" +
+                  "或换一个目录安装。")
+        }
+    } elseif ($hasComfy -and -not $hasPy) {
+        $InstallDir = Resolve-DirectoryConflict (
+            "检测到已有 ComfyUI，但没有便携 Python（python_embeded）。`n" +
+            "直接合并可能破坏现有环境。")
+        $hasComfy = Test-Path (Join-Path $InstallDir "ComfyUI\main.py")
+        $hasPy = Test-Path (Join-Path $InstallDir "python_embeded\python.exe")
+        if ($hasComfy -and $hasPy) { $Upgrade = $true }
     } elseif (Test-Path $InstallDir) {
-        $items = Get-ChildItem $InstallDir -Force
-        if ($items.Count -gt 0) { Fail ("目录不是空的：" + $InstallDir) }
+        $items = @(Get-ChildItem $InstallDir -Force |
+            Where-Object { $_.Name -notin @("_downloads", "_bootstrap") })
+        if ($items.Count -gt 0) {
+            $InstallDir = Resolve-DirectoryConflict (
+                "安装目录不是空的，而且不像本程序的完整安装：`n" + $InstallDir)
+        }
     }
+
+    if (-not (Test-WritableDir $InstallDir)) {
+        if ($Upgrade) {
+            Fail ("无法写入现有安装目录：`n" + $InstallDir +
+                  "`n请以管理员身份运行，或关闭杀毒软件的文件夹保护后重试。")
+        }
+        $InstallDir = Resolve-DirectoryConflict (
+            "无法写入安装目录：`n" + $InstallDir +
+            "`n常见原因：权限不足、杀毒软件/受控文件夹访问、目录只读。")
+        if (-not (Test-WritableDir $InstallDir)) {
+            Fail ("新目录仍然无法写入：" + $InstallDir)
+        }
+    }
+
     $drive = Split-Path -Qualifier $InstallDir
     $freeGB = 0
     try { $freeGB = [math]::Round((Get-PSDrive $drive.TrimEnd(":")).Free / 1GB, 1) } catch { }
-    if ($freeGB -gt 0 -and $freeGB -lt 20) {
-        Fail ("安装盘剩余空间不足（" + $freeGB + "GB），至少需要 20GB；默认模型约 6GB，安装过程还要临时空间。")
+    if ($freeGB -gt 0 -and $freeGB -lt 8) {
+        Fail ("安装盘剩余空间不足（" + $freeGB + "GB），至少需要 8GB 安装 ComfyUI 和运行依赖。")
+    }
+    if ($freeGB -gt 0 -and $freeGB -lt 20 -and -not $SkipModels) {
+        $msg = "安装盘剩余 $freeGB GB。完整安装（含默认模型）建议至少 20GB。`n`n是否继续安装但不下载模型？"
+        $skip = $false
+        if ($script:Dialogs) {
+            $skip = (Show-Gui $msg "磁盘空间不足" "YesNo" "Warning") -eq "Yes"
+        } elseif ($Yes -or $NoDialog) {
+            $skip = $true
+            Warn $msg
+        } else {
+            $skip = Use-ConsoleChoice $msg
+        }
+        if (-not $skip) { Fail "磁盘空间不足，已取消安装。" }
+        $SkipModels = $true
+        Add-Adaptation "磁盘空间不足，本次安装跳过模型下载"
     }
     Say ("  安装目录: " + $InstallDir)
     Say ("  可用空间: " + $freeGB + " GB")
     $admin = Test-Admin
     Say ("  管理员权限: " + $(if ($admin) { "是" } else { "否（防火墙规则需手动修复）" }))
 
+    # 端口/进程冲突：本项目的旧服务会询问后停止；外部程序占用则说明后果。
+    # DryRun 只报告，绝不停止任何正在运行的服务。
+    if ($DryRun) {
+        foreach ($port in @(8188, 8800)) {
+            $o = Get-PortOwner $port
+            if ($o) {
+                Add-Conflict ("端口 " + $port + " 被 " + $o.Name +
+                              "（PID " + $o.Pid + "）占用")
+            }
+        }
+    } else {
+        # 先停守护进程和它拉起的服务，再检查端口，避免守护进程又把它拉起来
+        Resolve-TargetProcesses
+        Resolve-PortConflicts
+    }
+
     Step "2" "网络与下载源检测"
+    $script:StageName = "网络与下载源检测"
     $netComfy = Test-Url $ComfyProxy
     $netHf = Test-Url ($HfMirror + "/circlestone-labs/Anima")
     if ($netComfy) { Ok "ComfyUI 下载源可用（gh-proxy）" } else { Warn "gh-proxy 不可用，将尝试 GitHub 直连" }
@@ -632,7 +1128,11 @@ try {
         Say ""
         Say ("  版本锁定: ComfyUI " + $ComfyTag + "；依赖/节点/模型 revision 已锁定") "Cyan"
         if ($SkipModels) {
-            Say "  已跳过模型包检查（商业清洁模式）" "Cyan"
+            if ($CommercialClean) {
+                Say "  已跳过模型包检查（商业清洁模式）" "Cyan"
+            } else {
+                Say "  已跳过模型包检查（-SkipModels）" "Cyan"
+            }
         } else {
             Say "  模型包 URL 检查：" "Cyan"
             $m = Get-Content $Manifest -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -658,10 +1158,12 @@ try {
     }
 
     Step "3" "准备目录"
+    $script:StageName = "准备目录"
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
     Ok "目录已准备"
 
     Step "4" "获取 ComfyUI 便携版"
+    $script:StageName = "获取 ComfyUI 便携版"
     Ensure-ComfyUI
     if ($SkipComfyUI) {
         Warn "已跳过 ComfyUI 更新（使用用户现有安装）"
@@ -673,17 +1175,21 @@ try {
     }
 
     Step "5" "安装网页程序与 Python 依赖"
+    $script:StageName = "安装网页程序与 Python 依赖"
     Copy-AppFiles
     Install-PythonDeps
     if (-not $NoTranslate) { Install-ArgosModel }
 
     Step "6" "安装必要自定义节点"
+    $script:StageName = "安装必要自定义节点"
     Install-CustomNodes
 
     Step "7" "下载模型（不随安装包分发）"
+    $script:StageName = "下载模型"
     Install-Models
 
     Step "8" "初始化账号、HTTPS 证书和自启动入口"
+    $script:StageName = "初始化账号、HTTPS 证书和自启动入口"
     Set-AdminPassword
     Add-FirewallRule
     if (-not $NoShortcut) { Create-Shortcut }
@@ -716,8 +1222,14 @@ try {
     try { Stop-Transcript | Out-Null } catch { }
     exit 0
 } catch {
-    Warn ("安装失败：" + $_.Exception.Message)
+    $err = $_.Exception.Message
+    Warn ("安装失败：" + $err)
     Say ("  日志：" + $LogFile) "Yellow"
     try { Stop-Transcript | Out-Null } catch { }
+    if ($err -match "用户取消安装") {
+        Say "已取消安装，没有修改 ComfyUI 或模型。" "Yellow"
+    } else {
+        try { Show-ProblemDialog $err } catch { Warn ("无法显示问题框：" + $_.Exception.Message) }
+    }
     exit 1
 }

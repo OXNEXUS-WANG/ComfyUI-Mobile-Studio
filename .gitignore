@@ -23,6 +23,8 @@ license.json
 access.json
 cert.pem
 key.pem
+cert.pem.bak-*
+key.pem.bak-*
 logs/
 generated/
 web_uploads/

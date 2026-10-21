@@ -45,6 +45,11 @@ $runtimeFiles = @(
 Get-ChildItem $Stage -Recurse -File -Force -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -in $runtimeFiles } |
     Remove-Item -Force -ErrorAction SilentlyContinue
+# 安装器续期证书时留下的旧证书/私钥备份也不能进发布包
+Get-ChildItem $Stage -Recurse -File -Force -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -like "cert.pem.bak-*" -or
+                   $_.Name -like "key.pem.bak-*" } |
+    Remove-Item -Force -ErrorAction SilentlyContinue
 $runtimeDirs = @("logs", "_restore_points", "generated", "web_uploads",
     "_backups", "_model_trash", "_model_uploads",
     "_node_trash", "_node_uploads", "workflows", "plugins")
