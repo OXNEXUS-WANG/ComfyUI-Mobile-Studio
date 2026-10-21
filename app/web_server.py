@@ -31,6 +31,7 @@ from app_core import _stage_to_input
 import lan_share
 import license_guard
 import model_manager
+import edition_policy
 import node_manager
 import plugin_manager
 import workflow_manager
@@ -611,6 +612,9 @@ class Handler(BaseHTTPRequestHandler):
         result = {}
 
         if action == "join_code":
+            if lan_share.worker_quota().get("reached"):
+                self._json({"error": edition_policy.quota_message("workers")}, 403)
+                return
             info = lan_share.create_join_code(
                 created_by=(user or {}).get("username") or "admin",
                 note=data.get("note") or "")
