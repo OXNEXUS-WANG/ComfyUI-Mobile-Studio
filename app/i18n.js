@@ -92,6 +92,7 @@
 
     /* ---------- 主页面：导航与模式 ---------- */
     '出 图': 'Generate',
+    '出视频': 'Generate video',
     '图 库': 'Gallery',
     '日 志': 'Logs',
     '插 件': 'Plugins',
@@ -102,6 +103,8 @@
     '插件包 JSON': 'Plugin JSON',
     '导入插件包': 'Import pack',
     '代码插件': 'Code plugins',
+    '安全插件包、代码插件提交与审批':
+      'Secure plugin packs, code plugin submission and approval',
     '插件 ZIP（≤20MB）': 'Plugin ZIP (≤20MB)',
     '提交审批': 'Submit for review',
     '我的提交': 'My submissions',
@@ -367,6 +370,8 @@
     '错误记录': 'Errors',
     '存储占用': 'Storage',
     '智能让路': 'Load guard',
+    '只留监控、运行中任务、告警和离线节点':
+      'Show only monitoring, running jobs, alerts and offline nodes',
     '实时活动': 'Live activity',
     '健康总览': 'Health overview',
     '告警中心': 'Alert center',
@@ -452,6 +457,15 @@
     '节点 / 模型扫描': 'Node / model scan',
     '系统状态': 'System status',
     '实时进度': 'Live progress',
+    '节点体检': 'Node health',
+    '工作流体检': 'Workflow health',
+    '自定义节点体检': 'Custom node health',
+    '上传节点': 'Upload node',
+    '下载工作流': 'Download workflow',
+    '检查 custom_nodes 的入口、NODE_CLASS_MAPPINGS、Python 语法、requirements 依赖和危险脚本；支持 ZIP/目录导入。':
+      'Checks custom_nodes entry points, NODE_CLASS_MAPPINGS, Python syntax, requirements and risky scripts; supports ZIP/folder import.',
+    '解析 UI / API 工作流，检查缺失节点和模型、断链、循环依赖；保存到工作流库并可下载原始 JSON。':
+      'Parses UI / API workflows and checks missing nodes/models, broken links and cycles; saves to the workflow library and allows downloading the original JSON.',
 
     /* ---------- 星图面板 / 流程 ---------- */
     '正在使用': 'In use',
@@ -1964,6 +1978,7 @@
     [/^准备图片失败:\s*(.+)$/, 'Could not prepare the image: $1'],
     [/^节点:\s*(.+)$/, 'Node: $1'],
     [/^节点\s+(.+)$/, 'Node $1'],
+    [/^异常聚焦\s*(\d+)$/, 'Abnormal focus $1'],
     [/^确认告警失败：(.+)$/, 'Could not acknowledge the alert: $1'],
     [/^队列操作失败：(.+)$/, 'Queue action failed: $1'],
     [/^ZIP 包含不允许的文件类型：(.+)$/,

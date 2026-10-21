@@ -100,6 +100,9 @@ input[type=range] { accent-color: var(--ac); }
 .row { display: flex; gap: 10px; margin: 10px 0; flex-wrap: wrap; }
 .row.tight { margin: 8px 0; }
 .row2 { display: flex; gap: 10px; align-items: stretch; margin-top: 8px; }
+/* .reload 默认是整行按钮；放进 row2 时要和右侧主按钮平分宽度，
+   否则 100% 宽会把「拼成提示词 / 开始重绘」挤成一条竖线。 */
+.row2 > .reload { width: auto; flex: 1 1 0; margin-bottom: 0; }
 .chip {
   flex: 1; min-width: 72px; min-height: 44px; padding: 11px 10px; text-align: center;
   display: flex; align-items: center; justify-content: center;
@@ -177,7 +180,8 @@ input[type=range] { accent-color: var(--ac); }
 /* ---------- 全屏浏览 ---------- */
 .viewer { position: fixed; inset: 0; background: rgba(6,7,11,.97);
   -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
-  z-index: 50; display: none; flex-direction: column; }
+  /* 要压过右上角 fixed 的语言/设置按钮（z=96），否则查看器的关闭键会被挡住 */
+  z-index: 97; display: none; flex-direction: column; }
 .viewer.on { display: flex; }
 .viewer .top { flex: 0 0 auto; display: flex; align-items: center;
   justify-content: space-between; padding: 10px 14px; color: var(--tx2); font-size: 14px; }
@@ -191,6 +195,7 @@ input[type=range] { accent-color: var(--ac); }
   box-shadow: 0 20px 60px rgba(0,0,0,.6); }
 .viewer .stage video { background: #000; }
 .viewer .nav { position: absolute; top: 50%; transform: translateY(-50%);
+  z-index: 2; /* 图片有入场动画会形成层叠上下文，导航必须显式压在图片上 */
   background: rgba(255,255,255,.09);
   -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
   color: #fff; border: 1px solid var(--gline); width: 42px; height: 62px;
@@ -313,7 +318,8 @@ button.go:disabled { background: rgba(255,255,255,.07); color: var(--tx3);
 /* ---------- 蒙版涂抹 ---------- */
 .maskui { position: fixed; inset: 0; background: rgba(6,7,11,.99);
   -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-  z-index: 60; display: none; flex-direction: column; }
+  /* 涂抹编辑器要盖住查看器和右上角按钮；关闭键不能被语言键拦截 */
+  z-index: 98; display: none; flex-direction: column; }
 .maskui.on { display: flex; }
 .maskui .top { padding: 10px 14px; color: var(--tx2); font-size: 14px;
   display: flex; justify-content: space-between; align-items: center; }
@@ -441,6 +447,10 @@ a.img:active { filter: brightness(.94); }
 /* ---------- 图库多选 ---------- */
 #galFilter { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px; }
+@media (max-width: 560px) {
+  /* 手机四列会把 Photoreal 这类长词拆成两行半，改两列 */
+  #galFilter { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 #galFilter .chip { min-width: 0; }
 .cell.sel { outline: 2px solid var(--ac); outline-offset: -2px; }
 .cell .tick { position: absolute; top: 6px; left: 6px; width: 22px; height: 22px;
@@ -1051,7 +1061,8 @@ img.result, video.result {
 .admin-worker-settings input[type=number] { width: 74px; }
 .admin-llm { display: grid; grid-template-columns: repeat(auto-fit,minmax(210px,1fr)); }
 .admin-llm label { flex-direction: column; align-items: stretch; gap: 3px; }
-.admin-llm label.admin-llm-clear { flex-direction: row; align-items: center; }
+.admin-llm label.admin-llm-clear,
+.admin-llm label:has(> input[type=checkbox]) { flex-direction: row; align-items: center; }
 .admin-llm input[type=text],
 .admin-llm input[type=password] { width: 100%; box-sizing: border-box; }
 .cleanup-notice {
@@ -1216,6 +1227,12 @@ img.result, video.result {
   font: 600 11px var(--mono); letter-spacing: .5px; cursor: pointer;
 }
 #langBtn:hover { border-color: rgba(127,227,255,.65); color: #fff; }
+#langBtn, #profileTopBtn { transition: opacity .18s ease, transform .18s ease; }
+/* 页面往下滚以后，右上角浮动按钮会压住列表里的操作按钮（例如删除）；
+   滚出顶部区域就收起，回到顶部再出现。 */
+body.scrolled #langBtn, body.scrolled #profileTopBtn {
+  opacity: 0; pointer-events: none; transform: translateY(-6px);
+}
 #profileTopBtn {
   position: fixed; right: 62px; top: 14px; z-index: 96;
   width: 32px; height: 32px; padding: 0; border-radius: 16px;
@@ -1227,6 +1244,10 @@ img.result, video.result {
 @media (max-width: 560px) {
   #langBtn { right: 10px; top: 10px; height: 30px; }
   #profileTopBtn { right: 56px; top: 10px; width: 30px; height: 30px; }
+  /* 顶部右侧是 fixed 的设置/语言按钮，标题和副标题不要钻到按钮下面。
+     英文副标题较长时整段换到第二行，中文仍保持一行。 */
+  h1 { padding-right: 84px; }
+  h1 span { display: inline-block; }
 }
 
 /* 排队生图悬浮窗 */
@@ -1301,6 +1322,9 @@ img.result, video.result {
   #queueFloat { left: 10px; right: 10px; width: auto; bottom: 88px; }
   .qf-body { max-height: 38vh; }
 }
+/* 智能让路的提示条在底部居中，和排队浮窗会叠在一起；
+   让排队浮窗整体上移，避免最后一个任务被提示条盖住。 */
+#guardBar.on ~ #queueFloat { bottom: 190px; }
 
 /* 任务完工弹窗 */
 #donePop, #profilePop, #adminSetPop, #guestPop, #createUserPop,
@@ -1449,7 +1473,7 @@ img.result, video.result {
   }
 }
 </style>
-<script src="/i18n.js?v=20261021c"></script>
+<script src="/i18n.js?v=20261021g"></script>
 </head>
 <body>
 <button id="langBtn" type="button" data-lang-toggle>EN</button>
@@ -2073,7 +2097,7 @@ img.result, video.result {
   </div>
   <div class="admin-model-tools">
     <label class="admin-model-path">服务器路径
-      <input id="adminModelPath" type="text" placeholder="D:\下载\model.safetensors">
+      <input id="adminModelPath" type="text" placeholder="D:\models\model.safetensors">
     </label>
     <label><input type="checkbox" id="adminModelMove"> 移动源文件（不勾选则复制）</label>
     <button class="reload" id="adminModelImportBtn" type="button">从路径导入</button>
@@ -2110,7 +2134,7 @@ img.result, video.result {
   </div>
   <div class="admin-model-tools">
     <label class="admin-model-path">服务器路径
-      <input id="adminNodePath" type="text" placeholder="D:\下载\my-node 或 my-node.zip">
+      <input id="adminNodePath" type="text" placeholder="D:\models\my-node / my-node.zip">
     </label>
     <label><input type="checkbox" id="adminNodeReplace"> 覆盖同名节点（旧版本移到回收站）</label>
     <button class="reload" id="adminNodeImport" type="button">从路径导入</button>
@@ -2139,7 +2163,7 @@ img.result, video.result {
   </div>
   <div class="admin-model-tools">
     <label class="admin-model-path">服务器路径
-      <input id="adminWorkflowPath" type="text" placeholder="D:\下载\workflow.json">
+      <input id="adminWorkflowPath" type="text" placeholder="D:\models\workflow.json">
     </label>
     <button class="reload" id="adminWorkflowImport" type="button">从路径导入</button>
   </div>
@@ -9901,6 +9925,20 @@ applyDeepLink();
     vwZoom = Math.max(1, Math.min(5, vwZoom * (e.deltaY < 0 ? 1.15 : 0.87)));
     apply();
   }, { passive: false });
+})();
+</script>
+<script>
+/* 右上角浮动按钮：滚出顶部后收起，避免压住列表里的删除/操作按钮 */
+(function wireTopButtons() {
+  var scrolled = false;
+  function sync() {
+    var s = window.scrollY > 80;
+    if (s === scrolled) { return; }
+    scrolled = s;
+    document.body.classList.toggle("scrolled", s);
+  }
+  window.addEventListener("scroll", sync, { passive: true });
+  sync();
 })();
 </script>
 </body>
