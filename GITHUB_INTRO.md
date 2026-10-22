@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-v1.3.5-6f8cff">
+  <img alt="version" src="https://img.shields.io/badge/version-v1.3.6-6f8cff">
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-3b82f6">
   <img alt="network" src="https://img.shields.io/badge/network-LAN%20%2F%20Hotspot-22c55e">
   <img alt="tests" src="https://img.shields.io/badge/tests-231%20passed-14b8a6">
@@ -263,8 +263,8 @@ flowchart LR
 
 ## 快速开始 / Quick start
 
-1. **下载 / Download** — 从 **Releases** 下载 `CometInk-v1.3.5-Share.zip`。  
-   Download `CometInk-v1.3.5-Share.zip` from **Releases**.
+1. **下载 / Download** — 从 **Releases** 下载 `CometInk-v1.3.6-Share.zip`。  
+   Download `CometInk-v1.3.6-Share.zip` from **Releases**.
 2. **安装 / Install** — 解压到普通目录，双击 `安装.bat`。  
    Extract to a normal folder and run `安装.bat`.
 3. **选择 / Choose** — 阅读免责声明，设置管理员密码，选择模型包。  
