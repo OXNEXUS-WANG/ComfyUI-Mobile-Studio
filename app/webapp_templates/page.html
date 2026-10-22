@@ -9683,6 +9683,7 @@ function renderWorkers() {
       '<div><div class="aw-name"><b>' + esc(w.name || w.id) + '</b>' +
       '<span class="aw-badge ' + sb[2] + '">' + esc(workerT(sb[0], sb[1])) + '</span>' +
       (w.trusted ? '<span class="aw-badge ok">' + esc(workerT("可信", "Trusted")) + '</span>' : '') +
+      (w.comfy_compatible === false ? '<span class="aw-badge bad">' + esc(workerT("ComfyUI 版本不兼容", "Incompatible ComfyUI")) + '</span>' : '') +
       (w.paused_by_owner ? '<span class="aw-badge warn">' + esc(workerT("所有者暂停", "Owner paused")) + '</span>' : '') +
       '</div><div class="aw-meta">' + esc(idText) + ' · ' + esc(workerT("所有者：", "Owner: ") + owner) + ' · ' + esc(workerOnlineText(w)) + '</div>' +
       '<div class="aw-meta">' + (meta || "—") + '</div>' +

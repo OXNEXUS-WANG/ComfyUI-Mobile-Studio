@@ -34,7 +34,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-AGENT_VERSION = "1.0"
+AGENT_VERSION = "1.1"
 PROTOCOL = 1
 ROOT = Path(__file__).resolve().parent
 DEFAULT_CONFIG = ROOT / "worker_agent.json"
@@ -283,6 +283,42 @@ def model_inventory(info):
     }
 
 
+_MODEL_DIR_ALIASES = {
+    "checkpoints": ("checkpoints",),
+    "diffusion_models": ("diffusion_models", "unet"),
+    "text_encoders": ("text_encoders", "clip"),
+    "vae": ("vae",),
+    "loras": ("loras",),
+    "upscale_models": ("upscale_models",),
+}
+
+
+def model_sizes(comfy_dir, models):
+    """按模型名读取文件大小；文件不存在或越界就跳过。"""
+    models = models if isinstance(models, dict) else {}
+    if not comfy_dir:
+        return {}
+    base = os.path.abspath(os.path.join(comfy_dir, "models"))
+    out = {}
+    for folder, names in models.items():
+        dirs = _MODEL_DIR_ALIASES.get(folder) or (folder,)
+        for name in names or []:
+            name = str(name or "").replace("/", os.sep)
+            if not name or name.startswith(".."):
+                continue
+            for sub in dirs:
+                path = os.path.abspath(os.path.join(base, sub, name))
+                try:
+                    if os.path.commonpath([base, path]) != base:
+                        continue
+                    if os.path.isfile(path):
+                        out.setdefault(folder, {})[str(name)] = os.path.getsize(path)
+                        break
+                except (OSError, ValueError):
+                    continue
+    return out
+
+
 def comfy_system_stats(comfy):
     try:
         return comfy_json(comfy, "/system_stats", timeout=8)
@@ -381,6 +417,7 @@ def probe(cfg=None):
         "comfy_dir": comfy_dir,
         "comfy_ready": bool(stats),
         "models": models,
+        "model_sizes": model_sizes(comfy_dir, models),
         "nodes": sorted(info.keys()) if info else [],
         "disk_free_mb": disk_free_mb,
         "capabilities": {

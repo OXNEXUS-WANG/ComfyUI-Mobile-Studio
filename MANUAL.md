@@ -1,7 +1,7 @@
 # CometInk 彗墨 · 使用手册
 
 > 把 ComfyUI 变成一台可以用手机浏览器操作的本地出图工作站。  
-> 版本：**v1.3.4** · 适用：分享版 / 商用版
+> 版本：**v1.3.5** · 适用：分享版 / 商用版
 
 ---
 
@@ -168,7 +168,7 @@ CometInk 彗墨是一个**本地部署的 ComfyUI 管理台**。
 
 ### 5.1 解压
 
-把 `CometInk-v1.3.4-Share.zip` 或 `CometInk-v1.3.4-Commercial.zip` 解压到一个普通文件夹。
+把 `CometInk-v1.3.5-Share.zip` 或 `CometInk-v1.3.5-Commercial.zip` 解压到一个普通文件夹。
 
 不要在压缩包里直接双击运行。
 

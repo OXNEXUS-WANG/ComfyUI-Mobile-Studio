@@ -127,6 +127,31 @@ def _clean_models(models):
     return out
 
 
+def _clean_model_sizes(raw):
+    """模型 -> 字节数；用于同名不同版本时拒绝派发。"""
+    raw = raw if isinstance(raw, dict) else {}
+    out = {}
+    for folder in ("checkpoints", "diffusion_models", "unet", "text_encoders",
+                   "clip", "vae", "loras", "upscale_models"):
+        rows = raw.get(folder)
+        if not isinstance(rows, dict):
+            continue
+        clean = {}
+        for name, size in list(rows.items())[:5000]:
+            key = str(name or "").strip()[:240]
+            if not key:
+                continue
+            try:
+                value = int(size)
+            except Exception:
+                continue
+            if value > 0:
+                clean[key] = value
+        if clean:
+            out[folder] = clean
+    return out
+
+
 def _clean_probe(probe):
     probe = probe if isinstance(probe, dict) else {}
     gpu = probe.get("gpu") if isinstance(probe.get("gpu"), dict) else {}
@@ -159,6 +184,7 @@ def _clean_probe(probe):
         "comfy_ready": bool(probe.get("comfy_ready")),
         "comfy_queue_depth": int(probe.get("comfy_queue_depth") or 0),
         "models": _clean_models(models),
+        "model_sizes": _clean_model_sizes(probe.get("model_sizes")),
         "nodes": _clean_list(probe.get("nodes") or []),
         "disk_free_mb": probe.get("disk_free_mb"),
         "capabilities": {
@@ -388,6 +414,7 @@ def worker_public(worker, admin=False):
             "gpu_temp_c": inv.get("gpu_temp_c"),
             "comfy_version": inv.get("comfy_version") or "",
             "models": inv.get("models") or {},
+            "model_sizes": inv.get("model_sizes") or {},
             "nodes_count": len(inv.get("nodes") or []),
             "nodes": inv.get("nodes") or [],
             "disk_free_mb": inv.get("disk_free_mb"),
@@ -761,6 +788,7 @@ def _norm_model(name):
 
 def worker_has_models(worker, requirements):
     inv = (worker.get("inventory") or {}).get("models") or {}
+    sizes = (worker.get("inventory") or {}).get("model_sizes") or {}
     aliases = {
         "diffusion_models": ("diffusion_models", "unet"),
         "text_encoders": ("text_encoders", "clip"),
@@ -777,14 +805,34 @@ def worker_has_models(worker, requirements):
         available = {_norm_model(v) for v in values}
         if name not in available:
             return False
+        # 节点机上报了大小才比较；老节点没上报时退回“按文件名”。
+        want_size = 0
+        try:
+            want_size = int(req.get("size") or 0)
+        except Exception:
+            want_size = 0
+        if want_size:
+            got_sizes = []
+            for f in folders:
+                rows = sizes.get(f) or {}
+                for key, value in rows.items():
+                    if _norm_model(key) == name:
+                        got_sizes.append(int(value or 0))
+            if got_sizes and want_size not in got_sizes:
+                return False
     return True
 
 
-def worker_can_take(worker, user, requirements=None, pixels=0, count=1):
+def worker_can_take(worker, user, requirements=None, pixels=0, count=1,
+                    required_nodes=None):
     if not worker_accepting(worker):
         return False
     inv = worker.get("inventory") or {}
     caps = inv.get("capabilities") or {}
+    if required_nodes:
+        available_nodes = set(inv.get("nodes") or [])
+        if any(str(n) not in available_nodes for n in required_nodes):
+            return False
     try:
         max_pixels = int(caps.get("max_pixels") or 0)
         if max_pixels and pixels and pixels > max_pixels:
@@ -863,7 +911,12 @@ def scheduler_workers():
                 "trusted": bool(worker.get("trusted")),
                 "allowed_users": tuple(worker.get("allowed_users") or []),
                 "models": inv.get("models") or {},
+                "model_sizes": inv.get("model_sizes") or {},
                 "nodes": tuple(inv.get("nodes") or []),
+                "comfy_version": worker.get("comfy_version")
+                or inv.get("comfy_version") or "",
+                "agent_version": worker.get("agent_version") or "",
+                "protocol": int(worker.get("protocol") or 0),
                 "caps": inv.get("capabilities") or {},
                 "paused": bool(worker.get("paused_by_admin")
                                or worker.get("paused_by_owner")

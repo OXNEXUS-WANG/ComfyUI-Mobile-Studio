@@ -1469,6 +1469,20 @@ def recover_queued_jobs():
         if init_mask and not os.path.isfile(os.path.join(INPUT_DIR, init_mask)):
             _fail_recovered_job(jid, "恢复失败：蒙版临时文件已清理，请重新提交。", resume)
             continue
+        rec_kind = resume.get("kind") or "gen"
+        rec_loras = resume.get("loras") or []
+        rec_turbo = bool(resume.get("turbo"))
+        with JOBS_LOCK:
+            if jid in JOBS:
+                JOBS[jid]["requirements"] = job_requirements(
+                    ckpt, rec_loras, rec_turbo,
+                    "gen" if rec_kind == "gen" else rec_kind)
+                JOBS[jid]["required_nodes"] = required_nodes_for(
+                    ckpt, rec_kind, loras=rec_loras,
+                    pag=bool(resume.get("pag", True)),
+                    prefix=pony_prefix_for(
+                        ckpt, resume.get("prompt_en") or resume.get("prompt") or ""),
+                    use_translate=False, turbo=rec_turbo)
         queue_err = scheduler_enqueue(jid)
         if queue_err:
             _fail_recovered_job(jid, "恢复排队失败：%s" % queue_err, resume)
@@ -3803,6 +3817,11 @@ def _worker_policy(w):
         "trusted": bool(w.get("trusted")),
         "allowed_users": tuple(w.get("allowed_users") or ()),
         "models": w.get("models") or {},
+        "model_sizes": w.get("model_sizes") or {},
+        "nodes": tuple(w.get("nodes") or ()),
+        "comfy_version": w.get("comfy_version") or "",
+        "agent_version": w.get("agent_version") or "",
+        "protocol": int(w.get("protocol") or 0),
         "caps": w.get("caps") or {},
         "online": bool(w.get("online")),
         "accepting": bool(w.get("accepting")),
@@ -3866,8 +3885,9 @@ def _sched_user_active_locked(uid):
     return n
 
 
-def _models_have(models, requirements):
+def _models_have(models, requirements, model_sizes=None):
     models = models or {}
+    model_sizes = model_sizes or {}
     aliases = {
         "diffusion_models": ("diffusion_models", "unet"),
         "text_encoders": ("text_encoders", "clip"),
@@ -3882,7 +3902,33 @@ def _models_have(models, requirements):
             values.extend(models.get(f) or [])
         if name not in {str(v).replace("\\", "/").casefold() for v in values}:
             return False
+        try:
+            want_size = int(req.get("size") or 0)
+        except Exception:
+            want_size = 0
+        if want_size:
+            got_sizes = []
+            for f in aliases.get(folder, (folder,)):
+                for key, value in (model_sizes.get(f) or {}).items():
+                    if str(key).replace("\\", "/").casefold() == name:
+                        try:
+                            got_sizes.append(int(value or 0))
+                        except Exception:
+                            pass
+            if got_sizes and want_size not in got_sizes:
+                return False
     return True
+
+
+def _worker_comfy_version_ok(policy):
+    """节点机版本必须在锁文件兼容范围内；没上报版本时先放行。"""
+    version = str((policy or {}).get("comfy_version") or "")
+    if not version:
+        return True
+    info = _version_lock_info()
+    result = comfy_version_compatible(
+        version, info.get("min") or "", info.get("max_exclusive") or "")
+    return result is not False
 
 
 def _worker_policy_can_run(policy, job):
@@ -3893,6 +3939,8 @@ def _worker_policy_can_run(policy, job):
     excluded = job.get("exclude_workers") or []
     if (policy.get("id") in excluded
             or job.get("worker_id") in excluded):
+        return False
+    if not _worker_comfy_version_ok(policy):
         return False
     uid = job.get("user_id") or "admin"
     user = get_user(uid) or {}
@@ -3907,8 +3955,14 @@ def _worker_policy_can_run(policy, job):
         if not allowed or uid not in allowed:
             return False
     if not _models_have(policy.get("models") or {},
-                        job.get("requirements") or []):
+                        job.get("requirements") or [],
+                        policy.get("model_sizes") or {}):
         return False
+    required_nodes = job.get("required_nodes") or []
+    if required_nodes:
+        available_nodes = set(policy.get("nodes") or ())
+        if any(str(n) not in available_nodes for n in required_nodes):
+            return False
     caps = policy.get("caps") or {}
     try:
         max_pixels = int(caps.get("max_pixels") or 0)
@@ -4568,12 +4622,13 @@ def scheduler_snapshot(user=None):
                     (SCHEDULER["slots"].get("local") or {}).get("available"))}
 
 
-def scheduler_has_remote(user, requirements, pixels=0, count=1):
+def scheduler_has_remote(user, requirements, pixels=0, count=1,
+                         required_nodes=None):
     if not lan_share.settings().get("remote_enabled"):
         return False
     job = {"remote_ok": True, "kind": "gen", "user_id": (user or {}).get("id") or "",
            "requirements": requirements or [], "pixels": pixels, "count": count,
-           "exclude_workers": []}
+           "required_nodes": required_nodes or [], "exclude_workers": []}
     for w in lan_share.scheduler_workers():
         # 正在跑图 / 临时忙的节点也应允许排队，不能因为这一秒忙就 503。
         if not w.get("online") or w.get("paused"):
@@ -4669,24 +4724,62 @@ training_manager.bind_runtime(
 )
 
 
+_JOB_MODEL_DIRS = {
+    "checkpoints": (CKPT_DIR,),
+    "diffusion_models": (UNET_DIR,),
+    "unet": (UNET_DIR,),
+    "text_encoders": (TEXT_ENC_DIR,),
+    "clip": (TEXT_ENC_DIR,),
+    "vae": (VAE_DIR,),
+    "loras": (LORA_DIR,),
+    "upscale_models": (UPSCALE_DIR,),
+}
+
+
+def _local_model_size(folder, name):
+    """返回本机模型文件大小；找不到返回 0。"""
+    name = str(name or "").replace("/", os.sep)
+    if not name or name.startswith(".."):
+        return 0
+    for base in _JOB_MODEL_DIRS.get(str(folder or ""), ()):
+        base_abs = os.path.abspath(base)
+        path = os.path.abspath(os.path.join(base_abs, name))
+        try:
+            if os.path.commonpath([base_abs, path]) != base_abs:
+                continue
+            if os.path.isfile(path):
+                return int(os.path.getsize(path))
+        except (OSError, ValueError):
+            continue
+    return 0
+
+
+def _model_req(folder, name):
+    item = {"folder": folder, "name": name}
+    size = _local_model_size(folder, name)
+    if size:
+        item["size"] = size
+    return item
+
+
 def job_requirements(ckpt, loras=None, turbo=False, kind="gen"):
     if kind != "gen":
         return []
     req = []
     if ckpt == ANIMA_MODEL:
         req.extend([
-            {"folder": "diffusion_models", "name": ANIMA_MODEL},
-            {"folder": "text_encoders", "name": ANIMA_CLIP},
-            {"folder": "vae", "name": ANIMA_VAE},
+            _model_req("diffusion_models", ANIMA_MODEL),
+            _model_req("text_encoders", ANIMA_CLIP),
+            _model_req("vae", ANIMA_VAE),
         ])
         if turbo:
-            req.append({"folder": "loras", "name": ANIMA_TURBO_LORA})
+            req.append(_model_req("loras", ANIMA_TURBO_LORA))
     else:
-        req.append({"folder": "checkpoints", "name": os.path.basename(ckpt or "")})
+        req.append(_model_req("checkpoints", os.path.basename(ckpt or "")))
     for item in loras or []:
         name = os.path.basename(str((item or {}).get("name") or ""))
         if name:
-            req.append({"folder": "loras", "name": name})
+            req.append(_model_req("loras", name))
     return req
 
 
@@ -5213,6 +5306,13 @@ def run_job(job_id, prompt, negative, width, height, steps, cfg, seed,
         "steps": int(steps or 0),
         "cfg": float(cfg or 0),
         "sampler": sampler or "",
+        "requirements": job_requirements(
+            ckpt, loras, turbo,
+            "gen" if kind_norm == "gen" else kind_norm),
+        "required_nodes": required_nodes_for(
+            ckpt, kind_norm, loras=loras, pag=pag,
+            prefix=pony_prefix_for(ckpt, prompt_en or prompt),
+            use_translate=False, turbo=turbo),
         "user_id": user_id or "admin",
     }
     _u = get_user(user_id or "admin") or {}
@@ -6705,8 +6805,13 @@ def monitor_snapshot():
 
 
 def _version_lock_info():
-    lock_paths = (os.path.join(ROOT, "installer", "versions.lock.json"),
-                  os.path.join(ROOT, "versions.lock.json"))
+    lock_paths = (
+        os.path.join(ROOT, "installer", "versions.lock.json"),
+        os.path.join(ROOT, "versions.lock.json"),
+        # GitHub 仓库是 app/ 布局，锁文件在上一层。
+        os.path.join(os.path.dirname(ROOT), "installer", "versions.lock.json"),
+        os.path.join(os.path.dirname(ROOT), "versions.lock.json"),
+    )
     lock = {}
     for p in lock_paths:
         if os.path.isfile(p):

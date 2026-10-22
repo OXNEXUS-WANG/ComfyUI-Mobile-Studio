@@ -27,8 +27,8 @@ from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from app_core import *
-# 星号导入不会带下划线开头的内部函数，单独补一个
-from app_core import _stage_to_input
+# 星号导入不会带下划线开头的内部函数，单独补上。
+from app_core import _stage_to_input, _version_lock_info
 
 # 单实例锁：端口绑定在 Windows 上可被两个进程同时抢到，光靠 /api/session
 # 有竞态；锁文件保证同一安装目录只跑一个网页服务。
@@ -67,6 +67,23 @@ def comfy_object_info_cached(max_age=30):
     except Exception:
         pass
     return _OBJECT_INFO_CACHE["v"]
+
+
+def _annotate_worker_compat(payload):
+    """给管理员节点列表补上 ComfyUI 版本兼容标记。"""
+    try:
+        info = _version_lock_info()
+    except Exception:
+        info = {}
+    for worker in (payload or {}).get("workers") or []:
+        inv = worker.get("inventory") or {}
+        version = str(inv.get("comfy_version") or "")
+        if not version:
+            worker["comfy_compatible"] = None
+            continue
+        worker["comfy_compatible"] = comfy_version_compatible(
+            version, info.get("min") or "", info.get("max_exclusive") or "")
+    return payload
 
 
 def plugin_styles_for(user):
@@ -731,7 +748,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         scheduler_kick()
-        payload = lan_share.admin_payload()
+        payload = _annotate_worker_compat(lan_share.admin_payload())
         payload["local"] = self._local_worker_payload()
         payload.update(result)
         self._json(payload)
@@ -1672,7 +1689,7 @@ class Handler(BaseHTTPRequestHandler):
             if not is_admin(user):
                 self._json({"error": "只有管理员可以管理算力节点"}, 403)
                 return
-            payload = lan_share.admin_payload()
+            payload = _annotate_worker_compat(lan_share.admin_payload())
             payload["local"] = self._local_worker_payload()
             try:
                 payload["telemetry"] = monitor_center.all_worker_series(60)
@@ -1818,7 +1835,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"error": "只有管理员可以进行系统维护"}, 403)
                 return
             snaps = system_state.list_snapshots(ROOT)
-            payload = lan_share.admin_payload()
+            payload = _annotate_worker_compat(lan_share.admin_payload())
             with USERS_LOCK:
                 user_count = len(USERS)
                 guest_count = sum(1 for u in USERS.values()
@@ -3704,10 +3721,16 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"error": "提示词是空的"}, 400)
                 return
             reqs = job_requirements(params["ckpt"], [], params["turbo"], "gen")
+            required_nodes = required_nodes_for(
+                params["ckpt"], "gen", loras=[], pag=params["pag"],
+                prefix=pony_prefix_for(
+                    params["ckpt"], params["prompt_en"] or params["prompt"]),
+                use_translate=False, turbo=params["turbo"])
             local_ready = bool(lan_share.settings().get("local_enabled", True)
                                and local_comfy_alive())
             if not local_ready and not scheduler_has_remote(
-                    user, reqs, params["w"] * params["h"], 1):
+                    user, reqs, params["w"] * params["h"], 1,
+                    required_nodes):
                 self._json({"error": "本机 ComfyUI 没在运行，也没有可用的算力节点。"}, 503)
                 return
             lim = user_limits(user)
@@ -4637,12 +4660,18 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"error": "准备参考图失败: %s" % e}, 500)
             return
 
+        req_kind = "i2v" if is_i2v else ("video" if is_video else "gen")
         reqs = job_requirements(ckpt, loras, turbo,
                                 "gen" if not is_video else "video")
+        required_nodes = required_nodes_for(
+            ckpt, req_kind, loras=loras, pag=pag,
+            prefix=pony_prefix_for(ckpt, prompt_en or prompt),
+            use_translate=False, turbo=turbo)
         local_ok = bool(local_comfy_alive()
                         and lan_share.settings().get("local_enabled", True))
         remote_ok = bool((not is_video) and
-                         scheduler_has_remote(user, reqs, w * h, count))
+                         scheduler_has_remote(user, reqs, w * h, count,
+                                              required_nodes))
         if not local_ok and not remote_ok:
             cleanup_stage(uid, stage_id)
             self._json({"error": "本机 ComfyUI 没在运行，也没有可用的算力节点。"}, 503)
@@ -4681,6 +4710,7 @@ class Handler(BaseHTTPRequestHandler):
                          "user_name": (user or {}).get("name") or "",
                          "eta": eta, "priority": 10,
                          "requirements": reqs,
+                         "required_nodes": required_nodes,
                          "remote_ok": bool(kind == "gen"),
                          "pixels": int(w * h),
                          "count": int(count),
