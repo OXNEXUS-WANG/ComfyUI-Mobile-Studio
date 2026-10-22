@@ -989,6 +989,17 @@ img.result, video.result {
 .admin-head .reload { margin-left: auto; }
 .admin-head-actions { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
 .admin-head-actions .reload { margin-left: 0 !important; }
+@media (min-width: 701px) {
+  .admin-head-actions .reload,
+  .admin-worker-head .reload,
+  .admin-worker-settings .reload,
+  .admin-model-tools .reload,
+  .admin-toolbar .reload {
+    width: auto;
+    flex: 0 0 auto;
+    margin-bottom: 0;
+  }
+}
 .sys-settings-card { width: min(640px, 100%); max-height: 84vh; overflow-y: auto; }
 @media (max-width: 700px) {
   .sys-settings-card { max-height: 88vh; }
@@ -6402,8 +6413,21 @@ const LOG_ACTION = {
   admin_batch: "批量管理", preference_update: "修改偏好",
   server_start: "服务启动"
 };
+const LOG_ACTION_EXTRA = {
+  plugin_pack_import: ["导入插件包", "Import plugin pack"],
+  plugin_pack_delete: ["删除插件包", "Delete plugin pack"],
+  plugin_submit: ["提交代码插件", "Submit code plugin"],
+  plugin_approve: ["通过插件", "Approve plugin"],
+  plugin_reject: ["拒绝插件", "Reject plugin"],
+  plugin_install: ["安装插件", "Install plugin"],
+  plugin_disable: ["禁用插件", "Disable plugin"],
+  plugin_rollback: ["回滚插件", "Roll back plugin"],
+  plugin_delete: ["删除插件", "Delete plugin"]
+};
 function logActionLabel(a) {
-  return LOG_ACTION[a] || a || "操作";
+  const extra = LOG_ACTION_EXTRA[a];
+  if (extra) { return uiT(extra[0], extra[1]); }
+  return LOG_ACTION[a] || a || uiT("操作", "Action");
 }
 function logTime(r) {
   const s = String(r.time || "");
