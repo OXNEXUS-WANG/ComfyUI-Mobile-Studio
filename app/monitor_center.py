@@ -219,7 +219,7 @@ def _post_webhook(alert):
         return
     _WEBHOOK_LAST[key] = now
     body = json.dumps({
-        "product": "Nexus",
+        "product": "CometInk",
         "event": "monitor_alert",
         "id": alert.get("id"),
         "severity": alert.get("severity"),
@@ -258,7 +258,7 @@ def notify_job(event, job):
         return False
     job = job or {}
     body = json.dumps({
-        "product": "Nexus",
+        "product": "CometInk",
         "event": "job_" + str(event),
         "job_id": job.get("job_id") or job.get("id") or "",
         "status": job.get("status") or event,
@@ -294,7 +294,7 @@ def send_test_webhook():
     if not url:
         return False, "请先填写 Webhook 地址"
     body = json.dumps({
-        "product": "Nexus",
+        "product": "CometInk",
         "event": "test",
         "severity": "info",
         "title": "测试告警",

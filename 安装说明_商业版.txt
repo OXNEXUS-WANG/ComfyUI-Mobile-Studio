@@ -1,4 +1,4 @@
-Nexus · 商用版
+CometInk 彗墨 · 商用版
 ==============
 
 一、授权
@@ -24,7 +24,7 @@ Nexus · 商用版
    - 中文翻译使用 MIT 兼容层，不安装 AGPL 的 MiniSBD
    - 已有 ComfyUI 直接复用，不自动更新
    - 没有 ComfyUI 时询问是否下载官方版本
-6. 安装完成后，桌面出现“Nexus Studio”快捷方式。
+6. 安装完成后，桌面出现“CometInk Studio”快捷方式。
 
 如果已有 ComfyUI，也可以在命令行指定：
   installer\install.ps1 -CommercialClean -ComfyUIDir "D:\你的ComfyUI目录"
@@ -56,7 +56,7 @@ ComfyUI v0.42.0、Python 依赖、自定义节点 commit、模型 revision、7zr
 
 - 清理外部 PYTHONHOME / PYTHONPATH 等变量，避免污染便携版 Python。
 - 目录冲突、已有 ComfyUI 但没有 python_embeded：弹窗建议换目录。
-- Nexus / ComfyUI 正在运行：询问是否停止；端口 8188 / 8800 被其他软件
+- CometInk / ComfyUI 正在运行：询问是否停止；端口 8188 / 8800 被其他软件
   占用时显示程序名、PID 和路径，可继续安装但启动前需先关闭占用程序。
 - 同名节点 / 模型先备份到 _node_trash 或 *.bak-时间戳，不直接删除。
 - 旧 HTTPS 证书过期或缺少热点地址时自动备份并续期。

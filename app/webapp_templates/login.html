@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>需要登录 · Nexus</title>
+<title>需要登录 · CometInk</title>
 <style>
   :root {
     --bg0:#0a0d16; --bg1:#121827; --ink:#e9eefb; --dim:#93a0bb;
@@ -30,6 +30,7 @@
   }
   @keyframes rise { from { opacity:0; transform:translateY(14px); } }
   h1 { margin:0 0 6px; font-size:19px; letter-spacing:.3px; }
+  h1 .cn { font-size:12px; font-weight:400; letter-spacing:2px; color:var(--dim); margin-left:8px; }
   p.sub { margin:0 0 22px; color:var(--dim); font-size:13px; line-height:1.6; }
   label { display:block; font-size:12px; color:var(--dim); margin-bottom:7px; }
   input {
@@ -58,12 +59,12 @@
   .lang:hover { color:var(--ink); border-color:rgba(122,162,255,.55); }
 </style>
 <link rel="icon" type="image/png" href="/icon-192.png">
-<script src="/i18n.js?v=20261022f"></script>
+<script src="/i18n.js?v=20261022g"></script>
 </head>
 <body>
 <button class="lang" type="button" data-lang-toggle>EN</button>
 <form class="card" id="f" autocomplete="off">
-  <h1>Nexus</h1>
+  <h1>CometInk <span class="cn" data-no-i18n>彗墨</span></h1>
   <p class="sub">手机出图 · 输入账号和密码后进入。<br>管理员和普通账号看到的图库、配额是分开的。</p>
   <label for="un">账号</label>
   <input id="un" type="text" inputmode="text" autocomplete="username"

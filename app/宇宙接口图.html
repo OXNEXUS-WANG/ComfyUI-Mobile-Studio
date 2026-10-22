@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#03050a">
 <link rel="icon" href="data:,">
-<title>NEXUS · 接口星图</title>
+<title>COMETINK · 接口星图</title>
 <style>
 :root{
   --bg:#03050a; --panel:rgba(8,14,26,.78); --line:rgba(120,190,255,.18);
@@ -1318,7 +1318,7 @@ void main(){
   gl_FragColor = vec4(mapped, alpha);
 }
 </script>
-<script src="i18n.js?v=20261022f"></script>
+<script src="i18n.js?v=20261022g"></script>
 </head>
 <body>
 <canvas id="starCanvas"></canvas>
@@ -1333,7 +1333,7 @@ void main(){
 <header id="hud-top">
   <div class="brand">
     <div class="logo"></div>
-    <div><h1>NEXUS <em>接口星图</em></h1><p>MOBILE IMAGE UNIVERSE · COMFYUI API MAP</p></div>
+    <div><h1>COMETINK <em>接口星图</em></h1><p>彗墨 · MOBILE IMAGE UNIVERSE · COMFYUI API MAP</p></div>
   </div>
   <div class="search-wrap"><input id="search" placeholder="搜索功能 / 接口，例如：图生视频、/api/gallery" autocomplete="off"></div>
   <div class="status"><span class="dot"></span>SYSTEM ONLINE <b id="fps">60</b> FPS
@@ -1545,7 +1545,7 @@ void main(){
 
 <div id="guide">点星球看详情 · 双击进功能 · 双指缩放 · 拖拽旋转</div>
 
-<div id="boot"><div class="ring"></div><p>ESTABLISHING NEXUS…</p></div>
+<div id="boot"><div class="ring"></div><p>ESTABLISHING COMETINK…</p></div>
 
 <script>
 /* ============================================================
@@ -1553,7 +1553,7 @@ void main(){
    ============================================================ */
 const CORE = {
   id:'core', kind:'core', name:'核心', color:'#ffd27a',
-  desc:'Nexus · 核心。本地 ComfyUI + 移动端网页控制台，负责调度模型、任务队列、图库与安全网关；所有功能都从这里向外延伸。'
+  desc:'CometInk 彗墨 · 核心。本地 ComfyUI + 移动端网页控制台，负责调度模型、任务队列、图库与安全网关；所有功能都从这里向外延伸。'
 };
 
 const ENDPOINTS = [
@@ -2147,6 +2147,7 @@ const TEXTURE_LIB = [
   {key:'gas_teal',   label:'青气态', type:'gas',   palette:PALETTES.prompt}
 ];
 const TEX_THUMBS = {};
+/* 旧版 localStorage 键名保留，避免升级后丢失星球位置、贴图和黑洞设置。 */
 const POS_KEY = 'nexusPosV1';
 const TEX_KEY = 'nexusTexV1';
 function readStore(key){
@@ -2155,8 +2156,8 @@ function readStore(key){
     return v && typeof v === 'object' ? v : {};
   }catch(e){ return {}; }
 }
-const NEXUS_POS = readStore(POS_KEY);
-const NEXUS_TEX = readStore(TEX_KEY);
+const COMETINK_POS = readStore(POS_KEY);
+const COMETINK_TEX = readStore(TEX_KEY);
 
 /* ComfyUI 常见节点类型 → 中文步骤名（有自定义标题时优先用标题） */
 const WF_TYPE_LABELS = {
@@ -2176,15 +2177,15 @@ function texPresetByKey(k){
   return TEXTURE_LIB.find(p => p.key === k) || null;
 }
 function autoTexPreset(n){
-  const saved = texPresetByKey(NEXUS_TEX[n.id]);
+  const saved = texPresetByKey(COMETINK_TEX[n.id]);
   if(saved) return saved;
   const idx = hashStr(String(n.wfType || '') + '|' + String(n.name || n.id)) %
               TEXTURE_LIB.length;
   return TEXTURE_LIB[idx];
 }
 function rememberTex(n, preset){
-  NEXUS_TEX[n.id] = preset.key;
-  try{ localStorage.setItem(TEX_KEY, JSON.stringify(NEXUS_TEX)); }catch(e){}
+  COMETINK_TEX[n.id] = preset.key;
+  try{ localStorage.setItem(TEX_KEY, JSON.stringify(COMETINK_TEX)); }catch(e){}
 }
 function texThumb(p){
   if(TEX_THUMBS[p.key]) return TEX_THUMBS[p.key];
@@ -2214,7 +2215,7 @@ function applyTexPreset(n, preset){
   });
 }
 function texSectionHtml(n){
-  const current = NEXUS_TEX[n.id] ||
+  const current = COMETINK_TEX[n.id] ||
     (n.dynamic ? autoTexPreset(n).key : '');
   return `<div class="p-sec">星球贴图库</div><div class="texlib">` +
     TEXTURE_LIB.map(p =>
@@ -2860,7 +2861,7 @@ function build(){
   // 恢复用户拖过的位置；_home 保留自动位置，方便一键重置
   nodes.forEach(n => {
     n._home = [n.x, n.y, n.z];
-    const p = NEXUS_POS[n.id];
+    const p = COMETINK_POS[n.id];
     if(Array.isArray(p) && p.length === 3 &&
        p.every(v => typeof v === 'number' && isFinite(v))){
       n.x = clamp(p[0], -900, 900);
@@ -3196,7 +3197,7 @@ function applyWorkflow(d){
       wfId:rawId, wfType:type, wfStep:node.step || (idx + 1)
     });
     n._home = [home.x, home.y, home.z];
-    const saved = NEXUS_POS[nid];
+    const saved = COMETINK_POS[nid];
     if(Array.isArray(saved) && saved.length === 3 &&
        saved.every(v => typeof v === 'number' && isFinite(v))){
       n.x = clamp(saved[0], -900, 900);
@@ -3286,12 +3287,12 @@ function workflowPanelHtml(){
 
 /* ---------- 拖动布置（只在「布置」模式开启） ---------- */
 function saveNodePos(n){
-  NEXUS_POS[n.id] = [Math.round(n.x*100)/100,
+  COMETINK_POS[n.id] = [Math.round(n.x*100)/100,
                      Math.round(n.y*100)/100,
                      Math.round(n.z*100)/100];
 }
 function persistPositions(){
-  try{ localStorage.setItem(POS_KEY, JSON.stringify(NEXUS_POS)); }catch(e){}
+  try{ localStorage.setItem(POS_KEY, JSON.stringify(COMETINK_POS)); }catch(e){}
 }
 function addPositionHandlers(el, n){
   el.addEventListener('click', e => {
@@ -3355,7 +3356,7 @@ function resetLayout(){
       n.x = n._home[0]; n.y = n._home[1]; n.z = n._home[2];
     }
   });
-  Object.keys(NEXUS_POS).forEach(k => delete NEXUS_POS[k]);
+  Object.keys(COMETINK_POS).forEach(k => delete COMETINK_POS[k]);
   try{ localStorage.removeItem(POS_KEY); }catch(e){}
   refreshStates();
 }
@@ -5477,7 +5478,7 @@ function nodeDesc(n){
     return 'API endpoint ' + (n.method || 'GET') + ' ' + (n.path || '') + '.';
   }
   if(n.kind === 'cat') return 'Feature group: ' + name + '.';
-  if(n.kind === 'core') return 'Nexus core: local ComfyUI + mobile web console.';
+  if(n.kind === 'core') return 'CometInk core: local ComfyUI + mobile web console.';
   var bits = [name + '.'];
   if(n.api && n.api.length){
     var apiList = n.api.map(function(eid){
@@ -5527,7 +5528,7 @@ function select(id){
     state.targetZoom = 1.0;
   }
   panel.classList.add('on');
-  pKind.textContent = n.kind==='core' ? 'NEXUS CORE' :
+  pKind.textContent = n.kind==='core' ? 'COMETINK CORE' :
     n.kind==='cat' ? 'CATEGORY' : n.kind==='feat' ? 'FEATURE' : 'API ENDPOINT';
   pName.textContent = n.name;
   pPath.textContent = n.kind === 'ep' ? `${n.method} · ${visibleUsedBy(n).length} 个功能调用` :

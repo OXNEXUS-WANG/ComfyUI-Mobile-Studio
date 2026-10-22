@@ -38,13 +38,13 @@ if ($ComfyUIDir -and $InstallDir) {
 
 $ErrorActionPreference = "Stop"
 $PkgRoot = Split-Path -Parent $PSScriptRoot
-$AppVersion = "1.2.7"
+$AppVersion = "1.3.0"
 $VersionFile = Join-Path $PkgRoot "VERSION"
 if (Test-Path $VersionFile) {
     $v = (Get-Content $VersionFile -Raw -Encoding ASCII).Trim()
     if ($v) { $AppVersion = $v }
 }
-$DisclaimerVersion = "1.1"
+$DisclaimerVersion = "1.2"
 $DisclaimerFile = Join-Path $PkgRoot "DISCLAIMER.md"
 $Curl = Join-Path $env:SystemRoot "System32\curl.exe"
 $SevenZip = Join-Path $PkgRoot "tools\7zr.exe"
@@ -69,7 +69,7 @@ $NodeAlekPet = [string]$Lock.nodes.alekpet
 $ArgosModelFile = [string]$Lock.argos_model.file
 $ArgosModelSize = [int64]$Lock.argos_model.size
 $LockSevenZipHash = [string]$Lock.sevenzip_sha256
-$LogFile = Join-Path $env:TEMP "Nexus-install.log"
+$LogFile = Join-Path $env:TEMP "CometInk-install.log"
 $ComfyWasFresh = $false
 
 function Say($msg, $color = "White") {
@@ -613,7 +613,7 @@ function Write-ProblemReport($err) {
     try { New-Item -ItemType Directory -Force -Path $dir | Out-Null } catch { $dir = $env:TEMP }
     $path = Join-Path $dir "install_problem.txt"
     $lines = @()
-    $lines += "Nexus 安装诊断"
+    $lines += "CometInk 安装诊断"
     $lines += ("时间: " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
     $lines += ("阶段: " + $script:StageName)
     $lines += ("错误: " + [string]$err)
@@ -663,7 +663,7 @@ function Show-ProblemDialog($err) {
     $text = "安装没有完成：`n" + [string]$err + "`n`n建议这样排查：`n" + $advice +
             "`n`n诊断报告：`n" + $report + "`n安装日志：`n" + $LogFile
     if ($script:Dialogs) {
-        $r = Show-Gui $text "Nexus · 安装遇到问题" "YesNo" "Error"
+        $r = Show-Gui $text "CometInk · 安装遇到问题" "YesNo" "Error"
         if ($r -eq "Yes") {
             if (Test-Path $LogFile) {
                 Start-Process notepad.exe -ArgumentList ('"' + $LogFile + '"')
@@ -753,6 +753,12 @@ function Copy-AppFiles {
             Copy-Item $_.FullName (Join-Path $InstallDir $_.Name) -Force
         }
     }
+    # 品牌从 Nexus 迁移到 CometInk 后，清理安装目录里的旧品牌图标。
+    Remove-Item (Join-Path $InstallDir "nexus.ico") -Force -ErrorAction SilentlyContinue
+    Get-ChildItem $InstallDir -Force -ErrorAction SilentlyContinue |
+        Where-Object { -not $_.PSIsContainer -and
+                       $_.Name -like "nexus-icon-*.png" } |
+        Remove-Item -Force -ErrorAction SilentlyContinue
     $editionFile = Join-Path $PkgRoot "EDITION"
     if (Test-Path $editionFile) {
         Copy-Item $editionFile (Join-Path $InstallDir "EDITION") -Force
@@ -818,9 +824,10 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
+netsh advfirewall firewall delete rule name="CometInk 8800" >nul 2>&1
 netsh advfirewall firewall delete rule name="Nexus 8800" >nul 2>&1
 netsh advfirewall firewall delete rule name="ComfyUI Mobile Studio 8800" >nul 2>&1
-netsh advfirewall firewall add rule name="Nexus 8800" dir=in action=allow protocol=TCP localport=8800 profile=any
+netsh advfirewall firewall add rule name="CometInk 8800" dir=in action=allow protocol=TCP localport=8800 profile=any
 echo Allowed TCP 8800 for LAN access.
 pause
 "@
@@ -1154,9 +1161,10 @@ function Set-AdminPassword {
 
 function Add-FirewallRule {
     if (Test-Admin) {
+        & netsh advfirewall firewall delete rule name="CometInk 8800" | Out-Null
         & netsh advfirewall firewall delete rule name="Nexus 8800" | Out-Null
         & netsh advfirewall firewall delete rule name="ComfyUI Mobile Studio 8800" | Out-Null
-        & netsh advfirewall firewall add rule name="Nexus 8800" dir=in action=allow protocol=TCP localport=8800 profile=any | Out-Null
+        & netsh advfirewall firewall add rule name="CometInk 8800" dir=in action=allow protocol=TCP localport=8800 profile=any | Out-Null
         if ($LASTEXITCODE -eq 0) { Ok "已放行 TCP 8800（手机访问）" }
         else { Warn "防火墙规则添加失败，可运行「修复手机访问.bat」" }
     } else {
@@ -1169,12 +1177,17 @@ function Create-Shortcut {
         $desktop = [Environment]::GetFolderPath("Desktop")
         $ws = New-Object -ComObject WScript.Shell
         $targetPath = Join-Path $InstallDir "一键启动.bat"
-        # 桌面上可能已有 Winstep Nexus / Nexus Studio 等同名快捷方式，
+        # 桌面上可能已有 Winstep Nexus 等第三方快捷方式，
         # 只更新指向当前安装的快捷方式，绝不覆盖别人的程序。
-        $shortcutName = "Nexus Studio.lnk"
-        for ($i = 2; $i -le 9; $i++) {
-            $candidate = Join-Path $desktop $shortcutName
-            if (-not (Test-Path $candidate)) { break }
+        $shortcutName = ""
+        for ($i = 1; $i -le 9; $i++) {
+            $name = "CometInk Studio.lnk"
+            if ($i -gt 1) { $name = "CometInk Studio ($i).lnk" }
+            $candidate = Join-Path $desktop $name
+            if (-not (Test-Path $candidate)) {
+                $shortcutName = $name
+                break
+            }
             $same = $false
             try {
                 $old = $ws.CreateShortcut($candidate)
@@ -1183,26 +1196,42 @@ function Create-Shortcut {
                              [IO.Path]::GetFullPath($targetPath))
                 }
             } catch { }
-            if ($same) { break }
-            $shortcutName = "Nexus Studio ($i).lnk"
+            if ($same) {
+                $shortcutName = $name
+                break
+            }
+            if ($i -eq 9) {
+                $shortcutName = "CometInk Studio " + (Get-Date -Format "HHmmss") + ".lnk"
+            }
         }
-        if (Test-Path (Join-Path $desktop $shortcutName)) {
-            $shortcutName = "Nexus Studio " + (Get-Date -Format "HHmmss") + ".lnk"
+        if (-not $shortcutName) {
+            $shortcutName = "CometInk Studio " + (Get-Date -Format "HHmmss") + ".lnk"
         }
         $lnk = $ws.CreateShortcut((Join-Path $desktop $shortcutName))
         $lnk.TargetPath = $targetPath
         $lnk.WorkingDirectory = $InstallDir
-        $icon = Join-Path $InstallDir "nexus.ico"
+        $icon = Join-Path $InstallDir "cometink.ico"
         if (-not (Test-Path $icon)) { $icon = Join-Path $InstallDir "comfyui.ico" }
         if (Test-Path $icon) { $lnk.IconLocation = $icon }
         $lnk.Save()
+        # 迁移旧品牌快捷方式：只删除指向当前安装的那个，
+        # Winstep Nexus 等第三方快捷方式原样保留。
+        $legacy = Join-Path $desktop "Nexus Studio.lnk"
+        if (Test-Path $legacy) {
+            try {
+                $old = $ws.CreateShortcut($legacy)
+                if ($old.TargetPath -and ([IO.Path]::GetFullPath($old.TargetPath) -ieq [IO.Path]::GetFullPath($targetPath))) {
+                    Remove-Item $legacy -Force
+                }
+            } catch { }
+        }
         Ok ("桌面快捷方式：" + $shortcutName.Replace(".lnk", ""))
     } catch { Warn ("创建桌面快捷方式失败：" + $_.Exception.Message) }
 }
 
 function Write-Report {
     $lines = @()
-    $lines += "Nexus 安装报告"
+    $lines += "CometInk 安装报告"
     $lines += ("时间: " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss"))
     $lines += ("安装目录: " + $InstallDir)
     $lines += ("GPU: " + $GpuText)
@@ -1482,7 +1511,7 @@ try {
     if ($NoShortcut) {
         Say ("  启动方式：安装目录里的 一键启动.bat")
     } else {
-        Say ("  桌面快捷方式：Nexus Studio")
+        Say ("  桌面快捷方式：CometInk Studio")
     }
     Say ("  本机打开：https://127.0.0.1:8800")
     Say ("  手机打开：https://192.168.137.1:8800（先连电脑热点）")
@@ -1492,7 +1521,7 @@ try {
     if ($NoShortcut) {
         Say "  下一步：双击安装目录里的「一键启动.bat」，等待启动完成后用浏览器打开。" "Green"
     } else {
-        Say "  下一步：双击桌面的「Nexus Studio」，等待启动完成后用浏览器打开。" "Green"
+        Say "  下一步：双击桌面的「CometInk Studio」，等待启动完成后用浏览器打开。" "Green"
     }
     Say ""
     try { Stop-Transcript | Out-Null } catch { }

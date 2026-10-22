@@ -1,10 +1,10 @@
 # Third-party notices / 第三方组件说明
 
-This repository contains the original integration code for Nexus.
+This repository contains the original integration code for CometInk 彗墨.
 It does **not** bundle ComfyUI, Python, PyTorch, model files, or most custom nodes;
 the installer downloads them from their original distribution points.
 
-本仓库只包含“手机出图”的集成代码。ComfyUI、Python、PyTorch、模型文件和大部分
+本仓库只包含 CometInk 彗墨的集成代码。ComfyUI、Python、PyTorch、模型文件和大部分
 自定义节点都不随仓库分发，由安装器从原发布地址下载。
 
 The project's own code is licensed under the **PolyForm Noncommercial License

@@ -1150,7 +1150,7 @@ button{margin-top:18px;padding:12px 18px;border:0;border-radius:11px;
 background:linear-gradient(135deg,#8ab4ff,#a78bfa);color:#081020;font-weight:700;cursor:pointer;
 box-shadow:0 8px 24px rgba(110,150,255,.25)}
 a{color:#9dbcff}p{color:var(--tx2);font-size:12.5px}
-</style><div class="card"><div class="kicker">NEXUS · WORKER</div>
+</style><div class="card"><div class="kicker">COMETINK · WORKER</div>
 <h1>算力节点</h1><table>%s</table>
 <form method="post" action="/api/%s"><button>%s</button></form>
 <p><a href="/">刷新</a> · 只允许本机访问</p>%s</div></html>""" % (

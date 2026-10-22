@@ -54,17 +54,17 @@ GitHub Actions 会在 push / pull request 时自动运行 `.github/workflows/tes
 1. 分别构建两个版本：
 
 ```powershell
-.\build_release.ps1 -Version 1.2.7 -Edition share
-.\build_release.ps1 -Version 1.2.7 -Edition commercial
+.\build_release.ps1 -Version 1.3.0 -Edition share
+.\build_release.ps1 -Version 1.3.0 -Edition commercial
 ```
 
 2. 打开 GitHub 仓库 → **Releases** → **Draft a new release**。
-3. Tag 填 `v1.2.7`，标题填 `v1.2.7`。
+3. Tag 填 `v1.3.0`，标题填 `v1.3.0`。
 4. 上传：
 
 ```text
-dist\Nexus-v1.2.7-Share.zip
-dist\Nexus-v1.2.7-Commercial.zip
+dist\CometInk-v1.3.0-Share.zip
+dist\CometInk-v1.3.0-Commercial.zip
 ```
 
 商用版也可以只私下交付给购买客户，不公开上传到 GitHub Release。

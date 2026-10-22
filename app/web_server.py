@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Nexus HTTP 服务层：路由、页面响应、启动。
+"""CometInk 彗墨 HTTP 服务层：路由、页面响应、启动。
 
 后端逻辑在 app_core.py；这里只负责 HTTP 和进程启动。
 """
@@ -1024,7 +1024,7 @@ class Handler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------ GET
     LICENSE_BYPASS_GET = {
         "/license", "/api/license", "/api/session", "/i18n.js", "/sw.js",
-        "/favicon.ico", "/comfyui.ico", "/nexus.ico",
+        "/favicon.ico", "/comfyui.ico", "/cometink.ico", "/nexus.ico",
         "/icon-192.png", "/icon-512.png",
         "/manifest.json", "/cert.pem",
     }
@@ -1125,8 +1125,11 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         # 品牌图标不敏感，登录页和激活页也要显示，放在鉴权之前。
-        if path in ("/favicon.ico", "/nexus.ico", "/comfyui.ico"):
-            p = os.path.join(ROOT, "nexus.ico")
+        if path in ("/favicon.ico", "/cometink.ico", "/nexus.ico",
+                    "/comfyui.ico"):
+            p = os.path.join(ROOT, "cometink.ico")
+            if not os.path.isfile(p):
+                p = os.path.join(ROOT, "comfyui.ico")
             if os.path.isfile(p) and self._file(p, "image/x-icon"):
                 return
             self._send(404, "no icon", "text/plain; charset=utf-8")
@@ -5068,18 +5071,18 @@ def monitor_loop():
 
 
 def main():
-    set_console_title("Nexus 服务  ·  关闭这个窗口 = 服务停止")
+    set_console_title("CometInk 服务  ·  关闭这个窗口 = 服务停止")
 
     if not acquire_instance_lock():
         print()
-        print("!! Nexus 服务已经有另一个实例在运行（%s）。" % INSTANCE_FILE)
+        print("!! CometInk 服务已经有另一个实例在运行（%s）。" % INSTANCE_FILE)
         print("   如果确认没有运行，请把这个文件删掉后重试。")
         return 4
     atexit.register(release_instance_lock)
 
     if already_running():
         print()
-        print("!! Nexus 服务已经在运行了（端口 %d 被占用）。" % PORT)
+        print("!! CometInk 服务已经在运行了（端口 %d 被占用）。" % PORT)
         print("   去找一下已经开着的那个窗口，不用重复启动。")
         return 4        # 启动脚本看到 4 会直接关窗口，不会停在 pause
 
@@ -5123,7 +5126,7 @@ def main():
 
     if not servers:
         print()
-        print("!! 端口 %d 无法监听 —— 大概率是 Nexus 服务已经在运行了。" % PORT)
+        print("!! 端口 %d 无法监听 —— 大概率是 CometInk 服务已经在运行了。" % PORT)
         print("   去找一下已经开着的那个窗口，不用重复启动。")
         return 4        # 启动脚本看到 4 会直接关窗口，不会停在 pause
 
@@ -5132,7 +5135,7 @@ def main():
           port=PORT, bind=",".join(addresses))
 
     print("=" * 56)
-    print("  Nexus 服务已启动")
+    print("  CometInk 服务已启动")
     print("=" * 56)
     print()
     models = list_models()

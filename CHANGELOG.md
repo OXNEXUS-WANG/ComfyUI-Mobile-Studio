@@ -1,5 +1,20 @@
 ﻿# 变更日志
 
+## 2026-10-22 · v1.3.0 品牌更名为 CometInk 彗墨
+
+- 产品对外名称从 **Nexus** 改为 **CometInk 彗墨**，避免与 Winstep Nexus、
+  Google Nexus、Nexus Mods、Sonatype Nexus 等大量同名项目冲突，便于搜索和传播。
+- 新图标：深空蓝圆角底、青紫渐变彗星墨迹 C、发光彗核和墨滴；提供
+  1024 / 512 / 192 / 180 PNG 和多尺寸 ICO。
+- 网页标题、登录页、商用激活页、PWA manifest、体检报告、监控 Webhook、
+  星图、安装器和桌面快捷方式统一使用 CometInk 彗墨。
+- 桌面快捷方式改为 `CometInk Studio.lnk`；防火墙规则改为 `CometInk 8800`，
+  安装器会顺带清理旧的 `Nexus 8800` 规则。
+- 发布包文件名改为 `CometInk-v1.3.0-Share.zip` / `CometInk-v1.3.0-Commercial.zip`。
+- 免责声明随品牌更名为 **1.2**，已安装用户下次安装会重新确认。
+- 旧星图 localStorage 键名保留，升级后不会丢失星球位置、贴图和黑洞设置。
+- 版本升级到 **1.3.0**。
+
 ## 2026-10-22 · v1.2.7 局域网边界与公网暴露免责条款
 
 - `DISCLAIMER.md` 新增第 7 节「网络边界与公网暴露风险」：明确本软件只为

@@ -96,7 +96,7 @@ class InstallerDisclaimerTests(unittest.TestCase):
             "法律允许的最大范围内",
         ):
             self.assertIn(text, self.disclaimer)
-        self.assertIn('$DisclaimerVersion = "1.1"', self.ps)
+        self.assertIn('$DisclaimerVersion = "1.2"', self.ps)
         # 接受记录不应包含密码或授权码。
         marker_fn = self.ps.split(
             "function Write-DisclaimerMarker")[1].split(

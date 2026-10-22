@@ -64,7 +64,7 @@ def _summary_text(data):
     snap = data.get("snapshot") or {}
     lic = data.get("license") or {}
     lines = [
-        "Nexus · 一键体检报告",
+        "CometInk · 一键体检报告",
         "生成时间：%s" % _fmt_time(data.get("generated") or time.time()),
         "版本：%s（%s）" % ((data.get("app") or {}).get("version") or "—",
                            (data.get("app") or {}).get("edition") or "—"),
@@ -213,7 +213,7 @@ def _html_report(data):
 
     return """<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
-<title>体检报告 · Nexus</title>
+<title>体检报告 · CometInk</title>
 <style>
 body{margin:0;background:#0a0e16;color:#e8f2fb;font:14px/1.65 "Segoe UI","Microsoft YaHei",sans-serif}
 .wrap{max-width:1040px;margin:0 auto;padding:28px 20px 60px}
@@ -233,7 +233,7 @@ ul{margin:6px 0 0;padding-left:20px} li{margin:5px 0}
 .note{margin-top:18px;padding:10px 12px;border:1px dashed rgba(255,190,110,.35);
 border-radius:8px;color:#ffd18a;font-size:12px}
 </style></head><body><div class="wrap">
-<h1>Nexus · 体检报告</h1>
+<h1>CometInk · 体检报告</h1>
 <div class="sub">生成时间：%s · 版本 %s（%s）· 报告格式 v%s</div>
 <div class="cards">%s</div>
 <h2>需要关注</h2><ul>%s</ul>

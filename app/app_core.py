@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Nexus · 局域网网页版
+CometInk 彗墨 · 局域网网页版
 
 在电脑上跑一个小网页服务，手机连上电脑热点就能打开：
     http://192.168.137.1:8800
@@ -6196,18 +6196,18 @@ def thumb_path(name, user=None):
 
 
 def app_icon(size):
-    """返回 PWA 图标；优先使用 app/ 里预生成的 Nexus 图标。"""
+    """返回 PWA 图标；优先使用 app/ 里预生成的 CometInk 图标。"""
     try:
-        bundled = os.path.join(ROOT, "nexus-icon-%d.png" % size)
+        bundled = os.path.join(ROOT, "cometink-icon-%d.png" % size)
         if os.path.isfile(bundled):
             return bundled
         os.makedirs(THUMB_DIR, exist_ok=True)
-        path = os.path.join(THUMB_DIR, "nexus_icon_%d.png" % size)
+        path = os.path.join(THUMB_DIR, "cometink_icon_%d.png" % size)
         if os.path.isfile(path):
             return path
         from PIL import Image
         # 没有对应尺寸时，从 512 图标缩放，保证所有入口都是同一套品牌。
-        for name in ("nexus-icon-512.png", "nexus-icon-1024.png"):
+        for name in ("cometink-icon-512.png", "cometink-icon-1024.png"):
             src = os.path.join(ROOT, name)
             if os.path.isfile(src):
                 im = Image.open(src).convert("RGBA")
@@ -7546,9 +7546,9 @@ SW_JS = load_template("sw.js")
 
 
 MANIFEST = {
-    "name": "Nexus",
-    "short_name": "Nexus",
-    "description": "Nexus · 本地 ComfyUI 出图、图库与协作",
+    "name": "CometInk",
+    "short_name": "CometInk",
+    "description": "CometInk 彗墨 · 本地 ComfyUI 出图、图库与协作",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#070b18",

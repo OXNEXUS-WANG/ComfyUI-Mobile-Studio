@@ -1,4 +1,4 @@
-# Nexus · 商用版
+# CometInk 彗墨 · 商用版
 
 这是 **商用版安装包**：只包含安装器和网页集成程序，不包含 ComfyUI、模型、
 LoRA 或放大模型。ComfyUI 和模型由用户自行选择安装。
@@ -40,7 +40,7 @@ KERR 是 MIT，模型各有模型卡许可。中文翻译使用 Argos（MIT）�
    - 中文翻译使用 MIT 兼容层 + CC-BY 4.0 模型，不安装 AGPL 的 MiniSBD
    - 已有 ComfyUI 直接复用，不自动更新
    - 没有 ComfyUI 时询问是否下载官方便携版
-5. 安装完成后，桌面会出现“Nexus Studio”快捷方式。
+5. 安装完成后，桌面会出现“CometInk Studio”快捷方式。
 6. 用户自行安装 ComfyUI、模型和需要的插件；如果加 `-NoTranslate`，
    请使用英文提示词。
 

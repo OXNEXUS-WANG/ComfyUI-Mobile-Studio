@@ -9,7 +9,7 @@ $Root = $PSScriptRoot
 $Stage = Join-Path $env:TEMP ("comfy-mobile-studio-" + [guid]::NewGuid().ToString("N"))
 $Dist = Join-Path $Root "dist"
 $Suffix = if ($Edition -eq "commercial") { "Commercial" } else { "Share" }
-$Zip = Join-Path $Dist ("Nexus-v" + $Version + "-" + $Suffix + ".zip")
+$Zip = Join-Path $Dist ("CometInk-v" + $Version + "-" + $Suffix + ".zip")
 
 function Remove-Staged($rel) {
     $p = Join-Path $Stage $rel

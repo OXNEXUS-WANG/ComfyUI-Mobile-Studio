@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Nexus 一键启动：ComfyUI + 手机网页服务，然后打开网页。
+"""CometInk 一键启动：ComfyUI + 手机网页服务，然后打开网页。
 
 桌面快捷方式指向同目录的 一键启动.bat。
 已经在运行的服务会跳过，不会重复开窗口。
@@ -198,7 +198,7 @@ def can_dialog():
         return False
 
 
-def show_message(text, title="Nexus", error=False, yes_no=False):
+def show_message(text, title="CometInk", error=False, yes_no=False):
     try:
         import ctypes
         flags = 0x40000  # MB_TOPMOST
@@ -227,21 +227,21 @@ def check_port_conflicts():
     if web_open and not web_ours:
         owner = port_owner(WEB_PORT)
         text = ("端口 8800 被其他程序占用：\n%s\n\n"
-                "Nexus 网页服务无法启动。请关闭占用 8800 的程序，"
+                "CometInk 网页服务无法启动。请关闭占用 8800 的程序，"
                 "或在它的设置里改端口后重试。" % owner_text(owner))
         log(text)
         if can_dialog():
-            show_message(text, "Nexus · 端口冲突", error=True)
+            show_message(text, "CometInk · 端口冲突", error=True)
         return False
 
     if web_open and web_ours:
         owner = port_owner(WEB_PORT)
         if owner and owner.get("exe") and not owner_is_ours(owner):
-            text = ("8800 端口上已经有一个 Nexus 实例，但不是当前目录：\n%s\n\n"
+            text = ("8800 端口上已经有一个 CometInk 实例，但不是当前目录：\n%s\n\n"
                     "请先关闭那个实例，再启动当前安装。" % owner_text(owner))
             log(text)
             if can_dialog():
-                show_message(text, "Nexus · 实例冲突", error=True)
+                show_message(text, "CometInk · 实例冲突", error=True)
             return False
 
     if comfy_open and not comfy_ok:
@@ -251,7 +251,7 @@ def check_port_conflicts():
                 % owner_text(owner))
         log(text)
         if can_dialog():
-            show_message(text, "Nexus · ComfyUI 端口冲突", error=True)
+            show_message(text, "CometInk · ComfyUI 端口冲突", error=True)
         return False
 
     if comfy_open:
@@ -263,7 +263,7 @@ def check_port_conflicts():
                     "是否继续？" % owner_text(owner))
             log(text)
             if can_dialog() and not show_message(
-                    text, "Nexus · 已有 ComfyUI", yes_no=True):
+                    text, "CometInk · 已有 ComfyUI", yes_no=True):
                 return False
     return True
 
@@ -438,7 +438,7 @@ def main():
     os.chdir(ROOT)
     no_browser = "--no-browser" in sys.argv
     log("=" * 48)
-    log("  Nexus · 一键启动")
+    log("  CometInk · 一键启动")
     log("=" * 48)
     log("目录：%s" % ROOT)
     log("")
@@ -467,9 +467,9 @@ def main():
 
     # ---------- 手机网页服务 ----------
     if web_proc:
-        log("[2/3] Nexus 网页服务已经在运行，跳过启动。")
+        log("[2/3] CometInk 网页服务已经在运行，跳过启动。")
     else:
-        log("[2/3] 正在启动 Nexus 网页服务 …")
+        log("[2/3] 正在启动 CometInk 网页服务 …")
         web_child = _start_web()
         log("      已在新窗口启动（最小化）。")
 

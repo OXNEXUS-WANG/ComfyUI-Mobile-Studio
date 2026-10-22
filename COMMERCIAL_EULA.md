@@ -1,6 +1,6 @@
 # Commercial Software License Agreement (EULA)
 
-Copyright (c) 2026 Nexus contributors. All rights reserved.
+Copyright (c) 2026 CometInk contributors. All rights reserved.
 
 This is the baseline license for the **Commercial Edition**. It becomes
 effective only when the customer and the copyright holder have accepted a

@@ -1,4 +1,4 @@
-﻿Nexus · 手机出图
+﻿CometInk 彗墨 · 手机出图
 ================
 
 一、准备工作
@@ -31,7 +31,7 @@
 
 三、启动
 --------
-1. 双击桌面的“Nexus Studio”快捷方式。
+1. 双击桌面的“CometInk Studio”快捷方式。
 2. 电脑浏览器打开：
    https://127.0.0.1:8800
 3. 账号：admin
@@ -105,7 +105,7 @@ ComfyUI v0.42.0、Python 依赖、自定义节点 commit、模型 revision、7zr
 - 目录已存在但不是本程序的完整安装：弹窗建议换一个 -Mobile-Studio 子目录。
 - 已有 ComfyUI 但没有 python_embeded：提示换目录，避免覆盖原有环境。
 - 磁盘空间不足 20GB：询问是否继续安装但不下载模型。
-- Nexus / ComfyUI 正在运行：询问是否自动停止；不停止就退出，避免文件被占用。
+- CometInk / ComfyUI 正在运行：询问是否自动停止；不停止就退出，避免文件被占用。
 - 端口 8188 / 8800 被其他软件占用：弹窗显示程序名、PID 和路径，可以继续安装
   （启动前需要先关闭那个程序），也可以取消。
 - 已有同名自定义节点 / 模型：先备份到 _node_trash 或 *.bak-时间戳，再继续，
@@ -116,7 +116,7 @@ ComfyUI v0.42.0、Python 依赖、自定义节点 commit、模型 revision、7zr
 1. 失败阶段和原因；
 2. 按情况给出的排查步骤；
 3. 诊断报告 install_problem.txt（含端口占用、自动适配记录）；
-4. 安装日志 %TEMP%\Nexus-install.log。
+4. 安装日志 %TEMP%\CometInk-install.log。
 点“是”可以直接打开日志和诊断报告。
 
 如果窗口没弹出来（无人值守 / -Yes），同样会生成上述两个文件。

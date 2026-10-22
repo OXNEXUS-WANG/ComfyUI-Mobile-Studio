@@ -5,7 +5,7 @@
 ## 分享版（Share）
 
 - 面向个人学习、研究、实验、爱好和非商业组织；
-- 许可证：**PolyForm Noncommercial License 1.1.0**；
+- 许可证：**PolyForm Noncommercial License 1.0.0**；
 - 包含完整源码、测试、文档和普通安装器；
 - 安装器可以让用户选择安装 ComfyUI、模型、插件和中文翻译；
 - 不能直接用于商业经营；商业用途需另购商用授权。
@@ -16,10 +16,10 @@
 构建：
 
 ```powershell
-.\build_release.ps1 -Version 1.2.7 -Edition share
+.\build_release.ps1 -Version 1.3.0 -Edition share
 ```
 
-输出：`dist\Nexus-v1.2.7-Share.zip`
+输出：`dist\CometInk-v1.3.0-Share.zip`
 
 ## 商用版（Commercial）
 
@@ -37,10 +37,10 @@
 构建：
 
 ```powershell
-.\build_release.ps1 -Version 1.2.7 -Edition commercial
+.\build_release.ps1 -Version 1.3.0 -Edition commercial
 ```
 
-输出：`dist\Nexus-v1.2.7-Commercial.zip`
+输出：`dist\CometInk-v1.3.0-Commercial.zip`
 
 ## 账号与多机额度
 
