@@ -56,9 +56,9 @@ It is not another ComfyUI skin; it adds the day-to-day layer around generation: 
 
 ### 图库 / Gallery
 
-**中文** — 图库按账号和底模分目录，支持收藏、搜索、多选打包下载、放大和再次编辑。普通账号只能看到自己的图片，管理员可以按用户筛选。
+**中文** — 图库按账号和底模分目录，支持收藏、搜索、多选打包下载、放大和再次编辑。普通账号只能看到自己的图片，管理员可以按用户筛选。提示词正文、作品说明和用户自己起的名字属于用户内容，不会被界面翻译。
 
-> **English** — The gallery is isolated by account and checkpoint, with favourites, search, multi-select ZIP export, upscale, and re-edit. Normal accounts see only their own images; the admin can filter by user.
+> **English** — The gallery is isolated by account and checkpoint, with favourites, search, multi-select ZIP export, upscale, and re-edit. Normal accounts see only their own images; the admin can filter by user. Prompt text, artwork captions, and user-chosen names are user content and are intentionally not translated.
 
 <p align="center">
   <img src="docs/media/zh/ui-gallery.png" alt="中文图库" width="49%">
