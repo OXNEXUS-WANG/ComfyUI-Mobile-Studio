@@ -35,6 +35,18 @@ D:\AI\ComfyUI_windows_portable\git\cmd\git.exe
 
 或者直接安装 GitHub Desktop / Git for Windows。
 
+### 网络不稳定时
+
+- 优先用 **GitHub Desktop**：`Add local repository` 选择本目录 →
+  `Publish repository`。它会在断线后保留本地提交，恢复网络后再同步。
+- 用命令行推送失败时不要反复删仓库重建；本地提交还在，换时间段重试
+  `git push` 即可。
+- **不要**为了省事把整个文件夹拖进网页上传：`.gitignore` 里的
+  `license_admin/`、`dist/`、`cert.pem`、`key.pem`、`users.json` 等会被一起传上去。
+  网页上传只适合补传单个文档或图片。
+- 推送后打开仓库首页，确认 `README.md` 里的截图和 GIF 能正常显示；
+  再到 `Settings → Social preview` 上传 `docs/media/github-social.png`。
+
 > 只有确认要公开时才推送。`backup-before-public` 分支是本地旧历史备份，
 > **不要**执行 `git push --all` 或推送该分支。
 
