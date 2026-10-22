@@ -108,8 +108,8 @@ commit、模型 revision 和 7zr 哈希都已锁定，不会自动追最新版�
 
 ## 2. 安装
 
-1. 分享版从 GitHub Releases 下载 `CometInk-v1.3.0-Share.zip`；
-   商用客户使用 `CometInk-v1.3.0-Commercial.zip`。
+1. 分享版从 GitHub Releases 下载 `CometInk-v1.3.1-Share.zip`；
+   商用客户使用 `CometInk-v1.3.1-Commercial.zip`。
 2. 解压到一个目录（不要在压缩包里直接运行）。
 3. 双击 `安装.bat`（或 `install.bat`）。
 4. **首次安装必须先阅读并同意醒目的免责声明与使用协议**：窗口内可滚动阅读，
