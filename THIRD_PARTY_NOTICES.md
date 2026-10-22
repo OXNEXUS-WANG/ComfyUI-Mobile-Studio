@@ -1,6 +1,6 @@
 # Third-party notices / 第三方组件说明
 
-This repository contains the original integration code for ComfyUI Mobile Studio.
+This repository contains the original integration code for Nexus.
 It does **not** bundle ComfyUI, Python, PyTorch, model files, or most custom nodes;
 the installer downloads them from their original distribution points.
 

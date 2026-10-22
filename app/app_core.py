@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-手机出图 · 局域网网页版
+Nexus · 局域网网页版
 
 在电脑上跑一个小网页服务，手机连上电脑热点就能打开：
     http://192.168.137.1:8800
@@ -6196,28 +6196,24 @@ def thumb_path(name, user=None):
 
 
 def app_icon(size):
-    """生成 PWA 图标（缓存到 .thumbs 里，不会被当成图片列出）。"""
+    """返回 PWA 图标；优先使用 app/ 里预生成的 Nexus 图标。"""
     try:
+        bundled = os.path.join(ROOT, "nexus-icon-%d.png" % size)
+        if os.path.isfile(bundled):
+            return bundled
         os.makedirs(THUMB_DIR, exist_ok=True)
-        path = os.path.join(THUMB_DIR, "icon_%d.png" % size)
+        path = os.path.join(THUMB_DIR, "nexus_icon_%d.png" % size)
         if os.path.isfile(path):
             return path
-        from PIL import Image, ImageDraw
-        im = Image.new("RGB", (size, size), (20, 22, 26))
-        d = ImageDraw.Draw(im)
-        m = int(size * 0.16)
-        d.rounded_rectangle([m, m, size - m, size - m],
-                            radius=int(size * 0.14), fill=(74, 124, 247))
-        r = int(size * 0.17)
-        cx, cy = size // 2, int(size * 0.52)
-        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(20, 22, 26))
-        d.ellipse([cx - int(r * 0.5), cy - int(r * 0.5),
-                   cx + int(r * 0.5), cy + int(r * 0.5)], fill=(122, 162, 255))
-        d.rounded_rectangle([int(size * 0.30), int(size * 0.22),
-                             int(size * 0.48), int(size * 0.30)],
-                            radius=int(size * 0.02), fill=(20, 22, 26))
-        im.save(path, "PNG")
-        return path
+        from PIL import Image
+        # 没有对应尺寸时，从 512 图标缩放，保证所有入口都是同一套品牌。
+        for name in ("nexus-icon-512.png", "nexus-icon-1024.png"):
+            src = os.path.join(ROOT, name)
+            if os.path.isfile(src):
+                im = Image.open(src).convert("RGBA")
+                im.resize((size, size), Image.LANCZOS).save(path, "PNG")
+                return path
+        return None
     except Exception:
         return None
 
@@ -7550,15 +7546,18 @@ SW_JS = load_template("sw.js")
 
 
 MANIFEST = {
-    "name": "手机出图",
-    "short_name": "出图",
+    "name": "Nexus",
+    "short_name": "Nexus",
+    "description": "Nexus · 本地 ComfyUI 出图、图库与协作",
     "start_url": "/",
     "display": "standalone",
-    "background_color": "#14161a",
-    "theme_color": "#14161a",
+    "background_color": "#070b18",
+    "theme_color": "#070b18",
     "icons": [
-        {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
-        {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"},
+        {"src": "/icon-192.png", "sizes": "192x192",
+         "type": "image/png", "purpose": "any maskable"},
+        {"src": "/icon-512.png", "sizes": "512x512",
+         "type": "image/png", "purpose": "any maskable"},
     ],
 }
 

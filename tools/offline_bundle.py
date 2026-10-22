@@ -162,6 +162,14 @@ def _copy_app_level(source, payload, progress=None):
             if got:
                 count += 1
                 total += got
+    # 已安装目录的品牌图标是根目录 PNG（PWA 192/512），也一起带走。
+    for fn in os.listdir(source):
+        if fn.startswith("nexus-icon-") and fn.lower().endswith(".png"):
+            got = _copy_file(os.path.join(source, fn),
+                             os.path.join(payload, fn), skip_same=False)
+            if got:
+                count += 1
+                total += got
     for name in APP_DIRS:
         src = os.path.join(source, name)
         if os.path.isdir(src):

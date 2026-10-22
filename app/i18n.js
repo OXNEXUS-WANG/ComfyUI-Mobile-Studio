@@ -12,10 +12,10 @@
 
   var EN = {
     /* ---------- 通用 ---------- */
-    '手机出图': 'Mobile Studio',
+    '手机出图': 'Nexus',
     '本地 · ComfyUI': 'Local · ComfyUI',
     '接口星图': 'API Star Map',
-    'NEXUS · 手机出图接口星图': 'NEXUS · Mobile Studio API Map',
+    'NEXUS · 手机出图接口星图': 'NEXUS · API Map',
     '账号': 'Account',
     '密码': 'Password',
     '进入': 'Sign in',
@@ -79,7 +79,8 @@
     '实时活动连接': 'Live activity connection',
 
     /* ---------- 登录页 ---------- */
-    '需要登录 · 手机出图': 'Sign in · Mobile Studio',
+    '需要登录 · 手机出图': 'Sign in · Nexus',
+    '需要登录 · Nexus': 'Sign in · Nexus',
     '输入账号和密码后进入。': 'Sign in with your account and password.',
     '管理员和普通账号看到的图库、配额是分开的。':
       'Admin and normal accounts have separate galleries and quotas.',
@@ -709,7 +710,7 @@
     '星系分类': 'Categories',
     '星系概览': 'Overview',
     '手机出图 · 核心。本地 ComfyUI + 移动端网页控制台，负责调度模型、任务队列、图库与安全网关；所有功能都从这里向外延伸。':
-      'Mobile Studio core. Local ComfyUI + mobile web console for models, job queue, gallery and security; everything extends from here.',
+      'Nexus core. Local ComfyUI + mobile web console for models, job queue, gallery and security; everything extends from here.',
     '深海蓝': 'Deep ocean',
     '紫云带': 'Violet cloud',
     '玫瑰岩': 'Rose rock',

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""手机出图服务 · 安全设置
+"""Nexus 服务 · 安全设置
 
 两个设置：
   1. 管理员密码 —— 多用户账号系统里 admin 的登录密码。
@@ -163,7 +163,7 @@ def make_cert():
 
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     name = x509.Name([
-        x509.NameAttribute(NameOID.COMMON_NAME, u"手机出图"),
+        x509.NameAttribute(NameOID.COMMON_NAME, u"Nexus"),
     ])
 
     alt = [x509.DNSName(u"localhost"),
@@ -255,7 +255,7 @@ def main():
     while True:
         print()
         print("=" * 54)
-        print("  手机出图服务 · 安全设置")
+        print("  Nexus 服务 · 安全设置")
         print("=" * 54)
         show_status()
         print()

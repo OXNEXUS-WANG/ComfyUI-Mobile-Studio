@@ -1,7 +1,8 @@
-# ComfyUI Mobile Studio · 手机出图
+# Nexus · ComfyUI 手机出图
 
 把 ComfyUI 包装成一个可以用手机浏览器访问的出图工作台：
 
+- 品牌 **Nexus**：深色斜体描线 N 图标，网页、PWA、浏览器标签和桌面快捷方式统一
 - 手机扫码/打开网页即可出图，支持文生图、图生图、局部重绘、高清修复、放大
 - 多账号、管理员/普通账号、每日限额、功能开关、流量统计、活动日志、安全日志
 - 按 GPU 成本加权公平排队：分类 ETA、开始/完成时间范围、最长等待、全局/单账号暂停、
@@ -107,8 +108,8 @@ commit、模型 revision 和 7zr 哈希都已锁定，不会自动追最新版�
 
 ## 2. 安装
 
-1. 分享版从 GitHub Releases 下载 `ComfyUI-Mobile-Studio-v1.2.5-Share.zip`；
-   商用客户使用 `ComfyUI-Mobile-Studio-v1.2.5-Commercial.zip`。
+1. 分享版从 GitHub Releases 下载 `Nexus-v1.2.6-Share.zip`；
+   商用客户使用 `Nexus-v1.2.6-Commercial.zip`。
 2. 解压到一个目录（不要在压缩包里直接运行）。
 3. 双击 `安装.bat`（或 `install.bat`）。
 4. **首次安装必须先阅读并同意醒目的免责声明与使用协议**：窗口内可滚动阅读，
@@ -122,7 +123,7 @@ commit、模型 revision 和 7zr 哈希都已锁定，不会自动追最新版�
    - 选择模型包：直接回车 = Anima 2B + 放大模型
    - 等待下载 ComfyUI、Python 依赖、自定义节点和模型
 
-6. 安装完成后，桌面会出现 **手机出图** 快捷方式。
+6. 安装完成后，桌面会出现 **Nexus Studio** 快捷方式（避免和 Winstep Nexus 等同名程序冲突）。
    接受记录写入安装目录的 `disclaimer_accepted.json`（只在本机判断，
    不含密码，不进发布包）。
 
@@ -182,7 +183,7 @@ installer\install.ps1 -CommercialClean -Yes -AcceptDisclaimer `
 
 ## 3. 第一次启动
 
-双击桌面的 **手机出图**，或安装目录里的 `一键启动.bat`。
+双击桌面的 **Nexus Studio**，或安装目录里的 `一键启动.bat`。
 
 启动器会自动：
 

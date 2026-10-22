@@ -117,7 +117,7 @@ def build_bundle(root, central_url, worker_name="", include_cert=True):
         if include_cert:
             _add_file(zf, os.path.join(root, "cert.pem"), "cert.pem")
         zf.writestr("生成说明.txt",
-                    "由 ComfyUI Mobile Studio 主机生成。\n"
+                    "由 Nexus 主机生成。\n"
                     "部署包不含模型权重和账号密码。\n"
                     "先运行：仅检测环境.bat\n"
                     "再运行：部署并启动.bat\n")

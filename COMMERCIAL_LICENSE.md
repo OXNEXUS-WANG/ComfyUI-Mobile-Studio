@@ -1,6 +1,6 @@
 # Commercial licensing / 商业授权
 
-The original code of **ComfyUI Mobile Studio** is free for noncommercial use
+The original code of **Nexus** is free for noncommercial use
 under the PolyForm Noncommercial License 1.0.0. **Commercial use requires a
 separate written license from the copyright holder.**
 
@@ -69,6 +69,6 @@ with qualified counsel.
 
 ## Copyright holder
 
-Copyright (c) 2026 ComfyUI Mobile Studio contributors.
+Copyright (c) 2026 Nexus contributors.
 
 This document is not legal advice.

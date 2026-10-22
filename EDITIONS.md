@@ -16,10 +16,10 @@
 构建：
 
 ```powershell
-.\build_release.ps1 -Version 1.2.5 -Edition share
+.\build_release.ps1 -Version 1.2.6 -Edition share
 ```
 
-输出：`dist\ComfyUI-Mobile-Studio-v1.2.5-Share.zip`
+输出：`dist\Nexus-v1.2.6-Share.zip`
 
 ## 商用版（Commercial）
 
@@ -37,10 +37,10 @@
 构建：
 
 ```powershell
-.\build_release.ps1 -Version 1.2.5 -Edition commercial
+.\build_release.ps1 -Version 1.2.6 -Edition commercial
 ```
 
-输出：`dist\ComfyUI-Mobile-Studio-v1.2.5-Commercial.zip`
+输出：`dist\Nexus-v1.2.6-Commercial.zip`
 
 ## 账号与多机额度
 

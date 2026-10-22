@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""手机出图入口。
+"""Nexus 入口。
 
 只负责把项目目录加入 sys.path，然后启动 HTTP 服务。
 后端逻辑在 app_core.py，HTTP 路由在 web_server.py，
