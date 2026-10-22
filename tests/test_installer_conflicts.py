@@ -2,7 +2,7 @@
 """安装器/启动器的环境冲突处理静态回归测试。"""
 import unittest
 
-from _common import ROOT
+from _common import APP, ROOT
 
 
 class InstallerConflictTests(unittest.TestCase):
@@ -14,11 +14,11 @@ class InstallerConflictTests(unittest.TestCase):
             encoding="utf-8")
         cls.boot = (base / "installer" / "bootstrap.py").read_text(
             encoding="utf-8")
-        cls.start = (base / "app" / "start_service.py").read_text(
+        cls.start = (APP / "start_service.py").read_text(
             encoding="utf-8")
-        cls.web = (base / "app" / "web_server.py").read_text(
+        cls.web = (APP / "web_server.py").read_text(
             encoding="utf-8")
-        cls.bat = (base / "app" / "一键启动.bat").read_text(encoding="utf-8")
+        cls.bat = (APP / "一键启动.bat").read_text(encoding="utf-8")
 
     def test_port_and_process_conflicts_are_detected(self):
         for name in ("Get-PortOwner", "Resolve-PortConflicts",

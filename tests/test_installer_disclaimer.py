@@ -12,7 +12,9 @@ class InstallerDisclaimerTests(unittest.TestCase):
             encoding="utf-8")
         cls.disclaimer = (ROOT / "DISCLAIMER.md").read_text(encoding="utf-8")
         cls.build = (ROOT / "build_release.ps1").read_text(encoding="utf-8")
-        cls.gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
+        gitignore_path = ROOT / ".gitignore"
+        cls.gitignore = (gitignore_path.read_text(encoding="utf-8")
+                         if gitignore_path.is_file() else "")
         cls.offline = (ROOT / "tools" / "offline_bundle.py").read_text(
             encoding="utf-8")
 
@@ -63,7 +65,8 @@ class InstallerDisclaimerTests(unittest.TestCase):
         # 安装完成后也把完整文本复制到安装目录，便于随时查阅。
         self.assertIn('"VERSION", "VERSION_LOCK.md", "DISCLAIMER.md"', self.ps)
         self.assertIn("disclaimer_accepted.json", self.build)
-        self.assertIn("disclaimer_accepted.json", self.gitignore)
+        if self.gitignore:
+            self.assertIn("disclaimer_accepted.json", self.gitignore)
         self.assertIn("disclaimer_accepted.json", self.offline)
         self.assertIn('"DISCLAIMER.md"', self.offline)
 

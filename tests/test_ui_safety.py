@@ -2,13 +2,13 @@
 """高危确认、查看器返回键和涂抹蒙版的静态回归测试。"""
 import unittest
 
-from _common import ROOT
+from _common import APP
 
 
 class UISafetyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.page = (ROOT / "app" / "webapp_templates" / "page.html").read_text(
+        cls.page = (APP / "webapp_templates" / "page.html").read_text(
             encoding="utf-8")
 
     def test_confirm_modal_requires_ack_when_requested(self):

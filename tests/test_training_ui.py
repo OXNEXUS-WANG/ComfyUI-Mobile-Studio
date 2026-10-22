@@ -2,18 +2,18 @@
 """训练页、接口和英文文案的静态回归测试。"""
 import unittest
 
-from _common import ROOT
+from _common import APP
 
 
 class TrainingUITests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.page = (ROOT / "app" / "webapp_templates" / "page.html").read_text(
+        cls.page = (APP / "webapp_templates" / "page.html").read_text(
             encoding="utf-8")
-        cls.js = (ROOT / "app" / "webapp_templates" / "training.js").read_text(
+        cls.js = (APP / "webapp_templates" / "training.js").read_text(
             encoding="utf-8")
-        cls.i18n = (ROOT / "app" / "i18n.js").read_text(encoding="utf-8")
-        cls.server = (ROOT / "app" / "web_server.py").read_text(
+        cls.i18n = (APP / "i18n.js").read_text(encoding="utf-8")
+        cls.server = (APP / "web_server.py").read_text(
             encoding="utf-8")
 
     def test_training_tab_and_modals_exist(self):
@@ -46,9 +46,9 @@ class TrainingUITests(unittest.TestCase):
             self.assertIn(text, self.i18n)
 
     def test_anima_lora_support(self):
-        profiles = (ROOT / "app" / "model_profiles.py").read_text(
+        profiles = (APP / "model_profiles.py").read_text(
             encoding="utf-8")
-        workflows = (ROOT / "app" / "comfy_workflows.py").read_text(
+        workflows = (APP / "comfy_workflows.py").read_text(
             encoding="utf-8")
         self.assertIn('"supports_lora": True', profiles)
         self.assertIn("loras=None", workflows)

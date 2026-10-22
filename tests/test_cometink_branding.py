@@ -12,15 +12,15 @@ import app_core
 class CometInkBrandingTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.page = (ROOT / "app" / "webapp_templates" / "page.html").read_text(
+        cls.page = (APP / "webapp_templates" / "page.html").read_text(
             encoding="utf-8")
-        cls.login = (ROOT / "app" / "webapp_templates" / "login.html").read_text(
+        cls.login = (APP / "webapp_templates" / "login.html").read_text(
             encoding="utf-8")
-        cls.license = (ROOT / "app" / "webapp_templates" / "license.html").read_text(
+        cls.license = (APP / "webapp_templates" / "license.html").read_text(
             encoding="utf-8")
-        cls.core = (ROOT / "app" / "app_core.py").read_text(encoding="utf-8")
-        cls.i18n = (ROOT / "app" / "i18n.js").read_text(encoding="utf-8")
-        cls.star = (ROOT / "app" / "宇宙接口图.html").read_text(encoding="utf-8")
+        cls.core = (APP / "app_core.py").read_text(encoding="utf-8")
+        cls.i18n = (APP / "i18n.js").read_text(encoding="utf-8")
+        cls.star = (APP / "宇宙接口图.html").read_text(encoding="utf-8")
         cls.build = (ROOT / "build_release.ps1").read_text(encoding="utf-8")
         cls.install = (ROOT / "installer" / "install.ps1").read_text(
             encoding="utf-8")
@@ -31,12 +31,12 @@ class CometInkBrandingTests(unittest.TestCase):
 
     def test_icon_assets_are_valid(self):
         for size in (1024, 512, 192, 180):
-            p = ROOT / "app" / ("cometink-icon-%d.png" % size)
+            p = APP / ("cometink-icon-%d.png" % size)
             self.assertTrue(p.is_file(), p)
             with Image.open(p) as im:
                 self.assertEqual(im.size, (size, size))
                 self.assertEqual(im.mode, "RGBA")
-        ico = ROOT / "app" / "cometink.ico"
+        ico = APP / "cometink.ico"
         self.assertTrue(ico.is_file())
         with Image.open(ico) as im:
             sizes = set(im.ico.sizes())
@@ -44,8 +44,8 @@ class CometInkBrandingTests(unittest.TestCase):
             self.assertIn(size, sizes)
         # 旧的快捷方式图标也换成同一套品牌。
         self.assertEqual(
-            hashlib.sha256((ROOT / "app" / "cometink.ico").read_bytes()).hexdigest(),
-            hashlib.sha256((ROOT / "app" / "comfyui.ico").read_bytes()).hexdigest())
+            hashlib.sha256((APP / "cometink.ico").read_bytes()).hexdigest(),
+            hashlib.sha256((APP / "comfyui.ico").read_bytes()).hexdigest())
 
     def test_pages_manifest_and_app_icon_use_cometink(self):
         self.assertIn('"name": "CometInk"', self.core)

@@ -2,13 +2,13 @@
 """星图连线遮挡的静态回归：前端画布和绘制入口不能被误删。"""
 import unittest
 
-from _common import ROOT
+from _common import APP
 
 
 class StarMapOcclusionTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.html = (ROOT / "app" / "宇宙接口图.html").read_text(encoding="utf-8")
+        cls.html = (APP / "宇宙接口图.html").read_text(encoding="utf-8")
 
     def test_front_canvas_exists_above_planets(self):
         self.assertIn('id="linkFront"', self.html)

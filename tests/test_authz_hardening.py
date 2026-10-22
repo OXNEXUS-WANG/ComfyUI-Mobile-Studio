@@ -11,10 +11,10 @@ import app_core
 class AuthzHardeningTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.web = (ROOT / "app" / "web_server.py").read_text(encoding="utf-8")
-        cls.page = (ROOT / "app" / "webapp_templates" / "page.html").read_text(
+        cls.web = (APP / "web_server.py").read_text(encoding="utf-8")
+        cls.page = (APP / "webapp_templates" / "page.html").read_text(
             encoding="utf-8")
-        cls.training = (ROOT / "app" / "training_manager.py").read_text(
+        cls.training = (APP / "training_manager.py").read_text(
             encoding="utf-8")
 
     def test_team_membership_is_admin_only(self):

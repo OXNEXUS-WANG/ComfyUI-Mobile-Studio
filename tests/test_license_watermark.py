@@ -3,12 +3,11 @@
 import unittest
 from pathlib import Path
 
-from _common import APP  # noqa: F401
+from _common import APP
 
 import license_guard
 
-ROOT = Path(__file__).resolve().parent.parent
-APP_DIR = ROOT / "app"
+APP_DIR = APP
 
 
 class LicenseWatermarkTests(unittest.TestCase):
