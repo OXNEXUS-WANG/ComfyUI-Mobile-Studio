@@ -116,7 +116,7 @@ ComfyUI v0.42.0、Python 依赖、自定义节点 commit、模型 revision、7zr
 1. 失败阶段和原因；
 2. 按情况给出的排查步骤；
 3. 诊断报告 install_problem.txt（含端口占用、自动适配记录）；
-4. 安装日志 %TEMP%\ComfyUI-Mobile-Studio-install.log。
+4. 安装日志 %TEMP%\Nexus-install.log。
 点“是”可以直接打开日志和诊断报告。
 
 如果窗口没弹出来（无人值守 / -Yes），同样会生成上述两个文件。
@@ -125,6 +125,10 @@ ComfyUI v0.42.0、Python 依赖、自定义节点 commit、模型 revision、7zr
 十、注意
 --------
 - 服务只监听本机和 192.168.137.1，不会对校园网开放。
+- **本系统只为局域网/热点内网设计。** 严禁把 8800 / 8188 端口映射到公网、
+  使用内网穿透、反向代理、VPN、云服务器或公网 IPv6 暴露服务。因擅自暴露
+  公网导致的扫描、攻击、入侵、数据泄露、算力盗用、违法内容或任何损失，
+  由部署者和使用者自行承担，详见 DISCLAIMER.md 第 7 节。
 - 不要提交 users.json、workers.json、cert.pem、key.pem、models/、
   trainings.json、training_settings.json、loras.json、trainings/、trainer/。
 - 模型版权归原模型作者，使用前看模型卡许可。

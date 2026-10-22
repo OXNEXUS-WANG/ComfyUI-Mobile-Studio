@@ -1,7 +1,7 @@
 # 免责声明与使用协议
 
 **Nexus（手机出图）**  
-免责声明版本：1.0 · 更新日期：2026-10-22
+免责声明版本：1.1 · 更新日期：2026-10-22
 
 请在使用本软件前完整阅读本声明。首次安装时必须勾选“我已阅读并同意”才能继续；不同意请退出安装。
 
@@ -48,19 +48,29 @@ ComfyUI、底模、LoRA、放大模型、翻译模型、自定义节点、插件
 
 分享版仅限非商业用途。商用授权不包含任何第三方模型、LoRA、插件、字体或素材的授权。
 
-## 7. 数据、隐私与备份
+## 7. 网络边界与公网暴露风险
+
+本软件仅为本机、家庭或办公室局域网以及 Windows 移动热点内网使用而设计。默认只监听本机回环地址和热点网关，不提供面向互联网的安全防护，也不承诺能够抵御公网环境下的端口扫描、密码爆破、DDoS、0day、供应链攻击或针对性入侵。
+
+使用者不得将本软件或其端口直接或间接暴露到互联网，包括但不限于：把 8800 / 8188 等端口映射到公网、在路由器或防火墙上做端口转发、使用内网穿透、反向代理、VPN、云服务器或公网 IPv6、把监听地址改成 `0.0.0.0` 或其他公网地址、关闭 HTTPS / 防火墙 / 登录鉴权、使用弱密码或共享管理员账号。
+
+无论因何种原因（包括但不限于使用者或任何第三方擅自更改配置、错误部署、端口映射、内网穿透、反向代理、云主机、VPN、IPv6、防火墙误配、弱密码、账号泄露、未及时更新、第三方组件漏洞、软件缺陷或对文档的理解偏差）导致服务被暴露到互联网、被扫描、攻击、入侵、盗用算力、篡改内容、窃取数据、发起 DDoS、产生违法内容，或引发任何争议、处罚、索赔或损失，均由部署者、运营者和使用者自行承担全部责任。在法律允许的最大范围内，开发者不承担任何责任。
+
+本条款不排除或限制法律强制规定不得排除或限制的责任。
+
+## 8. 数据、隐私与备份
 
 本软件默认在本机运行，图片、提示词、账号、日志、图库和训练数据保存在本机，不会主动上传到开发者服务器。使用者应自行做好访问控制、备份、脱敏和隐私合规。
 
 启用远程 worker、局域网共享、第三方翻译、模型下载或其他外部服务时，相关数据可能发送到对应设备或服务。使用者应自行评估并承担相应风险。
 
-## 8. 责任限制
+## 9. 责任限制
 
 在法律允许的最大范围内，开发者不对任何间接、附带、特殊、惩罚性、示范性损害，或利润、数据、业务、商誉损失承担责任，无论是否已被告知该等损害的可能性。
 
 开发者对使用本软件产生的全部责任，不超过使用者为该软件实际支付的费用；分享版为免费提供，开发者不承担付费支持、维护或赔偿义务。
 
-## 9. 其他
+## 10. 其他
 
 本声明不排除或限制法律强制规定不得排除或限制的责任。若本声明与双方签署的书面商用协议冲突，以书面协议为准。本声明不构成法律意见；正式商用前请咨询专业律师。
 
@@ -70,4 +80,4 @@ ComfyUI、底模、LoRA、放大模型、翻译模型、自定义节点、插件
 
 ## English summary
 
-By installing or using this software, you confirm that you will use it lawfully, that you hold all necessary rights to any images, captions, training data and other inputs you provide, and that you will comply with the licenses of all third-party models, LoRAs, plugins and components. The software is provided **AS IS**, without warranty of any kind. You are solely responsible for all generated content, training results and any commercial use. To the maximum extent permitted by law, the developer is not liable for indirect or consequential damages or for lost data, profits or business. If you do not agree, do not install or use the software.
+By installing or using this software, you confirm that you will use it lawfully, that you hold all necessary rights to any images, captions, training data and other inputs you provide, and that you will comply with the licenses of all third-party models, LoRAs, plugins and components. The software is designed for local and private LAN use only. You must not expose it to the public internet by port forwarding, tunneling, reverse proxying, VPN, cloud hosting, public IPv6 or any other means. You are solely responsible for any exposure, attack, data breach, resource theft or loss resulting from such deployment. The software is provided **AS IS**, without warranty of any kind. You are solely responsible for all generated content, training results and any commercial use. To the maximum extent permitted by law, the developer is not liable for indirect or consequential damages or for lost data, profits or business. If you do not agree, do not install or use the software.

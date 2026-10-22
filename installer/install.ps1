@@ -38,13 +38,13 @@ if ($ComfyUIDir -and $InstallDir) {
 
 $ErrorActionPreference = "Stop"
 $PkgRoot = Split-Path -Parent $PSScriptRoot
-$AppVersion = "1.2.6"
+$AppVersion = "1.2.7"
 $VersionFile = Join-Path $PkgRoot "VERSION"
 if (Test-Path $VersionFile) {
     $v = (Get-Content $VersionFile -Raw -Encoding ASCII).Trim()
     if ($v) { $AppVersion = $v }
 }
-$DisclaimerVersion = "1.0"
+$DisclaimerVersion = "1.1"
 $DisclaimerFile = Join-Path $PkgRoot "DISCLAIMER.md"
 $Curl = Join-Path $env:SystemRoot "System32\curl.exe"
 $SevenZip = Join-Path $PkgRoot "tools\7zr.exe"

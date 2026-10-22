@@ -75,11 +75,28 @@ class InstallerDisclaimerTests(unittest.TestCase):
             "模型、LoRA、插件与第三方组件",
             "训练数据与 LoRA",
             "商用授权范围",
+            "网络边界与公网暴露风险",
             "数据、隐私与备份",
             "责任限制",
             "English summary",
         ):
             self.assertIn(text, self.disclaimer)
+
+    def test_public_internet_exposure_clause_is_explicit(self):
+        for text in (
+            "仅为本机、家庭或办公室局域网",
+            "端口映射",
+            "内网穿透",
+            "反向代理",
+            "云服务器",
+            "公网 IPv6",
+            "0.0.0.0",
+            "无论因何种原因",
+            "由部署者、运营者和使用者自行承担全部责任",
+            "法律允许的最大范围内",
+        ):
+            self.assertIn(text, self.disclaimer)
+        self.assertIn('$DisclaimerVersion = "1.1"', self.ps)
         # 接受记录不应包含密码或授权码。
         marker_fn = self.ps.split(
             "function Write-DisclaimerMarker")[1].split(

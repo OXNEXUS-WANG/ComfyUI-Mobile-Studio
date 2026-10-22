@@ -32,7 +32,17 @@ not:
 - reverse engineer, decompile, or disassemble the software, except to the
   extent applicable law expressly permits;
 - use the software to develop a directly competing commercial product;
-- use the copyright holder's name or trademarks without permission.
+- use the copyright holder's name or trademarks without permission;
+- expose the software or its ports to the public internet, including by port
+  forwarding, tunneling, reverse proxying, VPN, cloud hosting, public IPv6, or
+  by disabling HTTPS, firewall or authentication controls.
+
+The Commercial Edition is designed for local and private LAN use only. The
+customer is solely responsible for any exposure, scanning, attack, intrusion,
+data breach, resource theft, unlawful content or loss resulting from public
+internet exposure, whether caused by the customer, its personnel, a contractor
+or any third party. To the maximum extent permitted by law, the copyright
+holder is not liable for such exposure or its consequences.
 
 ## 3. Third-party components
 
