@@ -1,7 +1,8 @@
 ﻿param(
     [string]$Version = "1.0.0",
     [ValidateSet("share", "commercial")]
-    [string]$Edition = "share"
+    [string]$Edition = "share",
+    [switch]$IncludeShowcase
 )
 
 $ErrorActionPreference = "Stop"
@@ -31,6 +32,31 @@ Get-ChildItem $Stage -Recurse -Directory -Filter "__pycache__" -Force -ErrorActi
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 Get-ChildItem $Stage -Recurse -File -Filter "*.pyc" -Force -ErrorAction SilentlyContinue |
     Remove-Item -Force -ErrorAction SilentlyContinue
+
+# GitHub 展示图/介绍只留在仓库，默认不进入安装包；需要完整文档时加 -IncludeShowcase。
+if (-not $IncludeShowcase) {
+    Remove-Staged "docs/media"
+    Remove-Staged "GITHUB_INTRO.md"
+    $readmePath = Join-Path $Stage "README.md"
+    if (Test-Path $readmePath) {
+        $lines = @(Get-Content $readmePath -Encoding UTF8)
+        $start = -1
+        $end = -1
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            if ($start -lt 0 -and $lines[$i] -eq '<p align="center">') { $start = $i }
+            if ($lines[$i] -like '> Screenshots use demo data;*') { $end = $i; break }
+        }
+        if ($start -ge 0 -and $end -gt $start) {
+            $lines = @($lines[0..($start - 1)]) + @($lines[($end + 1)..($lines.Count - 1)])
+        }
+        $lines = @($lines | Where-Object {
+            $_ -ne '>' -and $_ -notmatch 'GITHUB_INTRO\.md' -and
+            $_ -notmatch 'Full bilingual showcase'
+        })
+        $utf8 = New-Object System.Text.UTF8Encoding($false)
+        [IO.File]::WriteAllLines($readmePath, $lines, $utf8)
+    }
+}
 
 # 运行期状态、日志和密钥绝不进发布包（.gitignore 不作用于 Compress-Archive）
 $runtimeFiles = @(
