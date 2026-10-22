@@ -76,6 +76,31 @@ class TrainingManagerTests(unittest.TestCase):
         fresh = tm.TrainingManager(self.root)
         self.assertEqual(fresh.projects, {})
 
+    def test_disabled_training_profile_and_model_are_rejected(self):
+        self.m.settings["allowed_profiles"] = ["anima"]
+        with self.assertRaises(ValueError):
+            self.m.create_project(USER, {
+                "name": "Blocked SDXL", "profile": "sdxl",
+                "base_model": "Illustrious-XL-v2.0.safetensors",
+                "trigger": "x", "params": {"max_steps": 100,
+                                          "resolution": 512}})
+        self.m.settings["allowed_profiles"] = ["anima", "sdxl"]
+        self.m.settings["allowed_sdxl_models"] = ["Illustrious-XL-v2.0.safetensors"]
+        with self.assertRaises(ValueError):
+            self.m.create_project(USER, {
+                "name": "Blocked model", "profile": "sdxl",
+                "base_model": "Juggernaut-XI-byRunDiffusion.safetensors",
+                "trigger": "x", "params": {"max_steps": 100,
+                                          "resolution": 512}})
+        p = self.m.create_project(USER, {
+            "name": "Allowed", "profile": "sdxl",
+            "base_model": "Illustrious-XL-v2.0.safetensors",
+            "trigger": "x", "params": {"max_steps": 100,
+                                      "resolution": 512}})
+        self.m.settings["allowed_sdxl_models"] = ["Other.safetensors"]
+        with self.assertRaises(ValueError):
+            self.m.submit_project(p["id"], USER, limits=None, usage={})
+
     def test_sdxl_hardware_requirement_blocks_submit(self):
         p = self.m.create_project(USER, {
             "name": "SDXL Test", "profile": "sdxl",

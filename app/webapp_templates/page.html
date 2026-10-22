@@ -5316,7 +5316,7 @@ function renderCleanupNotice(info) {
   el.style.display = "block";
 }
 
-let teamData = { list: [], selected: "", prompts: [], role: "" };
+let teamData = { list: [], selected: "", prompts: [], role: "", isAdmin: false };
 
 function teamRoleLabel(role) {
   return role === "owner" ? uiT("所有者", "Owner")
@@ -5374,6 +5374,7 @@ async function loadTeams(select) {
       cache: "no-store", credentials: "same-origin"
     })).json();
     teamData.list = j.teams || [];
+    teamData.isAdmin = !!j.admin;
     if (select) { teamData.selected = select; }
     if (!teamData.selected || !teamData.list.some(function (t) {
       return t.id === teamData.selected;
@@ -5427,6 +5428,9 @@ async function loadTeamDetail(tid) {
   teamData.prompts = prompts;
   const role = team.role || "";
   const manager = role === "owner" || role === "admin";
+  // 普通团队所有者可以改名/删除团队和管理共享提示词，但成员增删改由管理员操作，
+  // 避免把任意账号拉进团队后直接看到对方的个人图库。
+  const memberManager = manager && (teamData.isAdmin || role === "admin");
   const editor = manager || role === "editor";
   let html = '<div class="pf-label" style="margin-top:12px">' + esc(team.name) +
     " · " + teamRoleLabel(role) + "</div>";
@@ -5441,7 +5445,7 @@ async function loadTeamDetail(tid) {
   html += (team.members || []).map(function (m) {
     const name = m.name || m.username || m.id;
     let control = '<span class="aw-badge">' + teamRoleLabel(m.role) + "</span>";
-    if (manager && m.role !== "owner") {
+    if (memberManager && m.role !== "owner") {
       control = '<select class="input team-role" data-member-role="' + esc(m.id) + '">' +
         ["editor", "viewer"].map(function (r) {
           return '<option value="' + r + '"' + (m.role === r ? " selected" : "") +
@@ -5454,7 +5458,7 @@ async function loadTeamDetail(tid) {
       esc(name) + "</b><span class=\"s-ua\">@" + esc(m.username || m.id) +
       "</span></div>" + control + "</div>";
   }).join("");
-  if (manager) {
+  if (memberManager) {
     html += '<div class="pf-pw"><input class="input" id="teamMemberName" ' +
       'placeholder="' + uiT("账号名", "Username") + '">' +
       '<select class="input" id="teamMemberRole"><option value="viewer">' +
@@ -5462,6 +5466,10 @@ async function loadTeamDetail(tid) {
       teamRoleLabel("editor") + "</option></select>" +
       '<button class="ghost" id="teamMemberAdd" type="button">' +
       uiT("添加成员", "Add member") + "</button></div>";
+  } else if (manager) {
+    html += '<div class="pf-note">' +
+      uiT("团队成员由管理员添加或移除，避免未经同意共享个人图库。",
+          "Only an administrator can add or remove members.") + "</div>";
   }
   html += '<div class="pf-label">' + uiT("共享提示词", "Shared prompts") + "</div>";
   if (!prompts.length) {

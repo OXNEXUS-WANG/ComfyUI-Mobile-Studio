@@ -131,6 +131,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
             self.send_header("Referrer-Policy", "no-referrer")
             if https_enabled():
                 self.send_header("Strict-Transport-Security",
@@ -961,6 +962,7 @@ class Handler(BaseHTTPRequestHandler):
                                  "bytes %d-%d/%d" % (start, end, size))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
             if https_enabled():
                 self.send_header("Strict-Transport-Security",
                                  "max-age=15552000")
@@ -987,6 +989,7 @@ class Handler(BaseHTTPRequestHandler):
                                  'attachment; filename="%s"' % safe)
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
             self.send_header("Referrer-Policy", "no-referrer")
             if https_enabled():
                 self.send_header("Strict-Transport-Security",
@@ -1791,7 +1794,7 @@ class Handler(BaseHTTPRequestHandler):
                                     or {}).get(row["id"], 0))
             rows.sort(key=lambda r: (-(r["queued"] + r["running"]),
                                      r.get("id") or ""))
-            self._json({"control": control, "queue": scheduler_snapshot(),
+            self._json({"control": control, "queue": scheduler_snapshot(user),
                         "users": rows})
             return
 
@@ -2166,7 +2169,7 @@ class Handler(BaseHTTPRequestHandler):
                             "queue_slot": info.get("queue_slot")})
             rows.sort(key=lambda r: r.get("started") or r.get("queued_at") or 0,
                       reverse=True)
-            self._json({"jobs": rows[:10], "queue": scheduler_snapshot()})
+            self._json({"jobs": rows[:10], "queue": scheduler_snapshot(user)})
             return
 
         if path.startswith("/archive/"):
@@ -2398,7 +2401,7 @@ class Handler(BaseHTTPRequestHandler):
             for item in cancelled:
                 activity("job", phase="cancel", **item)
             self._json({"ok": True, "cancelled": len(cancelled),
-                        "queue": scheduler_snapshot()})
+                        "queue": scheduler_snapshot(user)})
             return
 
         if route == "/api/teams":
@@ -2421,6 +2424,14 @@ class Handler(BaseHTTPRequestHandler):
                         return
                     if not teams.can_manage(uid, tid, admin):
                         self._json({"error": "只有团队所有者可以管理"}, 403)
+                        return
+                    # 成员加入会立即共享个人图库，必须由管理员审核/操作，
+                    # 不能由普通团队所有者单方面把任意账号拉进来。
+                    if action in ("add_member", "remove_member",
+                                  "set_role") and not admin:
+                        self._json({
+                            "error": "只有管理员可以添加、移除或修改团队成员"
+                        }, 403)
                         return
                     if action == "update":
                         team = teams.update_team(tid, data.get("name"))
@@ -2544,9 +2555,13 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as exc:
                 self._json({"error": str(exc)}, 400)
                 return
+            # 改密后让其他设备上的旧会话立即失效，当前设备保留登录。
+            sid = session_sid(self._cookie(COOKIE_NAME))
+            removed = drop_other_sessions(user.get("id"), sid)
             audit("security", "password_change", user=user,
-                  ip=self.client_address[0], ok=True)
-            self._json({"ok": True})
+                  ip=self.client_address[0], ok=True,
+                  revoked_sessions=removed)
+            self._json({"ok": True, "revoked_sessions": removed})
             return
 
         if route == "/api/preferences":
@@ -2877,7 +2892,7 @@ class Handler(BaseHTTPRequestHandler):
                   cancelled=cancelled)
             self._json({"ok": True, "cancelled": cancelled,
                         "control": queue_control.public(),
-                        "queue": scheduler_snapshot()})
+                        "queue": scheduler_snapshot(user)})
             return
 
         if route == "/api/plugins":
@@ -4688,7 +4703,7 @@ class Handler(BaseHTTPRequestHandler):
                   ip=self.client_address[0], ok=False,
                   operation="queue", error=queue_err)
             self._json({"error": queue_err,
-                        "queue": scheduler_snapshot()}, 429)
+                        "queue": scheduler_snapshot(user)}, 429)
             return
         activity_request("/api/generate", "POST", job_id=jid, mode=mode,
                          kind=kind, model=os.path.basename(ckpt),
@@ -4823,7 +4838,7 @@ class Handler(BaseHTTPRequestHandler):
                   ip=self.client_address[0], ok=False,
                   operation="queue", error=queue_err)
             self._json({"error": queue_err,
-                        "queue": scheduler_snapshot()}, 429)
+                        "queue": scheduler_snapshot(user)}, 429)
             return
         audit("activity", "upscale", user=user, ip=self.client_address[0],
               job_id=jid, factor=factor, model=os.path.basename(ckpt))

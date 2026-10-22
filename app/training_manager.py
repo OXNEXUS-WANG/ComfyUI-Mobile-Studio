@@ -497,6 +497,7 @@ class TrainingManager:
             base = training_profiles.ANIMA_MODEL
         if not base:
             raise ValueError("请选择底模")
+        self._check_profile_policy(profile, base)
         tid = _id("t_")
         now = _now()
         params = training_profiles.normalize_params(
@@ -579,6 +580,7 @@ class TrainingManager:
         if "base_model" in patch and p.get("profile") == "sdxl":
             base = os.path.basename(str(patch.get("base_model") or ""))
             if base:
+                self._check_profile_policy("sdxl", base)
                 p["base_model"] = base
         if "vpred" in patch:
             p["vpred"] = bool(patch.get("vpred"))
@@ -592,6 +594,32 @@ class TrainingManager:
         p["updated"] = _now()
         self.save_projects(force=True)
         return p
+
+    def _profile_policy_error(self, profile, base_model):
+        """管理员禁用某类训练后，普通账号不能靠直接调 API 绕过。"""
+        allowed = set(self.settings.get("allowed_profiles") or ())
+        if allowed and profile not in allowed:
+            return "管理员没有开放这种训练类型"
+        if profile != "sdxl":
+            return ""
+        base = os.path.basename(str(base_model or ""))
+        allowed_models = set(self.settings.get("allowed_sdxl_models") or ())
+        if allowed_models and base not in allowed_models:
+            return "这个底模没有被管理员开放用于训练"
+        try:
+            prof = model_profiles.profile_for(
+                base, os.path.join(self.root, "ComfyUI", "models",
+                                   "checkpoints", base))
+            if prof.get("vpred") and not self.settings.get("allow_sdxl_vpred"):
+                return "管理员没有开放 v-pred 底模训练"
+        except Exception:
+            pass
+        return ""
+
+    def _check_profile_policy(self, profile, base_model):
+        err = self._profile_policy_error(profile, base_model)
+        if err:
+            raise ValueError(err)
 
     def project_dataset_stats(self, project):
         m = self._load_manifest(project)
@@ -665,6 +693,7 @@ class TrainingManager:
         p = self.get_project(tid, user)
         if p.get("status") not in ("draft", "rejected", "cancelled"):
             raise ValueError("当前状态不能提交")
+        self._check_profile_policy(p.get("profile"), p.get("base_model"))
         count, _ = self.project_dataset_stats(p)
         if count < 5:
             raise ValueError("至少需要 5 张训练图片")
@@ -707,6 +736,7 @@ class TrainingManager:
             raise KeyError("训练项目不存在")
         if p.get("status") != "pending":
             raise ValueError("只有待审核项目可以批准")
+        self._check_profile_policy(p.get("profile"), p.get("base_model"))
         err, quota = self._quota_for(p)
         if err:
             raise ValueError(err)
@@ -799,7 +829,8 @@ class TrainingManager:
             raise ValueError("请先取消训练再删除")
         out_name = (p.get("output") or {}).get("name") or ""
         if delete_lora and out_name:
-            self.delete_lora(out_name, user, admin=True)
+            # 普通账号只能删除自己项目产出的 LoRA；管理员才可越权。
+            self.delete_lora(out_name, user, admin=admin)
         base = self._project_dir(p)
         if base and os.path.isdir(base):
             os.makedirs(self.trash_dir, exist_ok=True)

@@ -615,25 +615,7 @@ def scheduler_release(jid):
         _sched_dispatch_locked()
 
 
-def scheduler_snapshot():
-    """安全地公开队列概况，不包含提示词。"""
-    with SCHED_LOCK:
-        _sched_clean_locked()
-        active_job = _sched_job_locked(SCHEDULER["active"])
-        active = {"job_id": SCHEDULER["active"]} if SCHEDULER["active"] else None
-        if active:
-            active.update(job_activity_fields(active_job))
-            active["elapsed"] = active_job.get("elapsed", 0)
-        waiting = []
-        for jid in _sched_order_locked():
-            job = _sched_job_locked(jid)
-            item = {"job_id": jid}
-            item.update(job_activity_fields(job))
-            item.update(_sched_info_locked(jid))
-            waiting.append(item)
-        return {"active": active, "waiting": waiting,
-                "size": len(waiting), "max": SCHED_MAX_QUEUE,
-                "per_user_cap": SCHED_PER_USER_CAP}
+# 队列快照函数定义在调度器代码后部（会按登录账号过滤）。
 
 
 # 最近的出图耗时 (ckpt, steps, count, seconds)，用来估算进度条
@@ -4540,11 +4522,23 @@ def scheduler_release(jid):
         persist_jobs(force=True)
 
 
-def scheduler_snapshot():
+def scheduler_snapshot(user=None):
+    """队列概况；普通账号只看到自己的任务，管理员看全部。
+
+    队列里包含 user_id / username / 模型等元数据，不能把其他账号的任务
+    暴露给普通用户。
+    """
+    admin = user is None or is_admin(user)
+    uid = (user or {}).get("id") or ""
+
+    def visible(job):
+        return bool(admin or job.get("user_id") == uid)
+
     with SCHED_LOCK:
         _sched_clean_queues_locked()
         active_job = JOBS.get(SCHEDULER["active"]) or {}
-        active = {"job_id": SCHEDULER["active"]} if SCHEDULER["active"] else None
+        active = {"job_id": SCHEDULER["active"]} if (
+            SCHEDULER["active"] and visible(active_job)) else None
         if active:
             active.update(job_activity_fields(active_job))
             active["elapsed"] = active_job.get("elapsed", 0)
@@ -4556,6 +4550,8 @@ def scheduler_snapshot():
             if not jid:
                 continue
             job = JOBS.get(jid) or {}
+            if not visible(job):
+                continue
             item = {"job_id": jid, "worker_id": slot.get("id"),
                     "worker_name": slot.get("name") or "",
                     "worker_kind": slot.get("kind") or ""}
@@ -4565,13 +4561,17 @@ def scheduler_snapshot():
         waiting = []
         for jid in _sched_order_locked():
             job = JOBS.get(jid) or {}
+            if not visible(job):
+                continue
             item = {"job_id": jid}
             item.update(job_activity_fields(job))
             item.update(_sched_info_locked(jid))
             waiting.append(item)
         slots = [{
             "id": s.get("id"), "name": s.get("name"), "kind": s.get("kind"),
-            "available": bool(s.get("available")), "active": s.get("active") or "",
+            "available": bool(s.get("available")),
+            "active": (s.get("active") or "") if admin or visible(
+                JOBS.get(s.get("active") or "") or {}) else "",
         } for s in SCHEDULER["slots"].values()]
         control = queue_control.load()
         return {"active": active, "running": running, "waiting": waiting,
@@ -6407,6 +6407,13 @@ def gallery_stats(user=None):
     except OSError:
         pass
     durs = [round(d[3], 1) for d in DURATIONS]
+    models = list_models()
+    if not admin:
+        allowed = user_limits(user).get("allowed_models") or []
+        if allowed:
+            models = [m for m in models
+                      if m.get("name") in allowed
+                      or os.path.splitext(str(m.get("name")))[0] in allowed]
     return {
         "total": total,
         "by_kind": by_kind,
@@ -6422,7 +6429,7 @@ def gallery_stats(user=None):
         "staged_input": staged_input,
         "avg_seconds": round(sum(durs) / len(durs), 1) if durs else None,
         "recent_seconds": durs[-8:],
-        "models": [{"label": m["label"], "name": m["name"]} for m in list_models()],
+        "models": [{"label": m["label"], "name": m["name"]} for m in models],
     }
 
 
