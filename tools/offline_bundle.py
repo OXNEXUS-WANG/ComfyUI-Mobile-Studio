@@ -47,7 +47,8 @@ PROTECTED_DIR_NAMES = {
 APP_DIRS = ("worker", "docs", "installer", "tools", "webapp_templates")
 ROOT_FILES = (
     "VERSION", "EDITION", "README.md", "README-COMMERCIAL.md",
-    "CHANGELOG.md", "使用说明.md", "安装说明.txt", "安装说明_商业版.txt",
+    "MANUAL.md", "CHANGELOG.md", "使用说明.md", "安装说明.txt",
+    "安装说明_商业版.txt",
     "DISCLAIMER.md", "COMMERCIAL_EULA.md", "COMMERCIAL_LICENSE.md", "LICENSE",
     "THIRD_PARTY_NOTICES.md", "VERSION_LOCK.md", "EDITIONS.md",
     "商用授权说明.md", "商用版授权协议.md",

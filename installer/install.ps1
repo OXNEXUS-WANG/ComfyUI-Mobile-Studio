@@ -38,7 +38,7 @@ if ($ComfyUIDir -and $InstallDir) {
 
 $ErrorActionPreference = "Stop"
 $PkgRoot = Split-Path -Parent $PSScriptRoot
-$AppVersion = "1.3.2"
+$AppVersion = "1.3.3"
 $VersionFile = Join-Path $PkgRoot "VERSION"
 if (Test-Path $VersionFile) {
     $v = (Get-Content $VersionFile -Raw -Encoding ASCII).Trim()
@@ -787,8 +787,8 @@ function Copy-AppFiles {
     # 版本号、许可证、更新日志和根目录小工具（商业包没有的文件自动跳过）。
     $rootFiles = @(
         "VERSION", "VERSION_LOCK.md", "DISCLAIMER.md", "LICENSE",
-        "THIRD_PARTY_NOTICES.md", "README.md", "CHANGELOG.md", "EDITIONS.md",
-        "COMMERCIAL_LICENSE.md", "安装说明.txt", "备份数据.bat",
+        "THIRD_PARTY_NOTICES.md", "README.md", "MANUAL.md", "CHANGELOG.md",
+        "EDITIONS.md", "COMMERCIAL_LICENSE.md", "安装说明.txt", "备份数据.bat",
         "恢复数据.bat", "打包到U盘.bat", "运行测试.bat"
     )
     foreach ($name in $rootFiles) {
