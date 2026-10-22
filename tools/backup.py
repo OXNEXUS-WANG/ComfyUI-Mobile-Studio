@@ -34,6 +34,7 @@ ROOT_FILES = (
     "trainings.json",
     "training_settings.json",
     "loras.json",
+    "sensitive_filter.json",
 )
 META_SUFFIX = ".json"
 IMAGE_SUFFIX = (".png", ".jpg", ".jpeg", ".webp", ".mp4", ".webm")

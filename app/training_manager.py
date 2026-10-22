@@ -671,6 +671,8 @@ class TrainingManager:
         params = p.get("params") or {}
         if not p.get("trigger") and not p.get("caption_default"):
             raise ValueError("请填写触发词或默认描述，方便生成 caption")
+        self._check_caption_filter(p.get("trigger") or "")
+        self._check_caption_filter(p.get("caption_default") or "")
         hardware = self._hardware_error(p)
         if hardware:
             raise ValueError(hardware)
@@ -859,9 +861,18 @@ class TrainingManager:
         if max_mb and total + int(add_bytes or 0) > max_mb * 1048576:
             raise ValueError("训练集最多 %d MB" % max_mb)
 
+    def _check_caption_filter(self, caption):
+        text = str(caption or "")
+        if not text:
+            return
+        message = self._hook("check_caption", text)
+        if message:
+            raise ValueError(str(message))
+
     def _add_image_file(self, project, src, caption="", source="upload",
                         limits=None):
         from PIL import Image, ImageOps
+        self._check_caption_filter(caption)
         limits = limits if isinstance(limits, dict) else {}
         self._check_image_limits(project, os.path.getsize(src), limits)
         max_mb = int(limits.get("max_image_mb")
@@ -934,6 +945,7 @@ class TrainingManager:
         if not found:
             raise KeyError("图片不存在")
         raw = training_profiles.clean_text(caption, 2000)
+        self._check_caption_filter(raw)
         found["caption"] = raw
         self._save_manifest(p, manifest)
         d = self._dataset_dir(p)

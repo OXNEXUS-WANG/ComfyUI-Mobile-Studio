@@ -1123,6 +1123,15 @@ img.result, video.result {
 .admin-llm label:has(> input[type=checkbox]) { flex-direction: row; align-items: center; }
 .admin-llm input[type=text],
 .admin-llm input[type=password] { width: 100%; box-sizing: border-box; }
+.admin-sensitive-words { display: flex; flex-direction: column; gap: 5px;
+  margin: 2px 0 10px; color: var(--tx3); font-size: 10.5px; }
+.admin-sensitive-words textarea { width: 100%; min-height: 70px; resize: vertical;
+  box-sizing: border-box; padding: 8px 10px; border-radius: 9px;
+  border: 1px solid rgba(255,255,255,.12); background: #0b1422;
+  color: var(--tx); font: 11px/1.55 ui-monospace,Consolas,monospace; }
+.admin-sensitive-words textarea:focus { outline: none;
+  border-color: rgba(127,227,255,.55); }
+#adminSensitiveRefresh { width: auto; flex: 0 0 auto; min-height: 38px; }
 .cleanup-notice {
   margin: 0 3px 10px; padding: 9px 11px; border-radius: 10px;
   border: 1px solid rgba(255,190,110,.28);
@@ -1648,7 +1657,7 @@ body.scrolled #langBtn, body.scrolled #profileTopBtn {
   }
 }
 </style>
-<script src="/i18n.js?v=20261022c"></script>
+<script src="/i18n.js?v=20261022d"></script>
 </head>
 <body>
 <button id="langBtn" type="button" data-lang-toggle>EN</button>
@@ -2517,6 +2526,44 @@ body.scrolled #langBtn, body.scrolled #profileTopBtn {
       <span id="adminLlmHint">只允许本机或内网地址，避免把提示词发到公网。</span>
     </div>
     <div class="pf-status" id="adminLlmStatus"></div>
+
+    <div class="admin-worker-head">
+      <div>
+        <h3>提示词过滤</h3>
+        <p>只过滤提示词和训练 caption，不保证输出图片安全；默认关闭，词表由管理员维护。</p>
+      </div>
+      <button class="reload" id="adminSensitiveRefresh" type="button">刷新</button>
+    </div>
+    <div class="admin-worker-settings admin-llm admin-sensitive">
+      <label>模式
+        <select id="adminSensitiveMode">
+          <option value="off">关闭</option>
+          <option value="warn">仅提醒</option>
+          <option value="block">直接拦截</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="adminSensitivePrompt" checked> 正面提示词</label>
+      <label><input type="checkbox" id="adminSensitiveNegative" checked> 负面提示词</label>
+      <label><input type="checkbox" id="adminSensitiveCaption"> 训练 caption</label>
+    </div>
+    <label class="admin-sensitive-words">敏感词（一行一个，最多 1000 条）
+      <textarea id="adminSensitiveWords" rows="4" spellcheck="false"
+                placeholder="例如：某个词&#10;another word"></textarea>
+    </label>
+    <div class="admin-worker-settings">
+      <button class="reload" id="adminSensitiveSave" type="button">保存过滤设置</button>
+      <span id="adminSensitiveHint">提示词过滤只做本地词表匹配，不能替代输出内容审核。</span>
+    </div>
+    <div class="admin-model-hint" id="adminSensitiveInfo" data-no-i18n></div>
+    <label class="admin-sensitive-words">测试文本
+      <textarea id="adminSensitiveTestText" rows="2" spellcheck="false"
+                placeholder="输入一段文字，检查会命中哪些规则"></textarea>
+    </label>
+    <div class="admin-worker-settings">
+      <button class="reload" id="adminSensitiveTest" type="button">测试命中</button>
+      <span id="adminSensitiveTestInfo" data-no-i18n></span>
+    </div>
+    <div class="pf-status" id="adminSensitiveStatus" data-no-i18n></div>
 
     <div class="admin-worker-head">
       <div>
@@ -4850,6 +4897,11 @@ async function submitGenerate(extra) {
   const j = await r.json();
   if (j.error) { showApiError(j); setBusy(false); return null; }
   if (j.input_cleaned) { showInputCleaned(j.input_cleaned); }
+  if (j.sensitive_warning) {
+    show(uiT("提示词包含管理员关注的内容，已记录。",
+             "The prompt matched the admin's sensitive rules and was logged."),
+         "warn", true);
+  }
   if (j.eta) { etaSeconds = j.eta; }
   if (j.job_id) { jobPrompts.set(j.job_id, body.prompt || ""); }
   return j.job_id;
@@ -7132,6 +7184,8 @@ let adminLlmData = null;
 let adminSystemData = null;
 let adminMonitorData = null;
 let adminCleanupData = null;
+let adminSensitiveData = null;
+let adminSensitiveTestResult = null;
 let adminQueueData = null;
 let adminModelsData = null;
 let adminModelBusy = false;
@@ -7325,6 +7379,108 @@ async function adminSaveLlm(test) {
       st.className = "pf-status";
       st.textContent = adminT("已保存", "Saved");
     }
+  } catch (e) {
+    if (st) { st.className = "pf-status err"; st.textContent = adminErrText(e); }
+  }
+  if (btn) { btn.disabled = false; }
+}
+function adminSensitiveStatus(text, err) {
+  const el = document.getElementById("adminSensitiveStatus");
+  if (!el) { return; }
+  el.className = "pf-status" + (err ? " err" : "");
+  el.textContent = text || "";
+}
+function adminRenderSensitiveTestInfo() {
+  const info = document.getElementById("adminSensitiveTestInfo");
+  if (!info) { return; }
+  const j = adminSensitiveTestResult;
+  if (!j) { info.textContent = ""; return; }
+  if (j.hit) {
+    info.textContent = adminT(
+      "命中 " + j.count + " 条：" + (j.ids || []).join(", ") +
+      "（" + (j.terms || []).join(" / ") + "）",
+      j.count + " matched: " + (j.ids || []).join(", ") +
+      " (" + (j.terms || []).join(" / ") + ")");
+  } else {
+    info.textContent = adminT("没有命中", "No match");
+  }
+}
+function adminRenderSensitive() {
+  if (!adminSensitiveData) { return; }
+  const d = adminSensitiveData;
+  const mode = document.getElementById("adminSensitiveMode");
+  const words = document.getElementById("adminSensitiveWords");
+  const editing = words && document.activeElement === words;
+  if (mode) { mode.value = d.mode || "off"; }
+  const scope = d.scope || {};
+  const p = document.getElementById("adminSensitivePrompt");
+  const n = document.getElementById("adminSensitiveNegative");
+  const c = document.getElementById("adminSensitiveCaption");
+  if (p) { p.checked = scope.prompt !== false; }
+  if (n) { n.checked = scope.negative !== false; }
+  if (c) { c.checked = !!scope.caption; }
+  if (words && !editing) {
+    words.value = (d.words || []).join("\n");
+  }
+  const info = document.getElementById("adminSensitiveInfo");
+  if (info) {
+    const modeLabel = d.mode === "block" ? adminT("直接拦截", "Block")
+      : d.mode === "warn" ? adminT("仅提醒", "Warn only")
+      : adminT("关闭", "Off");
+    info.textContent = adminT(
+      "当前：" + modeLabel + " · " + Number(d.count || 0) + " 条词",
+      "Current: " + modeLabel + " · " + Number(d.count || 0) + " words");
+  }
+  adminRenderSensitiveTestInfo();
+}
+async function adminSaveSensitive() {
+  const st = document.getElementById("adminSensitiveStatus");
+  const btn = document.getElementById("adminSensitiveSave");
+  if (st) { st.className = "pf-status"; st.textContent = adminT("正在保存…", "Saving…"); }
+  if (btn) { btn.disabled = true; }
+  try {
+    const body = {
+      action: "settings",
+      mode: document.getElementById("adminSensitiveMode").value,
+      scope: {
+        prompt: document.getElementById("adminSensitivePrompt").checked,
+        negative: document.getElementById("adminSensitiveNegative").checked,
+        caption: document.getElementById("adminSensitiveCaption").checked
+      },
+      words: document.getElementById("adminSensitiveWords").value
+    };
+    const r = await fetch("/api/admin/sensitive", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      credentials: "same-origin", body: JSON.stringify(body)
+    });
+    const j = await r.json().catch(function () { return {}; });
+    if (!r.ok || j.error) { throw new Error(j.error || ("HTTP " + r.status)); }
+    adminSensitiveData = j;
+    adminRenderSensitive();
+    if (st) { st.className = "pf-status"; st.textContent = adminT("过滤设置已保存", "Filter settings saved"); }
+  } catch (e) {
+    if (st) { st.className = "pf-status err"; st.textContent = adminErrText(e); }
+  }
+  if (btn) { btn.disabled = false; }
+}
+async function adminTestSensitive() {
+  const st = document.getElementById("adminSensitiveStatus");
+  const btn = document.getElementById("adminSensitiveTest");
+  const text = document.getElementById("adminSensitiveTestText").value || "";
+  const info = document.getElementById("adminSensitiveTestInfo");
+  if (st) { st.textContent = adminT("正在测试…", "Testing…"); }
+  if (btn) { btn.disabled = true; }
+  try {
+    const r = await fetch("/api/admin/sensitive", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ action: "test", text: text })
+    });
+    const j = await r.json().catch(function () { return {}; });
+    if (!r.ok || j.error) { throw new Error(j.error || ("HTTP " + r.status)); }
+    adminSensitiveTestResult = j;
+    adminRenderSensitiveTestInfo();
+    if (st) { st.className = "pf-status"; st.textContent = ""; }
   } catch (e) {
     if (st) { st.className = "pf-status err"; st.textContent = adminErrText(e); }
   }
@@ -8921,7 +9077,8 @@ async function loadAdmin(showLoading) {
       fetch("/api/admin/cleanup", { cache: "no-store", credentials: "same-origin" }),
       fetch("/api/admin/queue", { cache: "no-store", credentials: "same-origin" }),
       fetch("/api/admin/nodes", { cache: "no-store", credentials: "same-origin" }),
-      fetch("/api/admin/workflows", { cache: "no-store", credentials: "same-origin" })
+      fetch("/api/admin/workflows", { cache: "no-store", credentials: "same-origin" }),
+      fetch("/api/admin/sensitive", { cache: "no-store", credentials: "same-origin" })
     ]);
     const users = await rs[0].json();
     const jobstats = await rs[1].json();
@@ -8934,6 +9091,7 @@ async function loadAdmin(showLoading) {
     const queue = await rs[8].json().catch(function () { return {}; });
     const nodes = await rs[9].json().catch(function () { return {}; });
     const workflows = await rs[10].json().catch(function () { return {}; });
+    const sensitive = await rs[11].json().catch(function () { return {}; });
     if (users.error) { throw new Error(users.error); }
     renderAccountQuota(users.quota || null);
     if (queue && queue.control) { adminRenderQueue(queue); }
@@ -8949,6 +9107,9 @@ async function loadAdmin(showLoading) {
     if (system && system.snapshots) { adminSystemData = system; adminRenderSystem(); }
     if (monitor && monitor.settings) { adminMonitorData = monitor; adminRenderMonitor(); }
     if (cleanup && cleanup.settings) { adminCleanupData = cleanup; adminRenderCleanup(); }
+    if (sensitive && sensitive.mode) {
+      adminSensitiveData = sensitive; adminRenderSensitive();
+    }
     const ids = new Set(adminUsersAll.map(function (u) { return u.id; }));
     adminSel.forEach(function (id) { if (!ids.has(id)) { adminSel.delete(id); } });
     adminLast = { users: adminUsersAll, jobstats: jobstats, activity: activity };
@@ -9276,6 +9437,12 @@ async function adminSaveSet() {
       window.open("/license", "_blank", "noopener");
     };
   }
+  const sensitiveRefresh = document.getElementById("adminSensitiveRefresh");
+  if (sensitiveRefresh) { sensitiveRefresh.onclick = function () { loadAdmin(true); }; }
+  const sensitiveSave = document.getElementById("adminSensitiveSave");
+  if (sensitiveSave) { sensitiveSave.onclick = adminSaveSensitive; }
+  const sensitiveTest = document.getElementById("adminSensitiveTest");
+  if (sensitiveTest) { sensitiveTest.onclick = adminTestSensitive; }
   const reportBtn = document.getElementById("adminHealthReport");
   if (reportBtn) { reportBtn.onclick = adminDownloadHealthReport; }
   const settingsClose = document.getElementById("systemSettingsClose");
@@ -9365,6 +9532,7 @@ async function adminSaveSet() {
     if (adminAccountQuotaData) { renderAccountQuota(adminAccountQuotaData); }
     if (workersData) { renderWorkerSettings(); }
     if (adminLlmData) { adminRenderLlm(); }
+    if (adminSensitiveData) { adminRenderSensitive(); }
     if (adminSystemData) { adminRenderSystem(); }
     if (adminCleanupData) { adminRenderCleanup(); }
     if (adminModelsData) { adminRenderModels(); }

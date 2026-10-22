@@ -48,6 +48,7 @@ import model_profiles
 import monitor_center
 import queue_control
 import runtime_settings
+import sensitive_filter
 import system_state
 import teams
 import training_manager
@@ -4645,6 +4646,13 @@ def training_feature_allowed(uid):
     return bool(is_admin(user) or feature_allowed(user, "train"))
 
 
+def training_caption_check(text):
+    result = sensitive_filter.check_caption(text)
+    if result.get("mode") == "block" and result.get("hit"):
+        return "训练描述包含管理员禁止的内容，已拦截。"
+    return ""
+
+
 def training_lora_in_use(name):
     name = os.path.basename(str(name or ""))
     with JOBS_LOCK:
@@ -4684,6 +4692,7 @@ training_manager.bind_runtime(
     usage_for=training_usage_for,
     lora_in_use=training_lora_in_use,
     can_train=training_feature_allowed,
+    check_caption=training_caption_check,
     ensure_sampler=ensure_load_sampler,
 )
 

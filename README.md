@@ -14,6 +14,8 @@
 - 自助修改密码、浏览器出图完成通知、一键备份/恢复
 - 账号间图片隔离，按底模分目录；图库支持多选打包下载
 - 输入防护：提示词/负面提示 2000 字上限、实时字数、清理控制/零宽/双向字符
+- 可选提示词过滤：管理员配置中英文敏感词，支持仅提醒/直接拦截，覆盖正面、
+  负面和训练 caption；默认关闭，不预置词库
 - 异常恢复：排队任务重启后自动重排；未提交任务安全重试；已提交任务不重复出图
 - 守护进程：ComfyUI / 网页服务异常退出自动重启，指数退避、每小时上限可设置
 - 可信时间：在线 NTP/HTTPS 校时，离线单调计时，检测系统时间回拨
@@ -105,8 +107,8 @@ commit、模型 revision 和 7zr 哈希都已锁定，不会自动追最新版�
 
 ## 2. 安装
 
-1. 分享版从 GitHub Releases 下载 `ComfyUI-Mobile-Studio-v1.2.2-Share.zip`；
-   商用客户使用 `ComfyUI-Mobile-Studio-v1.2.2-Commercial.zip`。
+1. 分享版从 GitHub Releases 下载 `ComfyUI-Mobile-Studio-v1.2.3-Share.zip`；
+   商用客户使用 `ComfyUI-Mobile-Studio-v1.2.3-Commercial.zip`。
 2. 解压到一个目录（不要在压缩包里直接运行）。
 3. 双击 `安装.bat`（或 `install.bat`）。
 4. 按提示操作：

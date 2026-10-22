@@ -38,6 +38,7 @@ import license_guard
 import model_manager
 import input_guard
 import runtime_settings
+import sensitive_filter
 import trusted_time
 import edition_policy
 import node_manager
@@ -1819,6 +1820,15 @@ class Handler(BaseHTTPRequestHandler):
             })
             return
 
+        if path == "/api/admin/sensitive":
+            user = self._current_user()
+            if not is_admin(user):
+                self._json({"error": "只有管理员可以管理提示词过滤"}, 403)
+                return
+            self._json({"ok": True,
+                        **sensitive_filter.public_settings(admin=True)})
+            return
+
         if path == "/api/supervisor":
             user = self._current_user()
             if not is_admin(user):
@@ -3231,6 +3241,35 @@ class Handler(BaseHTTPRequestHandler):
                         "test": test_result})
             return
 
+        if route == "/api/admin/sensitive":
+            user = self._current_user()
+            if not is_admin(user):
+                self._json({"error": "只有管理员可以管理提示词过滤"}, 403)
+                return
+            action = str(data.get("action") or "settings")
+            if action == "test":
+                result = sensitive_filter.test_text(data.get("text") or "")
+                self._json({"ok": True, **result})
+                return
+            if action != "settings":
+                self._json({"error": "未知操作"}, 400)
+                return
+            current = sensitive_filter.load()
+            patch = data.get("settings")
+            if not isinstance(patch, dict):
+                patch = data
+            for key in ("mode", "scope", "words"):
+                if key in patch:
+                    current[key] = patch[key]
+            saved = sensitive_filter.save(current)
+            audit("security", "sensitive_settings", user=user,
+                  ip=self.client_address[0], mode=saved.get("mode"),
+                  count=len(saved.get("words") or []),
+                  scope=saved.get("scope"))
+            self._json({"ok": True,
+                        **sensitive_filter.public_settings(admin=True)})
+            return
+
         if route == "/api/admin/system":
             user = self._current_user()
             if not is_admin(user):
@@ -3576,6 +3615,22 @@ class Handler(BaseHTTPRequestHandler):
                 return
             auto_negative, auto_neg_info = input_guard.clean_text(
                 data.get("negative"), input_guard.MAX_PROMPT_CHARS)
+            auto_filter = sensitive_filter.check(auto_prompt, auto_negative)
+            if auto_filter.get("hit"):
+                audit("security", "prompt_filter", user=user,
+                      ip=self.client_address[0],
+                      ok=auto_filter.get("mode") != "block",
+                      operation="auto", mode=auto_filter.get("mode"),
+                      rule_count=int(auto_filter.get("count") or 0),
+                      rule_ids=",".join(auto_filter.get("ids") or []))
+                if auto_filter.get("mode") == "block":
+                    self._json({
+                        "error": "提示词包含管理员禁止的内容，已拦截。",
+                        "code": "sensitive_prompt",
+                        "filter": {"mode": "block",
+                                   "count": auto_filter.get("count") or 0},
+                    }, 400)
+                    return
             params = {
                 "prompt": auto_prompt,
                 "negative": auto_negative
@@ -4294,6 +4349,25 @@ class Handler(BaseHTTPRequestHandler):
                                  "请改用英文，或在个人设置里选择本地翻译模型。"}, 400)
             return
 
+        sensitive_warning = ""
+        sensitive = sensitive_filter.check(prompt, negative)
+        if sensitive.get("hit"):
+            audit("security", "prompt_filter", user=user,
+                  ip=self.client_address[0],
+                  ok=sensitive.get("mode") != "block",
+                  mode=sensitive.get("mode"),
+                  rule_count=int(sensitive.get("count") or 0),
+                  rule_ids=",".join(sensitive.get("ids") or []))
+            if sensitive.get("mode") == "block":
+                self._json({
+                    "error": "提示词包含管理员禁止的内容，已拦截。",
+                    "code": "sensitive_prompt",
+                    "filter": {"mode": "block",
+                               "count": sensitive.get("count") or 0},
+                }, 400)
+                return
+            sensitive_warning = "提示词包含管理员关注的内容，已记录。"
+
         mode = str(data.get("mode") or "txt")
         is_video = mode in ("vid", "i2v")
         is_i2v = mode == "i2v"
@@ -4661,7 +4735,8 @@ class Handler(BaseHTTPRequestHandler):
                         "prompt": prompt_info,
                         "negative": negative_info,
                     },
-                    "lora_skipped": [x["name"] for x in lora_skipped]})
+                    "lora_skipped": [x["name"] for x in lora_skipped],
+                    "sensitive_warning": sensitive_warning})
 
     # ------------------------------------------------------------ 放大
     def _handle_upscale(self, data):

@@ -163,6 +163,27 @@
     '随机': 'Random',
     '开启': 'On',
     '关闭': 'Off',
+    '仅提醒': 'Warn only',
+    '直接拦截': 'Block',
+    '提示词过滤': 'Prompt filter',
+    '只过滤提示词和训练 caption，不保证输出图片安全；默认关闭，词表由管理员维护。':
+      'Filters prompts and training captions only; it cannot guarantee output safety. Off by default; admins maintain the word list.',
+    '正面提示词': 'Positive prompt',
+    '训练 caption': 'Training captions',
+    '敏感词（一行一个，最多 1000 条）':
+      'Sensitive words (one per line, up to 1000)',
+    '保存过滤设置': 'Save filter settings',
+    '提示词过滤只做本地词表匹配，不能替代输出内容审核。':
+      'Prompt filtering is local word matching only; it is not a substitute for output moderation.',
+    '测试文本': 'Test text',
+    '测试命中': 'Test match',
+    '输入一段文字，检查会命中哪些规则':
+      'Enter text to see which rules match',
+    '例如：某个词': 'e.g. a word',
+    '提示词包含管理员禁止的内容，已拦截。':
+      'The prompt contains content blocked by the administrator.',
+    '提示词包含管理员关注的内容，已记录。':
+      "The prompt matched the admin's sensitive rules and was logged.",
     '自定义': 'Custom',
     '自定义…': 'Custom…',
     '4 秒（可能爆显存）': '4s (may run out of VRAM)',

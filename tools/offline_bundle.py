@@ -31,6 +31,7 @@ PROTECTED_FILES = {
     "trainings.json", "trainings.json.bak",
     "training_settings.json", "training_settings.json.bak",
     "loras.json", "loras.json.bak",
+    "sensitive_filter.json", "sensitive_filter.json.bak",
     "license.json", "access.json", "cert.pem", "key.pem",
     "worker_agent.json",
 }

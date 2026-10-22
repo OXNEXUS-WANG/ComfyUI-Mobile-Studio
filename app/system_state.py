@@ -28,6 +28,7 @@ CONFIG_FILES = (
     "trainings.json",
     "training_settings.json",
     "loras.json",
+    "sensitive_filter.json",
 )
 FORMAT = "comfyui-mobile-studio-snapshot"
 SNAPSHOT_DIR_NAME = "_restore_points"
