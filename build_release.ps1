@@ -44,6 +44,7 @@ $runtimeFiles = @(
     "training_settings.json", "training_settings.json.bak",
     "loras.json", "loras.json.bak",
     "sensitive_filter.json", "sensitive_filter.json.bak",
+    "disclaimer_accepted.json",
     "license.json", "cert.pem", "key.pem", "worker_agent.json", "access.json"
 )
 Get-ChildItem $Stage -Recurse -File -Force -ErrorAction SilentlyContinue |

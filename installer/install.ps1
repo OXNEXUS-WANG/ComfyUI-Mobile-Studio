@@ -11,10 +11,12 @@
     [string]$ComfyUIDir = "",
     [switch]$AllowUpdates,
     [switch]$NoShortcut,
-    [switch]$NoDialog
+    [switch]$NoDialog,
+    [switch]$AcceptDisclaimer
 )
 
 $PkgRoot = Split-Path -Parent $PSScriptRoot
+$Edition = "share"
 # 商用包即使被直接运行 install.ps1 或英文 install.bat，也强制清洁模式，
 # 避免误下模型/装 GPL 节点。
 $EditionFile = Join-Path $PkgRoot "EDITION"
@@ -36,6 +38,14 @@ if ($ComfyUIDir -and $InstallDir) {
 
 $ErrorActionPreference = "Stop"
 $PkgRoot = Split-Path -Parent $PSScriptRoot
+$AppVersion = "1.2.4"
+$VersionFile = Join-Path $PkgRoot "VERSION"
+if (Test-Path $VersionFile) {
+    $v = (Get-Content $VersionFile -Raw -Encoding ASCII).Trim()
+    if ($v) { $AppVersion = $v }
+}
+$DisclaimerVersion = "1.0"
+$DisclaimerFile = Join-Path $PkgRoot "DISCLAIMER.md"
 $Curl = Join-Path $env:SystemRoot "System32\curl.exe"
 $SevenZip = Join-Path $PkgRoot "tools\7zr.exe"
 $Manifest = Join-Path $PkgRoot "installer\models_manifest.json"
@@ -77,6 +87,9 @@ function Fail($msg) { throw $msg }
 $script:StageName = "启动"
 $script:Adaptations = New-Object System.Collections.ArrayList
 $script:Conflicts = New-Object System.Collections.ArrayList
+$script:DisclaimerAccepted = $false
+$script:DisclaimerAcceptedAt = ""
+$script:DisclaimerMode = ""
 $script:Dialogs = $false
 if (-not $NoDialog -and -not $Yes) {
     try {
@@ -113,6 +126,226 @@ function Use-ConsoleChoice($message) {
     if ($Yes -or $NoDialog) { return $false }
     $ans = Read-Host ("  " + $message + " [Y/n]")
     return ($ans -notmatch '^[nN]')
+}
+
+# ---------------------------------------------------- 首次安装免责声明
+function Show-Disclaimer {
+    # 醒目、可滚动、必须勾选同意的免责声明窗口。返回是否同意。
+    if (-not $script:Dialogs) { return $false }
+    if (-not (Test-Path $DisclaimerFile)) {
+        Fail ("安装包缺少免责声明文件：" + $DisclaimerFile)
+    }
+    $text = (Get-Content $DisclaimerFile -Raw -Encoding UTF8).Trim()
+    if (-not $text) { Fail ("免责声明文件为空：" + $DisclaimerFile) }
+    # 窗口里显示去掉 Markdown 记号的纯文本，文件本身保留完整格式。
+    $displayText = $text -replace '(?m)^#+\s*', '' -replace '\*\*', ''
+    $displayText = $displayText -replace '(?m)^---+$', '' -replace "`r`n`r`n`r`n", "`r`n`r`n"
+    try {
+        Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+        Add-Type -AssemblyName System.Drawing -ErrorAction Stop
+    } catch {
+        Fail ("无法创建免责声明窗口：" + $_.Exception.Message)
+    }
+
+    $form = New-Object System.Windows.Forms.Form
+    $form.Text = "免责声明与使用协议 · 安装前必须阅读"
+    $form.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::None
+    $workArea = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+    $cw = [Math]::Min(780, [Math]::Max(480, $workArea.Width - 40))
+    $ch = [Math]::Min(700, [Math]::Max(400, $workArea.Height - 40))
+    $form.ClientSize = New-Object System.Drawing.Size($cw, $ch)
+    $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
+    $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+    $form.MaximizeBox = $false
+    $form.MinimizeBox = $false
+    $form.ShowInTaskbar = $true
+    $form.TopMost = $true
+    $form.BackColor = [System.Drawing.Color]::FromArgb(12, 16, 26)
+    $form.ForeColor = [System.Drawing.Color]::FromArgb(235, 240, 250)
+
+    $header = New-Object System.Windows.Forms.Panel
+    $header.Location = New-Object System.Drawing.Point(0, 0)
+    $header.Size = New-Object System.Drawing.Size($cw, 96)
+    $header.BackColor = [System.Drawing.Color]::FromArgb(128, 22, 30)
+    $form.Controls.Add($header)
+
+    $title = New-Object System.Windows.Forms.Label
+    $title.Text = "重要：请先阅读免责声明"
+    $title.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 17, [System.Drawing.FontStyle]::Bold)
+    $title.ForeColor = [System.Drawing.Color]::White
+    $title.AutoSize = $false
+    $title.Location = New-Object System.Drawing.Point(24, 14)
+    $title.Size = New-Object System.Drawing.Size(($cw - 48), 34)
+    $header.Controls.Add($title)
+
+    $subtitle = New-Object System.Windows.Forms.Label
+    $subtitle.Text = "不同意请退出安装；勾选同意后才能继续。同意前不会修改系统。"
+    $subtitle.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 9.5)
+    $subtitle.ForeColor = [System.Drawing.Color]::FromArgb(255, 220, 220)
+    $subtitle.AutoSize = $false
+    $subtitle.Location = New-Object System.Drawing.Point(26, 54)
+    $subtitle.Size = New-Object System.Drawing.Size(($cw - 50), 26)
+    $header.Controls.Add($subtitle)
+
+    $box = New-Object System.Windows.Forms.RichTextBox
+    $box.Location = New-Object System.Drawing.Point(24, 112)
+    $box.Size = New-Object System.Drawing.Size(($cw - 48), ($ch - 270))
+    $box.ReadOnly = $true
+    $box.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+    $box.BackColor = [System.Drawing.Color]::FromArgb(8, 11, 18)
+    $box.ForeColor = [System.Drawing.Color]::FromArgb(220, 228, 240)
+    $box.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 9.5)
+    $box.ScrollBars = [System.Windows.Forms.RichTextBoxScrollBars]::Vertical
+    $box.DetectUrls = $false
+    $box.Text = $displayText
+    $box.Select(0, 0)
+    $form.Controls.Add($box)
+
+    $agree = New-Object System.Windows.Forms.CheckBox
+    $agree.Text = "我已阅读并理解上述免责声明，并同意遵守全部条款"
+    $agree.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 10.5, [System.Drawing.FontStyle]::Bold)
+    $agree.ForeColor = [System.Drawing.Color]::FromArgb(255, 226, 150)
+    $agree.AutoSize = $false
+    $agree.Location = New-Object System.Drawing.Point(24, ($ch - 146))
+    $agree.Size = New-Object System.Drawing.Size(($cw - 48), 30)
+    $form.Controls.Add($agree)
+
+    $hint = New-Object System.Windows.Forms.Label
+    $hint.Text = "提示：必须先勾选同意框，「同意并继续」按钮才会变为可点击。"
+    $hint.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 9)
+    $hint.ForeColor = [System.Drawing.Color]::FromArgb(150, 166, 190)
+    $hint.AutoSize = $false
+    $hint.Location = New-Object System.Drawing.Point(24, ($ch - 112))
+    $hint.Size = New-Object System.Drawing.Size(($cw - 48), 24)
+    $form.Controls.Add($hint)
+
+    $decline = New-Object System.Windows.Forms.Button
+    $decline.Text = "退出安装"
+    $decline.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 10)
+    $decline.Location = New-Object System.Drawing.Point(
+        ($cw - 24 - 146 - 12 - 132), ($ch - 64))
+    $decline.Size = New-Object System.Drawing.Size(132, 44)
+    $decline.BackColor = [System.Drawing.Color]::FromArgb(48, 54, 68)
+    $decline.ForeColor = [System.Drawing.Color]::FromArgb(235, 240, 250)
+    $decline.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $decline.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(110, 120, 140)
+    $form.Controls.Add($decline)
+
+    $accept = New-Object System.Windows.Forms.Button
+    $accept.Text = "同意并继续"
+    $accept.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 10, [System.Drawing.FontStyle]::Bold)
+    $accept.Location = New-Object System.Drawing.Point(
+        ($cw - 24 - 146), ($ch - 64))
+    $accept.Size = New-Object System.Drawing.Size(146, 44)
+    $accept.BackColor = [System.Drawing.Color]::FromArgb(46, 160, 110)
+    $accept.ForeColor = [System.Drawing.Color]::White
+    $accept.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $accept.FlatAppearance.BorderSize = 0
+    $accept.Enabled = $false
+    $form.Controls.Add($accept)
+
+    $form.AcceptButton = $accept
+    $form.CancelButton = $decline
+    $script:DlgForm = $form
+    $script:DlgAgree = $agree
+    $script:DlgAccept = $accept
+    $script:DlgAccepted = $false
+    $agree.Add_CheckedChanged({
+        $script:DlgAccept.Enabled = [bool]$script:DlgAgree.Checked
+    })
+    $accept.Add_Click({
+        if ($script:DlgAgree.Checked) {
+            $script:DlgAccepted = $true
+            $script:DlgForm.Close()
+        }
+    })
+    $decline.Add_Click({
+        $script:DlgAccepted = $false
+        $script:DlgForm.Close()
+    })
+
+    try {
+        $form.ShowDialog() | Out-Null
+    } finally {
+        try { $form.Dispose() } catch { }
+    }
+    return [bool]$script:DlgAccepted
+}
+
+function Write-DisclaimerMarker([string]$Dir, [string]$Mode) {
+    # 把接受记录写到安装目录；只用于本机首次安装判断，不放进发布包。
+    $marker = Join-Path $Dir "disclaimer_accepted.json"
+    $payload = [ordered]@{
+        accepted = $true
+        version = $DisclaimerVersion
+        accepted_at = $script:DisclaimerAcceptedAt
+        app_version = $AppVersion
+        edition = $Edition
+        method = $Mode
+        user = [string]$env:USERNAME
+        machine = [string]$env:COMPUTERNAME
+    }
+    try {
+        New-Item -ItemType Directory -Force -Path $Dir | Out-Null
+        $json = $payload | ConvertTo-Json
+        [IO.File]::WriteAllText(
+            $marker, $json, (New-Object System.Text.UTF8Encoding($false)))
+    } catch {
+        Warn ("无法写入免责声明接受记录：" + $_.Exception.Message)
+    }
+}
+
+function Confirm-Disclaimer([string]$Dir) {
+    if ($DryRun) {
+        Say "  DryRun：不修改任何文件，跳过免责声明接受记录。" "Cyan"
+        return
+    }
+    if (-not (Test-Path $DisclaimerFile)) {
+        Fail ("安装包缺少免责声明文件：" + $DisclaimerFile)
+    }
+    $marker = Join-Path $Dir "disclaimer_accepted.json"
+    if (Test-Path $marker) {
+        try {
+            $old = Get-Content $marker -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($old.accepted -eq $true -and
+                [string]$old.version -eq $DisclaimerVersion) {
+                $script:DisclaimerAccepted = $true
+                $script:DisclaimerAcceptedAt = [string]$old.accepted_at
+                $script:DisclaimerMode = "此前已接受"
+                Ok ("免责声明已接受（" + $script:DisclaimerAcceptedAt + "）")
+                return
+            }
+        } catch {
+            Warn "免责声明接受记录损坏，将重新显示协议。"
+        }
+    }
+
+    $script:StageName = "免责声明"
+    if ($AcceptDisclaimer) {
+        $script:DisclaimerAccepted = $true
+        $script:DisclaimerAcceptedAt = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+        $script:DisclaimerMode = "无人值守参数 -AcceptDisclaimer"
+        Write-DisclaimerMarker $Dir "command_line"
+        Ok "已通过 -AcceptDisclaimer 接受免责声明。"
+        return
+    }
+    if (-not $script:Dialogs) {
+        Fail ("首次安装需要阅读并同意免责声明。" +
+              "`n无人值守安装请显式添加 -AcceptDisclaimer 参数。")
+    }
+
+    Say ""
+    Say "  首次安装：必须阅读并同意免责声明后才能继续。" "Red"
+    if (-not (Show-Disclaimer)) {
+        Fail "用户取消安装：未同意免责声明。"
+    }
+    $script:DisclaimerAccepted = $true
+    if (-not $script:DisclaimerAcceptedAt) {
+        $script:DisclaimerAcceptedAt = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+    }
+    $script:DisclaimerMode = "安装界面勾选同意"
+    Write-DisclaimerMarker $Dir "interactive"
+    Ok "免责声明已接受，继续安装。"
 }
 
 function Clear-PythonEnv {
@@ -547,10 +780,10 @@ function Copy-AppFiles {
     }
     # 版本号、许可证、更新日志和根目录小工具（商业包没有的文件自动跳过）。
     $rootFiles = @(
-        "VERSION", "VERSION_LOCK.md", "LICENSE", "THIRD_PARTY_NOTICES.md",
-        "README.md", "CHANGELOG.md", "EDITIONS.md", "COMMERCIAL_LICENSE.md",
-        "安装说明.txt", "备份数据.bat", "恢复数据.bat", "打包到U盘.bat",
-        "运行测试.bat"
+        "VERSION", "VERSION_LOCK.md", "DISCLAIMER.md", "LICENSE",
+        "THIRD_PARTY_NOTICES.md", "README.md", "CHANGELOG.md", "EDITIONS.md",
+        "COMMERCIAL_LICENSE.md", "安装说明.txt", "备份数据.bat",
+        "恢复数据.bat", "打包到U盘.bat", "运行测试.bat"
     )
     foreach ($name in $rootFiles) {
         $src = Join-Path $PkgRoot $name
@@ -955,6 +1188,8 @@ function Write-Report {
     $lines += ("自定义节点: " + $(if ($NoCustomNodes) { "跳过" } else { "已安装" }))
     $lines += ("ComfyUI 来源: " + $(if ($SkipComfyUI) { "用户现有安装，未自动更新" } else { "安装器下载/更新" }))
     $lines += ("商业清洁模式: " + $(if ($CommercialClean) { "是" } else { "否" }))
+    $lines += ("免责声明: 已接受（版本 " + $DisclaimerVersion + "；" +
+               $script:DisclaimerAcceptedAt + "；" + $script:DisclaimerMode + "）")
     $lines += ("管理员账号: admin")
     $lines += ("本机地址: https://127.0.0.1:8800")
     $lines += ("手机地址: https://192.168.137.1:8800（连接电脑热点后）")
@@ -1114,6 +1349,10 @@ try {
     $admin = Test-Admin
     Say ("  管理员权限: " + $(if ($admin) { "是" } else { "否（防火墙规则需手动修复）" }))
 
+    # 在停止任何旧服务、写文件或下载之前完成首次安装免责协议确认。
+    # DryRun 不修改系统，Confirm-Disclaimer 会直接跳过。
+    Confirm-Disclaimer $InstallDir
+
     # 端口/进程冲突：本项目的旧服务会询问后停止；外部程序占用则说明后果。
     # DryRun 只报告，绝不停止任何正在运行的服务。
     if ($DryRun) {
@@ -1224,6 +1463,7 @@ try {
     Say ("  本机打开：https://127.0.0.1:8800")
     Say ("  手机打开：https://192.168.137.1:8800（先连电脑热点）")
     Say "  管理员账号：admin（密码是你刚才设置的）"
+    Say ("  免责声明：已阅读并同意（" + $script:DisclaimerMode + "）") "Green"
     Say ""
     if ($NoShortcut) {
         Say "  下一步：双击安装目录里的「一键启动.bat」，等待启动完成后用浏览器打开。" "Green"

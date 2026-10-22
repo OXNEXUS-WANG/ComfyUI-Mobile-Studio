@@ -28,6 +28,7 @@ loras.json
 loras.json.bak
 sensitive_filter.json
 sensitive_filter.json.bak
+disclaimer_accepted.json
 license.json
 access.json
 cert.pem

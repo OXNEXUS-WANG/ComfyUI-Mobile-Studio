@@ -14,13 +14,17 @@ ComfyUI Mobile Studio · 商用版
 --------
 1. 解压 Setup ZIP 到一个普通文件夹。
 2. 双击“安装.bat”。
-3. 安装器默认使用商业清洁模式：
+3. 选择安装目录。
+4. **首次安装会弹出醒目的免责声明与使用协议窗口**：完整阅读后勾选同意，
+   再点“同意并继续”。不勾选无法继续；点“退出安装”不会修改系统。
+   完整文本在 DISCLAIMER.md。无人值守安装必须显式加 `-AcceptDisclaimer`。
+5. 安装器默认使用商业清洁模式：
    - 不下载画图模型
    - 不安装 GPL 自定义节点
    - 中文翻译使用 MIT 兼容层，不安装 AGPL 的 MiniSBD
    - 已有 ComfyUI 直接复用，不自动更新
    - 没有 ComfyUI 时询问是否下载官方版本
-4. 安装完成后，桌面出现“手机出图”快捷方式。
+6. 安装完成后，桌面出现“手机出图”快捷方式。
 
 如果已有 ComfyUI，也可以在命令行指定：
   installer\install.ps1 -CommercialClean -ComfyUIDir "D:\你的ComfyUI目录"

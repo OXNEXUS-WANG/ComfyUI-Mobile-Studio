@@ -107,18 +107,24 @@ commit、模型 revision 和 7zr 哈希都已锁定，不会自动追最新版�
 
 ## 2. 安装
 
-1. 分享版从 GitHub Releases 下载 `ComfyUI-Mobile-Studio-v1.2.3-Share.zip`；
-   商用客户使用 `ComfyUI-Mobile-Studio-v1.2.3-Commercial.zip`。
+1. 分享版从 GitHub Releases 下载 `ComfyUI-Mobile-Studio-v1.2.4-Share.zip`；
+   商用客户使用 `ComfyUI-Mobile-Studio-v1.2.4-Commercial.zip`。
 2. 解压到一个目录（不要在压缩包里直接运行）。
 3. 双击 `安装.bat`（或 `install.bat`）。
-4. 按提示操作：
+4. **首次安装必须先阅读并同意醒目的免责声明与使用协议**：窗口内可滚动阅读，
+   勾选“我已阅读并理解上述免责声明”后“同意并继续”按钮才可点击；
+   “退出安装”不会修改系统。完整文本见 `DISCLAIMER.md`。
+   无人值守安装必须显式加 `-AcceptDisclaimer`，否则安装器拒绝执行。
+5. 按提示操作：
 
    - 选择安装目录，默认 `D:\AI\ComfyUI_windows_portable`
    - 设置管理员密码（至少 8 位）
    - 选择模型包：直接回车 = Anima 2B + 放大模型
    - 等待下载 ComfyUI、Python 依赖、自定义节点和模型
 
-5. 安装完成后，桌面会出现 **手机出图** 快捷方式。
+6. 安装完成后，桌面会出现 **手机出图** 快捷方式。
+   接受记录写入安装目录的 `disclaimer_accepted.json`（只在本机判断，
+   不含密码，不进发布包）。
 
 安装器会做这些事：
 
@@ -161,7 +167,14 @@ installer\install.ps1 -CommercialClean -SkipComfyUI -InstallDir D:\AI\ComfyUI_wi
 
 # 复用已有 ComfyUI
 installer\install.ps1 -CommercialClean -ComfyUIDir D:\AI\ComfyUI_windows_portable
+
+# 无人值守安装：必须显式接受免责声明
+installer\install.ps1 -CommercialClean -Yes -AcceptDisclaimer `
+  -InstallDir D:\AI\ComfyUI_windows_portable
 ```
+
+> `-Yes` / `-NoDialog` 只关闭交互，**不等于同意免责声明**。首次安装必须
+> 同时加 `-AcceptDisclaimer`，或者手动运行一次并勾选同意。
 
 这样 Setup ZIP 里只有你的安装程序和网页代码，ComfyUI、模型和 GPL 节点由
 用户自己选择。中文翻译使用 MIT 兼容层，不引入 AGPL 的 MiniSBD。
@@ -582,6 +595,8 @@ ComfyUI_windows_portable/
 个人学习、研究、实验、私人娱乐和非商业组织使用免费；
 **任何商业用途必须事先取得版权所有者的书面授权**。
 详见 `LICENSE`、`COMMERCIAL_LICENSE.md` 和 `商用授权说明.md`。
+安装和使用前还必须阅读并同意 `DISCLAIMER.md`（首次安装会强制弹窗勾选，
+无人值守安装需显式加 `-AcceptDisclaimer`）。
 
 > 严格来说，PolyForm Noncommercial 不是 OSI 定义的开源许可证，
 > 而是“源码可见、非商业免费、商业需授权”的源代码许可。

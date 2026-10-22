@@ -32,6 +32,7 @@ PROTECTED_FILES = {
     "training_settings.json", "training_settings.json.bak",
     "loras.json", "loras.json.bak",
     "sensitive_filter.json", "sensitive_filter.json.bak",
+    "disclaimer_accepted.json",
     "license.json", "access.json", "cert.pem", "key.pem",
     "worker_agent.json",
 }
@@ -47,7 +48,7 @@ APP_DIRS = ("worker", "docs", "installer", "tools", "webapp_templates")
 ROOT_FILES = (
     "VERSION", "EDITION", "README.md", "README-COMMERCIAL.md",
     "CHANGELOG.md", "使用说明.md", "安装说明.txt", "安装说明_商业版.txt",
-    "COMMERCIAL_EULA.md", "COMMERCIAL_LICENSE.md", "LICENSE",
+    "DISCLAIMER.md", "COMMERCIAL_EULA.md", "COMMERCIAL_LICENSE.md", "LICENSE",
     "THIRD_PARTY_NOTICES.md", "VERSION_LOCK.md", "EDITIONS.md",
     "商用授权说明.md", "商用版授权协议.md",
 )
