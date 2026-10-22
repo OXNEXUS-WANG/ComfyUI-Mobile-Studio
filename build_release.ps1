@@ -43,7 +43,9 @@ if (-not $IncludeShowcase) {
         $start = -1
         $end = -1
         for ($i = 0; $i -lt $lines.Count; $i++) {
-            if ($start -lt 0 -and $lines[$i] -eq '<p align="center">') { $start = $i }
+            if ($start -lt 0 -and $lines[$i] -match 'docs/media/hero\.png') {
+                $start = [Math]::Max(0, $i - 1)
+            }
             if ($lines[$i] -like '> Screenshots use demo data;*') { $end = $i; break }
         }
         if ($start -ge 0 -and $end -gt $start) {

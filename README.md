@@ -3,6 +3,8 @@
 把 ComfyUI 包装成一个可以用手机浏览器访问的本地出图工作台。  
 Turn ComfyUI into a private, mobile-first image-generation studio.
 
+<p align="center"><a href="#english">English</a> &nbsp;·&nbsp; <a href="#chinese">中文</a></p>
+
 > **完整双语介绍（含管理员后台、UI 与星图截图/GIF）：** [GITHUB_INTRO.md](GITHUB_INTRO.md)  
 > Full bilingual showcase with admin console, UI and star-map screenshots/GIFs: [GITHUB_INTRO.md](GITHUB_INTRO.md)
 >
@@ -39,6 +41,29 @@ Turn ComfyUI into a private, mobile-first image-generation studio.
 
 > 截图为演示数据，作品由 CometInk 调用 Anima 2B / Juggernaut XI 生成。  
 > Screenshots use demo data; artwork was generated through CometInk with Anima 2B / Juggernaut XI.
+
+---
+
+<a id="english"></a>
+## English overview
+
+**CometInk 彗墨** is a local, mobile-first control room for ComfyUI on Windows. It turns one GPU machine into a small private studio: open the page from a phone, write a prompt, queue a job, browse the result, and let the admin manage accounts, quotas, workers, models, training, and logs from the same interface.
+
+- **Phone-first UI**: no app install; works over the PC hotspot and can be added to the home screen as a PWA.
+- **Fair multi-user queue**: admin, normal, and 24-hour guest accounts; per-user quotas, feature switches, traffic accounting, and a least-recently-served queue.
+- **Admin console**: accounts, limits, 14 feature switches, queue pause/maintenance windows, LAN worker approval, model management, training approval, and audit logs.
+- **Isolated galleries**: per-account and per-checkpoint folders, favourites, search, multi-select ZIP export, upscale, and re-edit.
+- **LoRA training**: admin approval, dataset upload or gallery import, GPU resource gates, private/shared LoRA, Anima 2B recommended.
+- **3D API star map**: features, categories, and API endpoints as planets; live task lighting, flow view, in-map generation deck, and a draggable layout mode.
+- **LAN-only security**: HTTPS, PBKDF2 passwords, hashed sessions, login lockout, upload quarantine, path-traversal protection, and no public-internet exposure.
+
+Full bilingual showcase with UI and admin screenshots: **[GITHUB_INTRO.md](GITHUB_INTRO.md)**  
+Full manual: **[MANUAL.md](MANUAL.md)**
+
+---
+
+<a id="chinese"></a>
+## 中文详细说明
 
 - 品牌 **CometInk 彗墨**：深色彗星墨迹 C 图标，网页、PWA、浏览器标签和桌面快捷方式统一
 - 手机扫码/打开网页即可出图，支持文生图、图生图、局部重绘、高清修复、放大
