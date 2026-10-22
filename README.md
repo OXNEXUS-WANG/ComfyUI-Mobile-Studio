@@ -674,3 +674,15 @@ ComfyUI 地址默认是 `http://127.0.0.1:8188`。需要改端口或指向别的
 
 完整清单、链接和说明见 `THIRD_PARTY_NOTICES.md`。
 模型文件不随本仓库分发，下载和使用请遵守原模型许可。
+
+
+---
+
+## 赞赏 / Support
+
+如果这个项目帮到了你，可以请我喝杯奶茶。赞赏完全自愿，不影响任何功能。
+
+<p align="center">
+  <img src="docs/support-qr.png" alt="CometInk 微信赞赏码" width="220">
+</p>
+<p align="center"><sub>微信赞赏码 · WeChat tip code</sub></p>

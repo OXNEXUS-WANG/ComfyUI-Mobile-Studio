@@ -344,3 +344,16 @@ Coverage includes installer layout, account permissions, queueing, gallery isola
   <sub>CometInk 彗墨 · 本地、私有、手机优先的 ComfyUI 工作台<br>
   Local, private, mobile-first ComfyUI studio</sub>
 </p>
+
+
+---
+
+## 赞赏 / Support
+
+如果这个项目帮到了你，可以请我喝杯奶茶。赞赏完全自愿，不影响任何功能。
+If CometInk saved you some time, you can buy me a coffee. Tips are optional and never affect any feature.
+
+<p align="center">
+  <img src="docs/support-qr.png" alt="CometInk 微信赞赏码 / WeChat tip code" width="220">
+</p>
+<p align="center"><sub>微信赞赏码 · WeChat tip code</sub></p>
