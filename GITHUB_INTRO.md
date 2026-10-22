@@ -265,8 +265,8 @@ flowchart LR
 
 1. **下载 / Download** — 从 **Releases** 下载 `CometInk-v1.3.6-Share.zip`。  
    Download `CometInk-v1.3.6-Share.zip` from **Releases**.
-2. **安装 / Install** — 解压到普通目录，双击 `安装.bat`。  
-   Extract to a normal folder and run `安装.bat`.
+2. **安装 / Install** — 解压到普通目录，双击 `安装.bat`（英文入口 `install.bat`）。  
+   Extract to a normal folder and run `安装.bat` (English entry: `install.bat`).
 3. **选择 / Choose** — 阅读免责声明，设置管理员密码，选择模型包。  
    Read the disclaimer, set the admin password, and choose a model pack.
 4. **启动 / Launch** — 双击桌面的 **CometInk Studio**。  
@@ -279,9 +279,13 @@ flowchart LR
 完整步骤、界面说明、故障排查见 **[MANUAL.md](MANUAL.md)**。  
 Full steps, UI reference, and troubleshooting are in **[MANUAL.md](MANUAL.md)**.
 
+> 安装器界面是中文；英文用户可以看 **[INSTALL.en.md](INSTALL.en.md)**，里面有中文提示对照和无交互安装命令。  
+> The installer UI is in Chinese; English users can follow **[INSTALL.en.md](INSTALL.en.md)** for a prompt label map and an unattended install command.
+
 ### 详细文档 / Documentation
 
 - [MANUAL.md](MANUAL.md) — 完整使用手册 / Full manual
+- [INSTALL.en.md](INSTALL.en.md) — 英文安装与使用指南 / English installation & usage guide
 - [安装说明.txt](安装说明.txt) — 安装器逐步说明 / Installer walkthrough
 - [EDITIONS.md](EDITIONS.md) — 分享版 / 商用版构建说明 / Share & Commercial builds
 - [VERSION_LOCK.md](VERSION_LOCK.md) — ComfyUI / 依赖 / 模型版本锁定 / Version lock

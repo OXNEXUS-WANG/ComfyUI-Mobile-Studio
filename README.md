@@ -8,6 +8,9 @@ Turn ComfyUI into a private, mobile-first image-generation studio.
 > **完整双语介绍（含管理员后台、UI 与星图截图/GIF）：** [GITHUB_INTRO.md](GITHUB_INTRO.md)  
 > Full bilingual showcase with admin console, UI and star-map screenshots/GIFs: [GITHUB_INTRO.md](GITHUB_INTRO.md)
 >
+> **English installation & usage guide:** [INSTALL.en.md](INSTALL.en.md)  
+> 英文安装、启动、手机访问、出图、图库、后台、训练和故障排查。
+>
 > **完整使用手册：** [MANUAL.md](MANUAL.md)  
 > 安装、界面、出图、图库、队列、多账号、训练、星图、安全与故障排查，都在这里。
 
@@ -49,6 +52,19 @@ Turn ComfyUI into a private, mobile-first image-generation studio.
 
 **CometInk 彗墨** is a local, mobile-first control room for ComfyUI on Windows. It turns one GPU machine into a small private studio: open the page from a phone, write a prompt, queue a job, browse the result, and let the admin manage accounts, quotas, workers, models, training, and logs from the same interface.
 
+### Quick start
+
+1. Download `CometInk-v1.3.6-Share.zip` from **Releases** and extract it.
+2. Run **`install.bat`** (the Chinese-name `安装.bat` opens the same installer).
+3. Choose the install folder, admin password, and model pack.
+4. Launch **CometInk Studio** from the desktop shortcut.
+5. Open `https://127.0.0.1:8800/` and sign in as `admin`.
+6. For phone access, turn on the Windows mobile hotspot and open `https://192.168.137.1:8800`.
+
+The installer UI is in Chinese, but **`INSTALL.en.md`** includes a prompt label map and a fully unattended PowerShell command. The application UI itself is bilingual; switch it with the `EN` / `中文` button.
+
+### What you get
+
 - **Phone-first UI**: no app install; works over the PC hotspot and can be added to the home screen as a PWA.
 - **Fair multi-user queue**: admin, normal, and 24-hour guest accounts; per-user quotas, feature switches, traffic accounting, and a least-recently-served queue.
 - **Admin console**: accounts, limits, 14 feature switches, queue pause/maintenance windows, LAN worker approval, model management, training approval, and audit logs.
@@ -57,8 +73,9 @@ Turn ComfyUI into a private, mobile-first image-generation studio.
 - **3D API star map**: features, categories, and API endpoints as planets; live task lighting, flow view, in-map generation deck, and a draggable layout mode.
 - **LAN-only security**: HTTPS, PBKDF2 passwords, hashed sessions, login lockout, upload quarantine, path-traversal protection, and no public-internet exposure.
 
+**English installation & usage guide:** **[INSTALL.en.md](INSTALL.en.md)**  
 Full bilingual showcase with UI and admin screenshots: **[GITHUB_INTRO.md](GITHUB_INTRO.md)**  
-Full manual: **[MANUAL.md](MANUAL.md)**
+Chinese manual: **[MANUAL.md](MANUAL.md)**
 
 ---
 
