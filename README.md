@@ -1,35 +1,44 @@
 # CometInk 彗墨 · ComfyUI 手机出图
 
-把 ComfyUI 包装成一个可以用手机浏览器访问的出图工作台：
+把 ComfyUI 包装成一个可以用手机浏览器访问的本地出图工作台。  
+Turn ComfyUI into a private, mobile-first image-generation studio.
 
+> **完整双语介绍（含管理员后台、UI 与星图截图/GIF）：** [GITHUB_INTRO.md](GITHUB_INTRO.md)  
+> Full bilingual showcase with admin console, UI and star-map screenshots/GIFs: [GITHUB_INTRO.md](GITHUB_INTRO.md)
+>
 > **完整使用手册：** [MANUAL.md](MANUAL.md)  
-> 安装、界面、出图、图库、队列、多账号、训练、星图、安全与故障排查，都在这里。  
-> **图文介绍 / GitHub 展示页：** [GITHUB_INTRO.md](GITHUB_INTRO.md)
+> 安装、界面、出图、图库、队列、多账号、训练、星图、安全与故障排查，都在这里。
 
 <p align="center">
   <img src="docs/media/hero.png" alt="CometInk 彗墨" width="100%">
 </p>
 
 <p align="center">
-  <img src="docs/media/ui-generator.png" alt="出图工作台" width="49%">
-  <img src="docs/media/result-modal.png" alt="出图结果" width="49%">
+  <img src="docs/media/zh/ui-generator.png" alt="中文出图工作台" width="49%">
+  <img src="docs/media/en/ui-generator.png" alt="English generator" width="49%">
 </p>
+<p align="center"><sub>出图工作台 · Generator（中 / EN）</sub></p>
 
 <p align="center">
-  <img src="docs/media/ui-gallery.png" alt="图库" width="66%">
-  <img src="docs/media/ui-mobile.png" alt="手机界面" width="20%">
+  <img src="docs/media/zh/admin-overview.png" alt="中文管理员后台" width="49%">
+  <img src="docs/media/en/admin-overview.png" alt="English admin console" width="49%">
 </p>
+<p align="center"><sub>管理员后台 · Admin console（中 / EN）</sub></p>
 
 <p align="center">
-  <img src="docs/media/star-map.png" alt="3D 接口星图" width="100%">
+  <img src="docs/media/zh/star-map.png" alt="中文 3D 接口星图" width="49%">
+  <img src="docs/media/en/star-map.png" alt="English 3D star map" width="49%">
 </p>
+<p align="center"><sub>3D 接口星图 · 3D API star map（中 / EN）</sub></p>
 
 <p align="center">
-  <img src="docs/media/star-map.gif" alt="星图旋转" width="72%">
-  <img src="docs/media/ui-tabs.gif" alt="页面切换" width="27%">
+  <img src="docs/media/zh/ui-tabs.gif" alt="中文页面切换" width="49%">
+  <img src="docs/media/en/ui-tabs.gif" alt="English page tabs" width="49%">
 </p>
+<p align="center"><sub>页面切换 · Page tabs（中 / EN）</sub></p>
 
-> 截图中的作品由 CometInk 调用 Anima 2B 生成，仅用于界面展示。
+> 截图中的账号与作品均为演示数据，作品由 CometInk 调用 Anima 2B / Juggernaut XI 生成。  
+> Screenshots use demo accounts; artwork was generated through CometInk with Anima 2B / Juggernaut XI.
 
 - 品牌 **CometInk 彗墨**：深色彗星墨迹 C 图标，网页、PWA、浏览器标签和桌面快捷方式统一
 - 手机扫码/打开网页即可出图，支持文生图、图生图、局部重绘、高清修复、放大
