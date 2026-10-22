@@ -26,17 +26,17 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 import runtime_settings  # noqa: E402
+from comfy_client import COMFY_BASE, COMFY_PORT  # noqa: E402
 
 PY = os.path.join(ROOT, "python_embeded", "python.exe")
 WEB_PORT = 8800
-COMFY_PORT = 8188
 CERT_FILE = os.path.join(ROOT, "cert.pem")
 KEY_FILE = os.path.join(ROOT, "key.pem")
 WEB_SCHEME = "https" if (os.path.isfile(CERT_FILE) and
                          os.path.isfile(KEY_FILE)) else "http"
 WEB_BASE = "%s://127.0.0.1:%d" % (WEB_SCHEME, WEB_PORT)
 WEB_URL = WEB_BASE + "/"
-COMFY_CHECK = "http://127.0.0.1:8188/system_stats"
+COMFY_CHECK = COMFY_BASE + "/system_stats"
 
 
 def log(msg):

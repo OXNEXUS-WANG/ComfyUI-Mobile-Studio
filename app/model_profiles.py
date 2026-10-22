@@ -12,184 +12,61 @@ import time
 
 _CACHE = {}
 
-# 已知家族的推荐参数。UI 和后端都从这里取，避免两边各写一套。
-PROFILES = {
-    "anima": {
-        "family": "anima", "label": "动漫 · Anima 2B", "kind": "anime",
-        "steps": 30, "cfg": 4.0, "sampler": "euler",
-        "recommended_size": "832x1216", "vpred": False, "pag": False,
-        "supports_lora": True, "supports_negative": True,
-        "supports_hires": True, "supported": True, "beginner": True,
-        "badges": ["新手推荐", "动漫"],
-        "tip": "原生支持中文描述，动漫首选。不能使用 SDXL LoRA 和 PAG；可用 Anima 专用 LoRA/极速 LoRA。",
-        "advice": ["初次使用建议直接按推荐参数出图。", "想更快可打开「Anima 极速」（8 步）。"],
-    },
-    "noob": {
-        "family": "noob", "label": "动漫 · NoobAI Vpred", "kind": "anime",
-        "steps": 30, "cfg": 4.5, "sampler": "euler",
-        "recommended_size": "832x1216", "vpred": True, "pag": True,
-        "supports_lora": True, "supports_negative": True,
-        "supports_hires": True, "supported": True, "beginner": False,
-        "badges": ["v-pred", "动漫"],
-        "tip": "角色和画师标签最全。v-pred 模型必须用 Euler，CFG 4~5。",
-        "advice": ["不要换成 DPM++ 等其他采样器。", "冷门角色可以用英文 tag 补全。"],
-    },
-    "sdxl_anime": {
-        "family": "sdxl_anime", "label": "动漫 · SDXL", "kind": "anime",
-        "steps": 25, "cfg": 6.5, "sampler": "dpmpp_2m",
-        "recommended_size": "832x1216", "vpred": False, "pag": True,
-        "supports_lora": True, "supports_negative": True,
-        "supports_hires": True, "supported": True, "beginner": True,
-        "badges": ["SDXL", "动漫"],
-        "tip": "通用 SDXL 动漫模型，LoRA 生态好，适合大多数二次元需求。",
-        "advice": ["SDXL 原生分辨率约 1024，竖图 832×1216 比较稳。"],
-    },
-    "sdxl_photo": {
-        "family": "sdxl_photo", "label": "写实 · SDXL", "kind": "photo",
-        "steps": 30, "cfg": 5.0, "sampler": "dpmpp_2m",
-        "recommended_size": "1216x832", "vpred": False, "pag": True,
-        "supports_lora": True, "supports_negative": True,
-        "supports_hires": True, "supported": True, "beginner": True,
-        "badges": ["SDXL", "写实"],
-        "tip": "写实/风景 SDXL 模型。建议横图 1216×832，DPM++ 2M。",
-        "advice": ["写实模型不需要动漫质量词，描述主体、光线、镜头即可。"],
-    },
-    "pony": {
-        "family": "pony", "label": "动漫 · Pony / SDXL", "kind": "anime",
-        "steps": 25, "cfg": 6.0, "sampler": "euler_ancestral",
-        "recommended_size": "1024x1024", "vpred": False, "pag": True,
-        "supports_lora": True, "supports_negative": True,
-        "supports_hires": True, "supported": True, "beginner": False,
-        "badges": ["Pony", "标签系"],
-        "tip": "Pony 系模型依赖 score_9、score_8_up 等质量标签；网页会自动补。",
-        "advice": ["网页会自动补 score_9, score_8_up, score_7_up；自己写了就不会重复加。",
-                   "负面词可用 score_4, score_5, score_6。"],
-    },
-    "sd15_anime": {
-        "family": "sd15_anime", "label": "动漫 · SD1.5", "kind": "anime",
-        "steps": 28, "cfg": 7.0, "sampler": "euler_ancestral",
-        "recommended_size": "512x768", "vpred": False, "pag": False,
-        "supports_lora": True, "supports_negative": True,
-        "supports_hires": True, "supported": True, "beginner": True,
-        "badges": ["SD1.5", "动漫"],
-        "tip": "老一代 SD1.5 动漫模型，速度快、LoRA 多，但原生分辨率只有 512。",
-        "advice": ["先用 512×768 出图；要更大再开高清修复。"],
-    },
-    "sd15": {
-        "family": "sd15", "label": "通用 · SD1.5", "kind": "general",
-        "steps": 28, "cfg": 7.0, "sampler": "euler_ancestral",
-        "recommended_size": "512x768", "vpred": False, "pag": False,
-        "supports_lora": True, "supports_negative": True,
-        "supports_hires": True, "supported": True, "beginner": True,
-        "badges": ["SD1.5"],
-        "tip": "老一代 SD1.5 模型，速度快，适合低显存和快速草图。",
-        "advice": ["直接开 1024 容易画出重复人物；先 512×768。"],
-    },
-    "flux": {
-        "family": "flux", "label": "通用 · Flux", "kind": "general",
-        "steps": 20, "cfg": 1.0, "sampler": "euler",
-        "recommended_size": "1024x1024", "vpred": False, "pag": False,
-        "supports_lora": True, "supports_negative": False,
-        "supports_hires": False, "supported": False, "beginner": False,
-        "badges": ["Flux", "实验性"],
-        "tip": "Flux 通常需要单独的 UNET、CLIP 和 VAE，CFG 固定约 1。",
-        "advice": ["当前网页对 Flux 只做识别；请确认你使用的是一体式 checkpoint。",
-                   "多数 Flux 模型需要单独的组件加载流程，不建议新手先用。"],
-    },
-    "qwen_image": {
-        "family": "qwen_image", "label": "通用 · Qwen-Image", "kind": "general",
-        "steps": 20, "cfg": 2.5, "sampler": "euler",
-        "recommended_size": "1024x1024", "vpred": False, "pag": False,
-        "supports_lora": True, "supports_negative": True,
-        "supports_hires": False, "supported": False, "beginner": False,
-        "badges": ["Qwen", "实验性"],
-        "tip": "Qwen-Image 通常需要单独的 UNET、文本编码器和 VAE。",
-        "advice": ["当前网页对 Qwen-Image 只做识别；建议使用 Anima 或 SDXL。"],
-    },
-    "unknown": {
+# 模型数据外置：新增模型/改推荐参数只需要编辑 model_catalog.json。
+# 这里保留极小兜底，JSON 损坏时服务仍能启动并提示“未识别”。
+_CATALOG_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "model_catalog.json")
+
+
+def _load_catalog():
+    try:
+        with open(_CATALOG_PATH, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+_CATALOG = _load_catalog()
+PROFILES = _CATALOG.get("profiles") or {}
+SIZE_PRESETS = _CATALOG.get("size_presets") or {}
+EN = _CATALOG.get("en") or {}
+NAME_HINTS = tuple(tuple(x) for x in (_CATALOG.get("name_hints") or ()))
+
+
+def catalog():
+    """给 app_core 读取人工模型预设等同一份目录数据。"""
+    return _CATALOG
+
+
+if "unknown" not in PROFILES:
+    PROFILES["unknown"] = {
         "family": "unknown", "label": "未识别模型", "kind": "general",
         "steps": 25, "cfg": 6.0, "sampler": "dpmpp_2m",
         "recommended_size": "832x1216", "vpred": False, "pag": True,
         "supports_lora": True, "supports_negative": True,
         "supports_hires": True, "supported": True, "beginner": False,
-        "badges": ["未识别"],
-        "tip": "没有从文件名或权重里认出架构，先按通用 SDXL 参数试用。",
-        "advice": ["如果画面异常，请确认模型是 SD1.5、SDXL 还是 Flux。",
-                   "可以在模型文件名里带上 sd15 / sdxl / pony / flux 方便识别。"],
-    },
-}
+        "badges": ["未识别"], "tip": "没有识别出架构，按通用 SDXL 参数试用。",
+        "advice": ["确认模型是 SD1.5、SDXL 还是 Flux。"],
+    }
+if "unknown" not in SIZE_PRESETS:
+    SIZE_PRESETS["unknown"] = {
+        "sizes": ["832x1216", "1216x832", "1024x1024", "512x512"],
+        "max_side": 1536, "max_pixels": 1500000,
+    }
+if "unknown" not in EN:
+    EN["unknown"] = {
+        "label": "Unrecognized model",
+        "tip": "Architecture was not detected; generic SDXL settings are used.",
+        "advice": ["Check whether this is SD1.5, SDXL or Flux."],
+        "badges": ["Unrecognized"],
+    }
 
-# 每个家族可选的画幅（WxH，全部是 16 的倍数）和安全上限。
-# 上限不是“理论最大值”，而是按 8GB 显存保守估的：超过时后端会等比缩小，
-# 避免用户手填一个 2048×2048 把任务直接跑爆。
-SIZE_PRESETS = {
-    "anima": {
-        "sizes": ["832x1216", "1216x832", "1024x1024", "768x1344",
-                  "1344x768", "1536x864", "864x1536", "512x512"],
-        "max_side": 1536, "max_pixels": 1500000,
-    },
-    "noob": {
-        "sizes": ["832x1216", "1216x832", "1024x1024", "768x1344",
-                  "1344x768", "1152x896", "896x1152", "512x512"],
-        "max_side": 1536, "max_pixels": 1500000,
-    },
-    "sdxl_anime": {
-        "sizes": ["832x1216", "1216x832", "1024x1024", "768x1344",
-                  "1344x768", "1152x896", "896x1152", "512x512"],
-        "max_side": 1536, "max_pixels": 1500000,
-    },
-    "sdxl_photo": {
-        "sizes": ["1216x832", "832x1216", "1024x1024", "1344x768",
-                  "768x1344", "1536x864", "864x1536", "512x512"],
-        "max_side": 1536, "max_pixels": 1500000,
-    },
-    "pony": {
-        "sizes": ["1024x1024", "832x1216", "1216x832", "768x1344",
-                  "1344x768", "1152x896", "896x1152", "512x512"],
-        "max_side": 1536, "max_pixels": 1500000,
-    },
-    "sd15_anime": {
-        "sizes": ["512x768", "768x512", "512x512", "640x640",
-                  "768x768", "640x448", "448x640"],
-        "max_side": 1024, "max_pixels": 600000,
-    },
-    "sd15": {
-        "sizes": ["512x768", "768x512", "512x512", "640x640",
-                  "768x768", "640x448", "448x640"],
-        "max_side": 1024, "max_pixels": 600000,
-    },
-    "flux": {
-        "sizes": ["1024x1024", "832x1216", "1216x832", "1344x768", "768x1344"],
-        "max_side": 1536, "max_pixels": 2000000,
-    },
-    "qwen_image": {
-        "sizes": ["1024x1024", "832x1216", "1216x832", "1344x768", "768x1344"],
-        "max_side": 1536, "max_pixels": 2000000,
-    },
-    "unknown": {
-        "sizes": ["832x1216", "1216x832", "1024x1024", "768x1344",
-                  "1344x768", "1152x896", "896x1152", "512x512"],
-        "max_side": 1536, "max_pixels": 1500000,
-    },
-}
 
 KIND_ZH = {"anime": "动漫", "photo": "写实", "general": "通用"}
 KIND_EN = {"anime": "Anime", "photo": "Photo", "general": "General"}
 
 # 常见模型在英文界面里用可读短名，避免所有 SDXL 都显示成“Photo · SDXL”。
-NAME_HINTS = (
-    ("animagine", "Animagine XL"),
-    ("animapencil", "AnimaPencil XL"),
-    ("anima", "Anima 2B"),
-    ("noob", "NoobAI Vpred"),
-    ("juggernaut", "Juggernaut XI"),
-    ("illustrious", "Illustrious XL"),
-    ("realvis", "RealVisXL"),
-    ("counterfeit", "Counterfeit"),
-    ("pony", "Pony Diffusion"),
-    ("flux", "Flux"),
-    ("qwen", "Qwen-Image"),
-)
 
 
 def _short_name(name):
@@ -201,75 +78,6 @@ def _short_name(name):
             return label
     stem = re.sub(r"[_\-]+", " ", stem).strip()
     return stem[:48] or "Model"
-
-
-EN = {
-    "anima": {
-        "label": "Anime · Anima 2B",
-        "tip": "Great at natural descriptions and anime. No SDXL LoRA or PAG; use Anima LoRAs or the turbo LoRA for speed.",
-        "advice": ["Start with the recommended settings.",
-                   "Open Anima Turbo for 8-step generation."],
-        "badges": ["Beginner pick", "Anime"],
-    },
-    "noob": {
-        "label": "Anime · NoobAI Vpred",
-        "tip": "Excellent character/artist tags. v-pred model: use Euler, CFG 4-5.",
-        "advice": ["Do not switch to DPM++ or other samplers.",
-                   "Add English tags for obscure characters."],
-        "badges": ["v-pred", "Anime"],
-    },
-    "sdxl_anime": {
-        "label": "Anime · SDXL",
-        "tip": "General SDXL anime model with a large LoRA ecosystem.",
-        "advice": ["832x1216 is a safe portrait size for SDXL."],
-        "badges": ["SDXL", "Anime"],
-    },
-    "sdxl_photo": {
-        "label": "Photo · SDXL",
-        "tip": "SDXL photo/landscape model. Try 1216x832 with DPM++ 2M.",
-        "advice": ["Describe subject, light and lens; skip anime quality tags."],
-        "badges": ["SDXL", "Photo"],
-    },
-    "pony": {
-        "label": "Anime · Pony / SDXL",
-        "tip": "Pony models rely on score_9 / score_8_up tags; the UI adds them automatically.",
-        "advice": ["score_9, score_8_up and score_7_up are added automatically unless you already included them.",
-                   "Use score_4, score_5, score_6 as negative tags."],
-        "badges": ["Pony", "Tag-based"],
-    },
-    "sd15_anime": {
-        "label": "Anime · SD1.5",
-        "tip": "Older SD1.5 anime model: fast and LoRA-rich, but native 512px.",
-        "advice": ["Start at 512x768; use hires fix for larger images."],
-        "badges": ["SD1.5", "Anime"],
-    },
-    "sd15": {
-        "label": "General · SD1.5",
-        "tip": "Older SD1.5 model: fast and light, good for drafts.",
-        "advice": ["Do not go straight to 1024; start at 512x768."],
-        "badges": ["SD1.5"],
-    },
-    "flux": {
-        "label": "General · Flux",
-        "tip": "Flux usually needs a separate UNET, CLIP and VAE; CFG is about 1.",
-        "advice": ["The web UI only detects Flux; use an all-in-one checkpoint.",
-                   "Split Flux pipelines are not beginner-friendly."],
-        "badges": ["Flux", "Experimental"],
-    },
-    "qwen_image": {
-        "label": "General · Qwen-Image",
-        "tip": "Qwen-Image usually needs a separate UNET, text encoder and VAE.",
-        "advice": ["The web UI only detects Qwen-Image; Anima or SDXL is recommended."],
-        "badges": ["Qwen", "Experimental"],
-    },
-    "unknown": {
-        "label": "Unrecognized model",
-        "tip": "Architecture was not detected; generic SDXL settings are used.",
-        "advice": ["If results look wrong, check whether this is SD1.5, SDXL or Flux.",
-                   "Put sd15 / sdxl / pony / flux in the filename to help detection."],
-        "badges": ["Unrecognized"],
-    },
-}
 
 
 def _header(path):

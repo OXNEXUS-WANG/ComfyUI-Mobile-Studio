@@ -4,6 +4,8 @@
   "comfyui": {
     "version": "0.42.0",
     "tag": "v0.42.0",
+    "compatible_min": "0.40.0",
+    "compatible_max_exclusive": "0.43.0",
     "asset": "ComfyUI_windows_portable_nvidia.7z",
     "size": 2018436691,
     "source": "bundled-in-portable"

@@ -23,13 +23,18 @@ import os
 import shutil
 import sys
 import time
-import urllib.error
-import urllib.request
 
-SERVER = "http://127.0.0.1:8188"
-COMFY_OUTPUT = r"D:\AI\ComfyUI_windows_portable\ComfyUI\output"
+ROOT = os.path.dirname(os.path.abspath(__file__))
+# 便携版 python313._pth 不会自动把脚本目录加进 sys.path。
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+from comfy_client import CLIENT, ComfyError
+
+SERVER = CLIENT.base_url
+COMFY_OUTPUT = os.path.join(ROOT, "ComfyUI", "output")
 # 生成后复制一份到这里，方便渠道侧取用
-DELIVER_DIR = r"D:\AI\ComfyUI_windows_portable\generated"
+DELIVER_DIR = os.path.join(ROOT, "generated")
 
 NEGATIVE = (
     "lowres, worst quality, low quality, low score, bad score, average score, "
@@ -108,17 +113,11 @@ def build_workflow(prompt, width, height, steps, cfg, seed, use_translate):
 
 
 def post_json(path, payload, timeout=60):
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        SERVER + path, data=data, headers={"Content-Type": "application/json"}
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.load(r)
+    return CLIENT.request_json(path, payload, timeout=timeout)
 
 
 def get_json(path, timeout=30):
-    with urllib.request.urlopen(SERVER + path, timeout=timeout) as r:
-        return json.load(r)
+    return CLIENT.get(path, timeout=timeout)
 
 
 def main():
@@ -174,9 +173,10 @@ def main():
 
     try:
         resp = post_json("/prompt", workflow)
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", "replace")
-        print("ERROR: 提交失败 HTTP %s\n%s" % (e.code, body[:1500]), file=sys.stderr)
+    except ComfyError as e:
+        print("ERROR: 提交失败（HTTP %s）\n%s"
+              % (getattr(e, "status", 0) or "-", str(e)[:1500]),
+              file=sys.stderr)
         return 4
 
     pid = resp.get("prompt_id")

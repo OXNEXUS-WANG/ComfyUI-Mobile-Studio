@@ -11,7 +11,7 @@ installer/versions.lock.json
 
 | 项目 | 锁定方式 |
 |---|---|
-| ComfyUI | `v0.42.0` 的官方 Windows 便携包 `ComfyUI_windows_portable_nvidia.7z`，并校验大小 |
+| ComfyUI | 默认安装 `v0.42.0` 官方 Windows 便携包 `ComfyUI_windows_portable_nvidia.7z`，并校验大小；运行兼容范围为 `>=0.40.0,<0.43.0` |
 | ComfyUI 源码 | 使用便携包自带的 0.42.0，不再安装器额外拉取 master |
 | Python 基础依赖 | `psutil` / `pillow` / `cryptography` 精确版本 |
 | 翻译组件 | `argostranslate` / `ctranslate2` / `sentencepiece` / `stanza` / `sacremoses` / `packaging` 精确版本 |

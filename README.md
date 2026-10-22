@@ -111,8 +111,8 @@ commit、模型 revision 和 7zr 哈希都已锁定，不会自动追最新版�
 
 ## 2. 安装
 
-1. 分享版从 GitHub Releases 下载 `CometInk-v1.3.3-Share.zip`；
-   商用客户使用 `CometInk-v1.3.3-Commercial.zip`。
+1. 分享版从 GitHub Releases 下载 `CometInk-v1.3.4-Share.zip`；
+   商用客户使用 `CometInk-v1.3.4-Commercial.zip`。
 2. 解压到一个目录（不要在压缩包里直接运行）。
 3. 双击 `安装.bat`（或 `install.bat`）。
 4. **首次安装必须先阅读并同意醒目的免责声明与使用协议**：窗口内可滚动阅读，
@@ -507,7 +507,11 @@ ComfyUI_windows_portable/
 ├─ python_embeded/          # ComfyUI 自带的 Python
 ├─ app_core.py              # 后端核心
 ├─ web_server.py            # HTTP / HTTPS 路由
-├─ comfy_workflows.py       # 工作流
+├─ comfy_client.py          # 唯一 ComfyUI 访问层（地址/接口/能力检查）
+├─ comfy_workflows.py       # 工作流构建
+├─ workflow_templates.py    # 工作流模板加载
+├─ workflow_templates.json  # 基础工作流节点图
+├─ model_catalog.json       # 模型家族、尺寸和预设配置
 ├─ prompt_engine.py         # 翻译/角色词典
 ├─ local_llm.py             # Ollama / OpenAI 兼容本地翻译
 ├─ system_state.py          # 还原点 / 配置回滚
@@ -524,6 +528,11 @@ ComfyUI_windows_portable/
 ├─ installer/               # 安装器与模型清单
 └─ cert.pem / key.pem       # 安装时生成，不提交
 ```
+
+ComfyUI 地址默认是 `http://127.0.0.1:8188`。需要改端口或指向别的本机地址时，
+可用 `MGS_COMFY_URL`（完整 URL）或 `MGS_COMFY_HOST` / `MGS_COMFY_PORT` 覆盖；
+模型家族和推荐参数改 `model_catalog.json`，基础工作流骨架改
+`workflow_templates.json`，不需要改 Python。
 
 ## 11. 从源码运行
 

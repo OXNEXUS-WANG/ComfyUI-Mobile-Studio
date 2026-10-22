@@ -55,7 +55,13 @@ import training_manager
 import training_profiles
 import trusted_time
 
-COMFY = "http://127.0.0.1:8188"
+# ComfyUI 的地址、端口、请求和节点能力全部收口在 comfy_client.py。
+# 业务代码只使用这里的别名，不再自己拼 URL。
+from comfy_client import (
+    CLIENT as COMFY_CLIENT, COMFY, http_json,
+    comfy_current_prompt, comfy_free, CORE_NODES,
+)
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
 # 便携版 python313._pth 不会自动把脚本目录加进 sys.path，拆模块后要手动加
 if ROOT not in sys.path:
@@ -243,33 +249,9 @@ VIDEO_MIN_SECONDS = 0.5
 VIDEO_MAX_SECONDS = 6.0
 
 # 每个底模的显示名和推荐参数。Lightning 类模型步数少、CFG 低，选错会出糊图。
-CKPT_PRESETS = {
-    ANIMA_MODEL: {
-        # Anima 官方推荐 30 步 / CFG 4；2B 模型，8GB 显存比 SDXL 更宽裕
-        "label": "动漫 · Anima 2B（2026）", "steps": 30, "cfg": 4.0,
-        "kind": "anime", "family": "anima", "sampler": "euler",
-        "tip": "最懂你的描述，动漫首选。用不了 SDXL 的 LoRA 和 PAG；「更多」里可开 8 步极速。"},
-    NOOB_MODEL: {
-        # v-pred：必须 Euler + CFG 4~5 + clip skip 2 + v_prediction + RescaleCFG
-        "label": "动漫 · NoobAI Vpred", "steps": 30, "cfg": 4.5,
-        "kind": "anime", "family": "noob", "vpred": True, "sampler": "euler",
-        "tip": "Tag 知识最全，冷门角色/画师最准。v-pred 模型，只用 Euler，30 步 / CFG 4.5。"},
-    "Juggernaut-XI-byRunDiffusion.safetensors": {
-        # 风景/写实：XI v11 是 v9 的全面升级，官方推荐 DPM++ 2M Karras
-        "label": "写实 · Juggernaut XI 风景", "steps": 30, "cfg": 5.0,
-        "kind": "photo", "orientation": "landscape", "sampler": "dpmpp_2m",
-        "tip": "XI v11：手、脸、构图和提示词都更强。自动横图，DPM++ 2M，30 步 / CFG 5。"},
-    "Illustrious-XL-v2.0.safetensors": {
-        # 实测 20 步比 28 步快约 34%，画质肉眼看不出差别（Illustrious 收敛得快）
-        "label": "动漫 · Illustrious", "steps": 20, "cfg": 6.0, "kind": "anime",
-        "tip": "老牌动漫模型，SDXL 的 LoRA 最多；想加 LoRA 就用它。"},
-    "RealVisXL_V5.0_Lightning_fp16.safetensors": {
-        "label": "写实 · RealVis Lightning", "steps": 8, "cfg": 2.0, "kind": "photo",
-        "tip": "写实人像和照片，8 步就出图，速度最快。"},
-    "Counterfeit-V2.5_pruned.safetensors": {
-        "label": "动漫 · Counterfeit（旧）", "steps": 28, "cfg": 6.0, "kind": "anime",
-        "tip": "很老的 SD1.5 模型，现在基本用不到，可以删掉腾空间。"},
-}
+CKPT_PRESETS = dict(
+    (model_profiles.catalog().get("checkpoint_presets") or {}))
+
 
 # 采样器。Illustrious 官方推荐 Euler a；DPM++ 细节稍好但每步更慢。
 SAMPLERS = {
@@ -4612,18 +4594,8 @@ def local_generation_running():
 
 
 def comfy_free_models():
-    """让 ComfyUI 释放模型/显存；/free 返回空体，不能走 http_json。"""
-    try:
-        data = json.dumps({"unload_models": True,
-                           "free_memory": True}).encode("utf-8")
-        req = urllib.request.Request(
-            COMFY + "/free", data=data,
-            headers={"Content-Type": "application/json"}, method="POST")
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            resp.read(64)
-        return True
-    except Exception:
-        return False
+    """让 ComfyUI 释放模型/显存；失败不抛，调用方只做尽力清理。"""
+    return comfy_free()
 
 
 def training_limits_for(uid):
@@ -5402,6 +5374,8 @@ def run_job(job_id, prompt, negative, width, height, steps, cfg, seed,
             negative = _trn
     try:
         if kind == "upscale":
+            COMFY_CLIENT.ensure_nodes(
+                required_nodes_for(ckpt, "upscale"), context="放大")
             up_model = upscaler_for(ckpt)
             if not up_model:
                 update(status="error", error="没有可用的放大模型")
@@ -5409,20 +5383,34 @@ def run_job(job_id, prompt, negative, width, height, steps, cfg, seed,
             wf = build_upscale_workflow(init_image, up_model, count)
         elif kind == "i2v":
             text = prompt_en or prompt
+            use_translate = has_chinese(text)
+            COMFY_CLIENT.ensure_nodes(
+                required_nodes_for(ckpt, "i2v", use_translate=use_translate),
+                context="图生视频")
             wf = build_i2v_workflow(text, negative, width, height, frames,
                                     seed, init_image,
-                                    use_translate=has_chinese(text))
+                                    use_translate=use_translate)
         elif kind == "video":
             text = prompt_en or prompt
+            use_translate = has_chinese(text)
+            COMFY_CLIENT.ensure_nodes(
+                required_nodes_for(ckpt, "video", use_translate=use_translate),
+                context="文生视频")
             wf = build_video_workflow(text, negative, width, height,
                                       frames, seed,
-                                      use_translate=has_chinese(text))
+                                      use_translate=use_translate)
         else:
             # prompt_en 已经转成英文标签，就不再走 ComfyUI 里的翻译节点
             text = prompt_en or prompt
             use_translate = (not prompt_en) and has_chinese(text)
             profile = model_profile(ckpt)
             pony_prefix = pony_prefix_for(ckpt, text)
+            COMFY_CLIENT.ensure_nodes(
+                required_nodes_for(
+                    ckpt, "gen", loras=loras, pag=pag,
+                    prefix=pony_prefix, use_translate=use_translate,
+                    turbo=turbo),
+                context="出图")
             if ckpt == ANIMA_MODEL:
                 wf = build_anima_workflow(
                     text, negative, width, height, steps, cfg, seed,
@@ -6736,8 +6724,38 @@ def _version_lock_info():
             actual = m.group(1) if m else ""
     except Exception:
         pass
-    want = str((lock.get("comfyui") or {}).get("version") or "")
-    return {"lock": lock, "expected": want, "actual": actual}
+    comfy_lock = lock.get("comfyui") or {}
+    want = str(comfy_lock.get("version") or "")
+    return {
+        "lock": lock,
+        "expected": want,
+        "actual": actual,
+        "min": str(comfy_lock.get("compatible_min") or ""),
+        "max_exclusive": str(comfy_lock.get("compatible_max_exclusive") or ""),
+    }
+
+
+def _version_tuple(text):
+    nums = re.findall(r"\d+", str(text or ""))
+    if not nums:
+        return ()
+    return tuple(int(x) for x in nums[:3])
+
+
+def comfy_version_compatible(actual, min_version="", max_exclusive=""):
+    """按锁文件里的兼容范围判断；没有范围时退回“前缀相同”。"""
+    actual_t = _version_tuple(actual)
+    if not actual_t:
+        return None
+    if min_version:
+        low = _version_tuple(min_version)
+        if low and actual_t < low:
+            return False
+    if max_exclusive:
+        high = _version_tuple(max_exclusive)
+        if high and actual_t >= high:
+            return False
+    return True
 
 
 def diagnose_system():
@@ -6814,6 +6832,24 @@ def diagnose_system():
         if node_dirs else "No custom nodes detected.",
         "UltimateSDUpscale / AlekPet are recommended."
         if not node_dirs else "")
+    try:
+        cap = COMFY_CLIENT.capabilities(required=CORE_NODES)
+    except Exception:
+        cap = {}
+    if cap.get("online"):
+        missing_nodes = cap.get("missing") or []
+        add("comfy_nodes",
+            "ok" if not missing_nodes else "error",
+            "ComfyUI 核心节点",
+            "核心节点齐全。" if not missing_nodes
+            else "缺少核心节点：%s。" % ", ".join(missing_nodes),
+            "" if not missing_nodes
+            else "安装或更新对应节点后重启 ComfyUI。",
+            "ComfyUI core nodes",
+            "All core nodes are available." if not missing_nodes
+            else "Missing core nodes: %s." % ", ".join(missing_nodes),
+            "" if not missing_nodes
+            else "Install or update the missing nodes, then restart ComfyUI.")
     workers = lan_share.admin_payload().get("workers") or []
     approved = [w for w in workers if w.get("status") == "approved"]
     offline = [w for w in approved if not w.get("online")]
@@ -6912,17 +6948,25 @@ def diagnose_system():
         "Chinese prompts need one of them." if not tr.get("ready") else "")
     ver = _version_lock_info()
     if ver["expected"]:
-        same = bool(ver["actual"]) and (
-            ver["actual"].startswith(ver["expected"]) or
-            ver["expected"].startswith(ver["actual"]))
-        add("version", "ok" if same else "warn", "ComfyUI 版本",
-            "锁定 %s，当前 %s。" % (ver["expected"],
-                                   ver["actual"] or "未知"),
-            "版本不一致时先看 VERSION_LOCK.md。" if not same else "",
+        compatible = comfy_version_compatible(
+            ver["actual"], ver.get("min") or "", ver.get("max_exclusive") or "")
+        if compatible is None:
+            compatible = bool(ver["actual"]) and (
+                ver["actual"].startswith(ver["expected"]) or
+                ver["expected"].startswith(ver["actual"]))
+        if ver.get("min") and ver.get("max_exclusive"):
+            range_text = "%s ~ <%s" % (ver["min"], ver["max_exclusive"])
+        else:
+            range_text = ver["expected"]
+        add("version", "ok" if compatible else "warn", "ComfyUI 版本",
+            "兼容范围 %s，当前 %s。" % (range_text,
+                                      ver["actual"] or "未知"),
+            "版本超出范围时先看 VERSION_LOCK.md。" if not compatible else "",
             "ComfyUI version",
-            "Locked %s, current %s." % (ver["expected"],
-                                        ver["actual"] or "unknown"),
-            "See VERSION_LOCK.md if versions differ." if not same else "")
+            "Compatible range %s, current %s." %
+            (range_text, ver["actual"] or "unknown"),
+            "See VERSION_LOCK.md if the version is out of range."
+            if not compatible else "")
     summary = {"ok": 0, "info": 0, "warn": 0, "error": 0, "critical": 0}
     for c in checks:
         summary[c["level"]] = summary.get(c["level"], 0) + 1
@@ -7334,12 +7378,14 @@ def _ws_exact(sock, n):
 
 def _ws_handshake(sock):
     key = base64.b64encode(os.urandom(16)).decode()
-    req = ("GET /ws?clientId=mobile_web HTTP/1.1\r\n"
-           "Host: 127.0.0.1:8188\r\n"
+    target = COMFY_CLIENT.ws_target()
+    req = ("GET %s HTTP/1.1\r\n"
+           "Host: %s\r\n"
            "Upgrade: websocket\r\n"
            "Connection: Upgrade\r\n"
            "Sec-WebSocket-Key: %s\r\n"
-           "Sec-WebSocket-Version: 13\r\n\r\n") % key
+           "Sec-WebSocket-Version: 13\r\n\r\n") % (
+               target["path"], target["netloc"], key)
     sock.sendall(req.encode())
     buf = b""
     while b"\r\n\r\n" not in buf:
@@ -7415,7 +7461,9 @@ def ws_listener():
     while True:
         sock = None
         try:
-            sock = socket.create_connection(("127.0.0.1", 8188), timeout=10)
+            _ws = COMFY_CLIENT.ws_target()
+            sock = socket.create_connection(
+                (_ws["host"], _ws["port"]), timeout=10)
             sock.settimeout(90)
             _ws_handshake(sock)
             while True:
@@ -7565,7 +7613,7 @@ MANIFEST = {
 
 # ComfyUI 工作流模块（放在文件末尾导入，确保常量已经定义）
 from comfy_workflows import (
-    http_json, comfy_current_prompt, source_megapixels,
-    build_workflow, build_anima_workflow, build_video_workflow,
-    build_i2v_workflow, build_upscale_workflow, friendly_error,
+    source_megapixels, build_workflow, build_anima_workflow,
+    build_video_workflow, build_i2v_workflow, build_upscale_workflow,
+    friendly_error, required_nodes_for,
 )

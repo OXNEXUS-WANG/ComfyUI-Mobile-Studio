@@ -1,5 +1,23 @@
 ﻿# 变更日志
 
+## 2026-10-22 · v1.3.4 ComfyUI 适配层与配置外置
+
+- 新增 `app/comfy_client.py`：ComfyUI 地址、端口、超时、`/prompt`、`/history`、
+  `/queue`、`/interrupt`、`/free`、`/object_info`、`/system_stats` 和 WebSocket
+  目标全部收口到一个客户端；业务代码不再自己拼 ComfyUI URL。
+- 启动、管理后台体检和 `/api/load` 增加 ComfyUI 核心节点能力检查；缺节点时
+  直接提示节点名，不再等任务跑到一半才失败。
+- 模型家族、尺寸预设、中英文说明和已知底模参数外置到
+  `app/model_catalog.json`；新增模型不需要改 Python。
+- 基础工作流骨架外置到 `app/workflow_templates.json`，Python 只负责 LoRA、
+  PAG、高清修复、重绘、翻译等条件分支。
+- `gen_image.py` 去掉写死的 `D:\AI\...` 路径，改用脚本所在目录推导输出目录；
+  CLI 与网页共用同一个 ComfyUI 客户端。
+- ComfyUI 版本从“精确锁定”改为“默认锁 0.42.0 + 兼容范围
+  `>=0.40.0,<0.43.0`”，体检和启动会提示超范围版本。
+- 新增适配层、能力检查、模板和版本范围测试；完整套件 **222 项通过**。
+- 版本升级到 **1.3.4**。
+
 ## 2026-10-22 · v1.3.3 完整使用手册
 
 - 新增 `MANUAL.md`：从安装、界面、出图、图库、队列、多账号、训练、

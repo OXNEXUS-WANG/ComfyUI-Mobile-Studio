@@ -1242,6 +1242,7 @@ class Handler(BaseHTTPRequestHandler):
                 snap = dict(LOAD_STATE)
             snap["ts"] = round(time.time(), 3)
             snap["guard"] = guard_snapshot()
+            snap["comfy"] = COMFY_CLIENT.capabilities()
             _u = self._current_user()
             snap["training"] = training_manager.M.summary(
                 admin=is_admin(_u), user=_u)
@@ -1254,6 +1255,7 @@ class Handler(BaseHTTPRequestHandler):
             ensure_guard()
             _u = self._current_user()
             snap = guard_snapshot()
+            snap["comfy"] = COMFY_CLIENT.capabilities()
             snap["training"] = training_manager.M.summary(
                 admin=is_admin(_u), user=_u)
             self._json(snap)
@@ -5141,6 +5143,31 @@ def main():
     models = list_models()
     print("  可用底模: %s" % (", ".join(m["label"] for m in models) or "（无）"))
     print("  放大模型: %s" % (upscaler_for(DEFAULT_CHECKPOINT) or "（无）"))
+    try:
+        cap = COMFY_CLIENT.capabilities()
+        if not cap.get("online"):
+            print("  [ComfyUI] 未连接；启动 ComfyUI 后刷新页面即可。")
+        elif cap.get("missing"):
+            print("  [ComfyUI] 缺少核心节点: %s"
+                  % ", ".join(cap.get("missing") or []))
+            print("            出图会失败，请安装/更新节点后重启 ComfyUI。")
+        else:
+            print("  [ComfyUI] 核心节点齐全%s" % (
+                " · " + cap.get("comfyui_version")
+                if cap.get("comfyui_version") else ""))
+    except Exception as exc:
+        print("  [ComfyUI] 能力检查失败: %s" % exc)
+    try:
+        ver = _version_lock_info()
+        good = comfy_version_compatible(
+            ver.get("actual"), ver.get("min") or "",
+            ver.get("max_exclusive") or "")
+        if good is False:
+            print("  [ComfyUI] 版本 %s 超出兼容范围 %s ~ <%s，建议先测试。"
+                  % (ver.get("actual") or "?",
+                     ver.get("min") or "?", ver.get("max_exclusive") or "?"))
+    except Exception:
+        pass
     print()
 
     if auth_enabled():

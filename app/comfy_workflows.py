@@ -6,36 +6,59 @@
 """
 import json
 import os
-import urllib.request
 
 from app_core import *
+from comfy_client import (
+    CLIENT, CORE_NODES, ANIMA_NODES, SDXL_NODES, VIDEO_NODES,
+    I2V_NODES, UPSCALE_NODES, PONY_NODES,
+    http_json, comfy_current_prompt,
+)
+import workflow_templates as wt
 
 
-# --------------------------------------------------------------------- ComfyUI
+# --------------------------------------------------------------------- 能力检查
 
-def http_json(path, payload=None, timeout=60):
-    if payload is None:
-        req = urllib.request.Request(COMFY + path)
-    else:
-        req = urllib.request.Request(
-            COMFY + path,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-        )
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.load(r)
+def required_nodes_for(ckpt, kind="gen", loras=None, pag=False, prefix="",
+                       use_translate=False, turbo=False):
+    """返回当前工作流真正需要的 ComfyUI 节点类名。
 
+    只做“缺了会直接跑不起来”的检查；可选功能（PAG、LoRA、翻译）按实际
+    参数叠加。这样用户看到的是“缺哪个节点”，而不是 ComfyUI 的 400。
+    """
+    if kind == "upscale":
+        return list(UPSCALE_NODES)
+    if kind == "i2v":
+        return list(I2V_NODES)
+    if kind in ("video", "vid"):
+        return list(VIDEO_NODES)
 
-def comfy_current_prompt():
-    """ComfyUI 当前真正在跑的 prompt_id；读不到返回空字符串。"""
+    nodes = list(CORE_NODES)
+    family = ""
     try:
-        q = http_json("/queue", timeout=5)
-        running = q.get("queue_running") or []
-        if running and isinstance(running[0], (list, tuple)) and len(running[0]) > 1:
-            return str(running[0][1])
+        family = str((model_profile(ckpt) or {}).get("family") or "")
     except Exception:
-        pass
-    return ""
+        family = ""
+    if ckpt == ANIMA_MODEL or family == "anima":
+        nodes += ANIMA_NODES
+    elif ckpt == NOOB_MODEL or family == "noob":
+        nodes += SDXL_NODES
+    if loras or turbo:
+        nodes.append("LoraLoaderModelOnly"
+                     if (ckpt == ANIMA_MODEL or family == "anima")
+                     else "LoraLoader")
+    if pag and ckpt != ANIMA_MODEL:
+        nodes.append("PerturbedAttentionGuidance")
+    if prefix:
+        nodes += PONY_NODES
+    if use_translate:
+        nodes.append("ArgosTranslateTextNode")
+    # 去重但保留顺序，方便错误提示稳定
+    return list(dict.fromkeys(nodes))
+
+
+def ensure_nodes_for(ckpt, kind="gen", context="", **kwargs):
+    return CLIENT.ensure_nodes(
+        required_nodes_for(ckpt, kind=kind, **kwargs), context=context)
 
 
 def source_megapixels(filename):
@@ -74,23 +97,10 @@ def build_workflow(prompt, negative, width, height, steps, cfg, seed,
     if vpred:
         # NoobAI 官方要求：只用 Euler，其他采样器会出问题
         sp = {"sampler": "euler", "sched": "normal"}
-    nodes = {
-        "4": {"class_type": "CheckpointLoaderSimple",
-              "inputs": {"ckpt_name": ckpt}},
-        "5": {"class_type": "EmptyLatentImage",
-              "inputs": {"width": width, "height": height, "batch_size": count}},
-        "7": {"class_type": "CLIPTextEncode",
-              "inputs": {"text": negative or DEFAULT_NEGATIVE, "clip": ["4", 1]}},
-        "3": {"class_type": "KSampler",
-              "inputs": {"seed": seed, "steps": steps, "cfg": cfg,
-                         "sampler_name": sp["sampler"], "scheduler": sp["sched"],
-                         "denoise": 1.0, "model": ["4", 0], "positive": ["6", 0],
-                         "negative": ["7", 0], "latent_image": ["5", 0]}},
-        "8": {"class_type": "VAEDecode",
-              "inputs": {"samples": ["3", 0], "vae": ["4", 2]}},
-        "9": {"class_type": "SaveImage",
-              "inputs": {"filename_prefix": "phone", "images": ["8", 0]}},
-    }
+    nodes = wt.build(
+        "sdxl_base", ckpt=ckpt, width=width, height=height, count=count,
+        negative=(negative or DEFAULT_NEGATIVE), seed=seed, steps=steps,
+        cfg=cfg, sampler=sp["sampler"], scheduler=sp["sched"])
 
     # 参考图过大就先等比缩到安全像素数，否则 8GB 显存会直接爆掉（表现为一直转圈）。
     src_mp = source_megapixels(init_image)
@@ -260,28 +270,11 @@ def build_anima_workflow(prompt, negative, width, height, steps, cfg, seed,
     if turbo:
         steps, cfg = ANIMA_TURBO_STEPS, ANIMA_TURBO_CFG
     sp = SAMPLERS.get(sampler) or SAMPLERS[DEFAULT_SAMPLER]
-    nodes = {
-        "4": {"class_type": "UNETLoader",
-              "inputs": {"unet_name": ANIMA_MODEL, "weight_dtype": "default"}},
-        "41": {"class_type": "CLIPLoader",
-               "inputs": {"clip_name": ANIMA_CLIP, "type": "stable_diffusion",
-                          "device": "default"}},
-        "42": {"class_type": "VAELoader", "inputs": {"vae_name": ANIMA_VAE}},
-        "5": {"class_type": "EmptyLatentImage",
-              "inputs": {"width": width, "height": height, "batch_size": count}},
-        "7": {"class_type": "CLIPTextEncode",
-              "inputs": {"text": negative or ANIMA_NEGATIVE, "clip": ["41", 0]}},
-        "3": {"class_type": "KSampler",
-              "inputs": {"seed": seed, "steps": steps, "cfg": cfg,
-                         # Anima 是流匹配模型，调度器固定用 simple
-                         "sampler_name": sp["sampler"], "scheduler": "simple",
-                         "denoise": 1.0, "model": ["4", 0], "positive": ["6", 0],
-                         "negative": ["7", 0], "latent_image": ["5", 0]}},
-        "8": {"class_type": "VAEDecode",
-              "inputs": {"samples": ["3", 0], "vae": ["42", 0]}},
-        "9": {"class_type": "SaveImage",
-              "inputs": {"filename_prefix": "phone", "images": ["8", 0]}},
-    }
+    nodes = wt.build(
+        "anima_base", unet=ANIMA_MODEL, clip=ANIMA_CLIP, vae=ANIMA_VAE,
+        width=width, height=height, count=count,
+        negative=(negative or ANIMA_NEGATIVE), seed=seed, steps=steps,
+        cfg=cfg, sampler=sp["sampler"])
 
     # 极速模式：先套官方 Turbo LoRA，再套用户选中的 Anima LoRA。
     model_src = ["4", 0]
@@ -407,40 +400,12 @@ def build_video_workflow(prompt, negative, width, height, frames, seed,
     """
     length = max(5, ((frames * 2) // 4) * 4 + 1)
 
-    nodes = {
-        "1": {"class_type": "UNETLoader",
-              "inputs": {"unet_name": VIDEO_UNET,
-                         "weight_dtype": "default"}},
-        "2": {"class_type": "CLIPLoader",
-              "inputs": {"clip_name": VIDEO_CLIP, "type": "wan"}},
-        "3": {"class_type": "VAELoader",
-              "inputs": {"vae_name": VIDEO_VAE}},
-        "4": {"class_type": "CLIPTextEncode",
-              "inputs": {"text": ["12", 0] if use_translate else prompt,
-                         "clip": ["2", 0]}},
-        "5": {"class_type": "CLIPTextEncode",
-              "inputs": {"text": negative or VIDEO_NEGATIVE,
-                         "clip": ["2", 0]}},
-        "6": {"class_type": "ModelSamplingSD3",
-              "inputs": {"model": ["1", 0], "shift": 8.0}},
-        "7": {"class_type": "EmptyHunyuanLatentVideo",
-              "inputs": {"width": width, "height": height,
-                         "length": length, "batch_size": 1}},
-        "8": {"class_type": "KSampler",
-              "inputs": {"seed": seed, "steps": steps, "cfg": cfg,
-                         "sampler_name": "uni_pc", "scheduler": "simple",
-                         "denoise": 1.0, "model": ["6", 0],
-                         "positive": ["4", 0], "negative": ["5", 0],
-                         "latent_image": ["7", 0]}},
-        "9": {"class_type": "VAEDecode",
-              "inputs": {"samples": ["8", 0], "vae": ["3", 0]}},
-        "10": {"class_type": "CreateVideo",
-               "inputs": {"images": ["9", 0], "fps": float(VIDEO_FPS)}},
-        "11": {"class_type": "SaveVideo",
-               "inputs": {"video": ["10", 0],
-                          "filename_prefix": "video/wan",
-                          "format": "mp4"}},
-    }
+    nodes = wt.build(
+        "video_t2v", unet=VIDEO_UNET, clip=VIDEO_CLIP, vae=VIDEO_VAE,
+        prompt=(["12", 0] if use_translate else prompt),
+        negative=(negative or VIDEO_NEGATIVE), width=width, height=height,
+        length=length, seed=seed, steps=steps, cfg=cfg,
+        fps=float(VIDEO_FPS))
     if use_translate:
         nodes["12"] = {"class_type": "ArgosTranslateTextNode",
                        "inputs": {"from_translate": "chinese",
@@ -458,46 +423,12 @@ def build_i2v_workflow(prompt, negative, width, height, frames, seed,
     """
     length = max(5, ((frames * 2) // 4) * 4 + 1)
 
-    nodes = {
-        "1": {"class_type": "UNETLoader",
-              "inputs": {"unet_name": VIDEO_VACE,
-                         "weight_dtype": "default"}},
-        "2": {"class_type": "CLIPLoader",
-              "inputs": {"clip_name": VIDEO_CLIP, "type": "wan"}},
-        "3": {"class_type": "VAELoader",
-              "inputs": {"vae_name": VIDEO_VAE}},
-        "4": {"class_type": "CLIPTextEncode",
-              "inputs": {"text": ["12", 0] if use_translate else prompt,
-                         "clip": ["2", 0]}},
-        "5": {"class_type": "CLIPTextEncode",
-              "inputs": {"text": negative or VIDEO_NEGATIVE,
-                         "clip": ["2", 0]}},
-        "6": {"class_type": "ModelSamplingSD3",
-              "inputs": {"model": ["1", 0], "shift": 8.0}},
-        "13": {"class_type": "LoadImage",
-               "inputs": {"image": image_name}},
-        "7": {"class_type": "WanVaceToVideo",
-              "inputs": {"positive": ["4", 0], "negative": ["5", 0],
-                         "vae": ["3", 0],
-                         "width": width, "height": height,
-                         "length": length, "batch_size": 1,
-                         "strength": 1.0,
-                         "reference_image": ["13", 0]}},
-        "8": {"class_type": "KSampler",
-              "inputs": {"seed": seed, "steps": steps, "cfg": cfg,
-                         "sampler_name": "uni_pc", "scheduler": "simple",
-                         "denoise": 1.0, "model": ["6", 0],
-                         "positive": ["7", 0], "negative": ["7", 1],
-                         "latent_image": ["7", 2]}},
-        "9": {"class_type": "VAEDecode",
-              "inputs": {"samples": ["8", 0], "vae": ["3", 0]}},
-        "10": {"class_type": "CreateVideo",
-               "inputs": {"images": ["9", 0], "fps": float(VIDEO_FPS)}},
-        "11": {"class_type": "SaveVideo",
-               "inputs": {"video": ["10", 0],
-                          "filename_prefix": "video/i2v",
-                          "format": "mp4"}},
-    }
+    nodes = wt.build(
+        "video_i2v", unet=VIDEO_VACE, clip=VIDEO_CLIP, vae=VIDEO_VAE,
+        prompt=(["12", 0] if use_translate else prompt),
+        negative=(negative or VIDEO_NEGATIVE), width=width, height=height,
+        length=length, seed=seed, steps=steps, cfg=cfg,
+        fps=float(VIDEO_FPS), image_name=image_name)
     if use_translate:
         nodes["12"] = {"class_type": "ArgosTranslateTextNode",
                        "inputs": {"from_translate": "chinese",
@@ -508,13 +439,7 @@ def build_i2v_workflow(prompt, negative, width, height, frames, seed,
 
 def build_upscale_workflow(image_name, up_model, factor):
     """放大工作流：ESRGAN 4 倍，如需 2 倍再缩回来。"""
-    nodes = {
-        "1": {"class_type": "UpscaleModelLoader",
-              "inputs": {"model_name": up_model}},
-        "2": {"class_type": "LoadImage", "inputs": {"image": image_name}},
-        "3": {"class_type": "ImageUpscaleWithModel",
-              "inputs": {"upscale_model": ["1", 0], "image": ["2", 0]}},
-    }
+    nodes = wt.build("upscale_base", up_model=up_model, image_name=image_name)
     last = ["3", 0]
     if factor == 2:
         nodes["4"] = {"class_type": "ImageScaleBy",
