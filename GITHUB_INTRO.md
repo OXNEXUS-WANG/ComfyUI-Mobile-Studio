@@ -352,6 +352,14 @@ Coverage includes installer layout, account permissions, queueing, gallery isola
 
 ---
 
+## 开发说明 / Development note
+
+CometInk 由一名大一学生单人从零完成：需求、架构、后端、前端、星图、测试、文档和发布流程均由一人推进，开发期间使用 AI 编程助手辅助。近 30 天累计 **6,038,125,446 tokens**（约 60.4 亿）、**17,517 次 API 请求**，API 费用 **¥227.20**；当前版本通过 **231 项测试**，并经过人工审查。
+
+CometInk was built solo from scratch by a first-year university student: requirements, architecture, backend, frontend, star map, tests, documentation, and releases were all driven by one developer, with AI coding assistants. In the last 30 days: **6,038,125,446 tokens**, **17,517 API requests**, and **¥227.20** in API usage. The current build passes **231 tests** and has been manually reviewed.
+
+---
+
 ## 赞赏 / Support
 
 如果这个项目帮到了你，可以请我喝杯奶茶。赞赏完全自愿，不影响任何功能。
