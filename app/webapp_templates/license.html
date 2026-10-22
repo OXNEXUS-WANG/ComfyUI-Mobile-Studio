@@ -59,7 +59,14 @@ textarea{width:100%;min-height:96px;resize:vertical;border-radius:10px;
   padding:10px 11px;font:11px var(--mono,Consolas,monospace);line-height:1.55}
 textarea:focus{outline:none;border-color:rgba(127,227,255,.55)}
 .row{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-top:10px}
-.file{color:var(--tx3);font-size:10.5px;max-width:260px}
+.file{display:none}
+.file-pick{display:inline-flex;align-items:center;justify-content:center;
+  min-height:34px;padding:7px 12px;border-radius:9px;cursor:pointer;
+  border:1px solid var(--line);background:rgba(255,255,255,.05);
+  color:var(--tx2);font-size:11px;font-weight:600}
+.file-pick:hover{color:#fff;border-color:rgba(127,227,255,.42)}
+.file-name{color:var(--tx3);font-size:10.5px;max-width:180px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
 button.primary{background:linear-gradient(180deg,#9fe9ff,#6cc7ef);color:#06111f;
   border:0;border-radius:10px;padding:10px 18px;font:700 12px inherit;cursor:pointer}
 button.primary:disabled{opacity:.45;cursor:not-allowed}
@@ -102,6 +109,8 @@ button.primary:disabled{opacity:.45;cursor:not-allowed}
     <textarea id="codeInput" spellcheck="false" placeholder="MGS1.…"></textarea>
     <div class="row">
       <input class="file" type="file" id="fileInput" accept=".json,.txt">
+      <label class="file-pick" for="fileInput" id="fileLabel">选择授权文件</label>
+      <span class="file-name" id="fileName">未选择文件</span>
       <button class="primary" id="activateBtn" type="button">激活</button>
     </div>
     <div class="hint" id="activateHint">把机器码发给供应商换取授权码；也可以直接选择对方发来的 JSON 文件。</div>
@@ -118,6 +127,7 @@ button.primary:disabled{opacity:.45;cursor:not-allowed}
   var lang = localStorage.getItem(LANG_KEY) === 'en' ? 'en' : 'zh';
   var status = null;
   var session = null;
+  var fileSelected = false;
   var texts = {
     zh: {
       lang: 'EN', title: '商用版激活',
@@ -125,6 +135,7 @@ button.primary:disabled{opacity:.45;cursor:not-allowed}
       statusLoading: '正在读取授权状态…',
       machine: '机器码', copy: '复制机器码', copied: '已复制',
       code: '授权码 / 授权文件内容',
+      chooseFile: '选择授权文件', noFile: '未选择文件',
       activate: '激活', activating: '正在验证…',
       hint: '把机器码发给供应商换取授权码；也可以直接选择对方发来的 JSON 文件。',
       foot: '授权只校验机器码和签名，不会上传任何图片、提示词或账号信息。',
@@ -149,6 +160,7 @@ button.primary:disabled{opacity:.45;cursor:not-allowed}
       statusLoading: 'Reading license status…',
       machine: 'Machine code', copy: 'Copy machine code', copied: 'Copied',
       code: 'Activation code / license file content',
+      chooseFile: 'Choose license file', noFile: 'No file selected',
       activate: 'Activate', activating: 'Verifying…',
       hint: 'Send the machine code to your vendor, or choose the JSON file they send back.',
       foot: 'The license only checks the machine code and signature. No images, prompts or account data are uploaded.',
@@ -178,6 +190,8 @@ button.primary:disabled{opacity:.45;cursor:not-allowed}
     $('machineLabel').textContent = t('machine');
     $('copyBtn').textContent = t('copy');
     $('codeLabel').textContent = t('code');
+    $('fileLabel').textContent = t('chooseFile');
+    if (!fileSelected) { $('fileName').textContent = t('noFile'); }
     $('activateBtn').textContent = t('activate');
     $('activateHint').textContent = t('hint');
     $('foot').textContent = t('foot');
@@ -278,7 +292,15 @@ button.primary:disabled{opacity:.45;cursor:not-allowed}
   };
   $('fileInput').onchange = function(){
     var f = this.files && this.files[0];
-    if (!f) { return; }
+    if (!f) {
+      fileSelected = false;
+      $('fileName').removeAttribute('data-no-i18n');
+      $('fileName').textContent = t('noFile');
+      return;
+    }
+    fileSelected = true;
+    $('fileName').textContent = f.name;
+    $('fileName').setAttribute('data-no-i18n', '');
     var reader = new FileReader();
     reader.onload = function(){
       var text = String(reader.result || '').trim();
