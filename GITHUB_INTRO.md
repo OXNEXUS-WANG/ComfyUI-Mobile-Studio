@@ -21,8 +21,8 @@
 
 > **English** — CometInk turns ComfyUI into a small private studio on your LAN: write prompts, queue generations, and browse the gallery from a phone browser, while the admin manages accounts, quotas, traffic, the queue, worker nodes, LoRA training, and audit logs from the same page. Images, accounts, and logs stay on your machine; no cloud account is required.
 
-> 以下截图来自演示账号，作品由 CometInk 调用 Anima 2B / Juggernaut XI 生成，仅用于界面展示。  
-> Screenshots use demo accounts; the artwork was generated through CometInk with Anima 2B / Juggernaut XI and is shown for UI demonstration only.
+> 以下截图来自演示环境，作品由 CometInk 调用 Anima 2B / Juggernaut XI 生成，仅用于界面展示。  
+> Screenshots come from a demo environment; the artwork was generated through CometInk with Anima 2B / Juggernaut XI and is shown for UI demonstration only.
 
 ---
 

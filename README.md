@@ -37,8 +37,8 @@ Turn ComfyUI into a private, mobile-first image-generation studio.
 </p>
 <p align="center"><sub>页面切换 · Page tabs（中 / EN）</sub></p>
 
-> 截图中的账号与作品均为演示数据，作品由 CometInk 调用 Anima 2B / Juggernaut XI 生成。  
-> Screenshots use demo accounts; artwork was generated through CometInk with Anima 2B / Juggernaut XI.
+> 截图为演示数据，作品由 CometInk 调用 Anima 2B / Juggernaut XI 生成。  
+> Screenshots use demo data; artwork was generated through CometInk with Anima 2B / Juggernaut XI.
 
 - 品牌 **CometInk 彗墨**：深色彗星墨迹 C 图标，网页、PWA、浏览器标签和桌面快捷方式统一
 - 手机扫码/打开网页即可出图，支持文生图、图生图、局部重绘、高清修复、放大
