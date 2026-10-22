@@ -322,7 +322,7 @@ body::after{content:'';position:fixed;inset:0;z-index:9;pointer-events:none;opac
 .gen-fab.hidden{opacity:0;pointer-events:none;transform:translateY(8px)}
 @keyframes genFabPulse{0%,100%{box-shadow:0 0 18px rgba(70,170,255,.16)}
   50%{box-shadow:0 0 36px rgba(120,230,255,.42)}}
-@media(max-width:700px){.gen-fab{left:12px;bottom:94px;padding:8px 12px;font-size:10.5px}}
+@media(max-width:700px){.gen-fab{left:12px;bottom:100px;padding:8px 12px;font-size:10.5px}}
 
 #genDeck{position:fixed;left:50%;bottom:84px;z-index:40;
   width:min(640px,calc(100vw - 32px));max-height:min(78vh,720px);
@@ -917,19 +917,21 @@ body.flowmode #loadHud{opacity:0;pointer-events:none}
 #panelBody::-webkit-scrollbar-thumb{background:rgba(120,190,255,.25);border-radius:4px}
 
 /* ---------- 底部 HUD ---------- */
-#hud-bottom{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;align-items:flex-end;
-  justify-content:space-between;gap:16px;padding:10px 18px calc(12px + env(safe-area-inset-bottom));
+#hud-bottom{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  grid-template-areas:"hint hint" "legend stats";
+  align-items:end;gap:4px 16px;padding:10px 18px calc(12px + env(safe-area-inset-bottom));
   pointer-events:none;background:linear-gradient(to top, rgba(3,5,10,.92), rgba(3,5,10,0))}
-#legend{display:flex;flex-wrap:wrap;gap:5px 12px;max-width:52%;pointer-events:auto}
+#legend{grid-area:legend;display:flex;flex-wrap:wrap;gap:5px 12px;max-width:100%;pointer-events:auto}
 .lg{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--tx2);letter-spacing:.4px}
 .lg i{width:7px;height:7px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c)}
 .lg.live{color:#bfffe4}
 .lg.live i{animation:pulse 1.6s infinite}
-.hint{position:absolute;left:50%;bottom:40px;transform:translateX(-50%);white-space:nowrap;
-  font:10.5px/1 ui-monospace,Consolas,monospace;color:var(--tx3);letter-spacing:.6px;
-  pointer-events:none;padding:5px 12px;border-radius:20px;
+.hint{grid-area:hint;justify-self:center;max-width:calc(100vw - 36px);
+  font:10.5px/1.45 ui-monospace,Consolas,monospace;color:var(--tx3);letter-spacing:.6px;
+  text-align:center;pointer-events:none;padding:5px 12px;border-radius:20px;
   background:rgba(3,5,10,.55);border:1px solid rgba(120,190,255,.10);backdrop-filter:blur(6px)}
-#stats{font:10.5px/1.6 ui-monospace,Consolas,monospace;color:var(--tx3);text-align:right;
+#stats{grid-area:stats;font:10.5px/1.6 ui-monospace,Consolas,monospace;color:var(--tx3);text-align:right;
   letter-spacing:.8px;pointer-events:auto;white-space:nowrap}
 #stats b{color:var(--cy);font-weight:500}
 #guide{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:20;
@@ -937,7 +939,9 @@ body.flowmode #loadHud{opacity:0;pointer-events:none}
   pointer-events:none;white-space:nowrap;opacity:.9;display:none;
   padding:5px 12px;border-radius:20px;background:rgba(3,5,10,.55);
   border:1px solid rgba(120,190,255,.10);backdrop-filter:blur(6px)}
-@media (max-width:700px){#guide{display:block}}
+@media (max-width:700px){#guide{display:block;left:12px;right:12px;width:auto;
+  transform:none;bottom:calc(100px + 40px);white-space:normal;text-align:center;
+  line-height:1.5;font-size:9.5px;max-width:calc(100vw - 24px)}}
 .hint.live,#guide.live{color:#e8fbff;border-color:rgba(127,227,255,.34);
   box-shadow:0 0 18px rgba(127,227,255,.12)}
 .hint.live b,#guide.live b{color:#8fffd0;font-weight:600}
@@ -945,7 +949,7 @@ body.flowmode #loadHud{opacity:0;pointer-events:none}
 .hint.err b,#guide.err b{color:#ffb09a}
 
 /* ---------- 控件按钮 ---------- */
-#controls{position:fixed;right:18px;bottom:52px;z-index:21;display:flex;gap:7px}
+#controls{position:fixed;right:18px;bottom:calc(var(--hud-h, 58px) + 10px);z-index:21;display:flex;gap:7px}
 .ctl{padding:7px 11px;border-radius:8px;background:rgba(8,16,30,.78);
   border:1px solid rgba(120,190,255,.22);color:var(--tx2);font-size:11px;letter-spacing:.5px;
   cursor:pointer;backdrop-filter:blur(10px);transition:.18s}
@@ -997,7 +1001,8 @@ body.posedit #guardNotice{bottom:190px}
 /* 横屏手机 / 矮窗口：底部图例和提示会互相压住，直接收起 */
 @media (max-height:560px){
   #legend,.hint{display:none}
-  #hud-bottom{padding-bottom:8px}
+  #hud-bottom{display:flex;align-items:flex-end;padding-bottom:8px}
+  #stats{margin-left:auto}
 }
 
 @media (max-width:700px){
@@ -1011,15 +1016,20 @@ body.posedit #guardNotice{bottom:190px}
   #panel{left:12px;right:12px;top:auto;bottom:0;width:auto;max-height:56vh;
     border-radius:16px 16px 0 0;transform:translateY(105%)}
   #panel.on{transform:none}
-  #hud-bottom{align-items:flex-start;flex-direction:column;gap:6px;padding:6px 12px 10px}
+  #hud-bottom{display:flex;align-items:flex-start;flex-direction:column;gap:6px;padding:6px 12px 10px}
   #legend{display:none}
   .hint{display:none}
   #stats{font-size:9.5px;text-align:left}
-  #controls{right:12px;bottom:34px}
+  #controls{left:12px;right:12px;bottom:34px;flex-wrap:wrap;justify-content:flex-end;row-gap:6px}
   .ctl{padding:6px 9px;font-size:10px}
   .planet.feat .label{font-size:9.5px}
   /* 英文画风名更长，手机上会排到三四行；不做内部裁剪，交给生成舱整体滚动 */
   .gd-styles{max-height:none;overflow:visible}
+}
+/* 极窄屏：按钮缩小，避免底部控制条挤成三行压住生成按钮。 */
+@media (max-width:300px){
+  #controls{gap:4px;row-gap:4px}
+  .ctl{padding:5px 6px;font-size:9px;letter-spacing:.2px}
 }
 /* 横屏/矮窗口：头部更矮，过滤条和负载面板都要跟着上移。
    放在 max-width 规则之后，避免窄横屏被后面的手机规则覆盖。 */
@@ -6426,6 +6436,29 @@ addEventListener('keydown', e => {
     if(genState.open) closeGenDeck(); else closePanel();
   }
 });
+/* 底部 HUD 高度会随中英文图例换行变化；把实际高度写给控件，
+   避免英文长文案时按钮压住提示 / 图例。 */
+const hudBottomEl = document.getElementById('hud-bottom');
+function syncHudHeight(){
+  if(!hudBottomEl) return;
+  document.documentElement.style.setProperty(
+    '--hud-h', hudBottomEl.getBoundingClientRect().height + 'px');
+}
+syncHudHeight();
+requestAnimationFrame(syncHudHeight);
+setTimeout(syncHudHeight, 300);
+document.addEventListener('mg-lang', () => {
+  syncHudHeight();
+  requestAnimationFrame(syncHudHeight);
+});
+if(window.ResizeObserver){
+  if(!window.__hudResizeObserver){
+    window.__hudResizeObserver = new ResizeObserver(syncHudHeight);
+    window.__hudResizeObserver.observe(hudBottomEl);
+  }
+}
+addEventListener('resize', syncHudHeight);
+
 let lastFitW = innerWidth, resizePending = 0;
 addEventListener('resize', () => {
   // 合并同一帧内的多次 resize（手机地址栏/软键盘会连续触发），

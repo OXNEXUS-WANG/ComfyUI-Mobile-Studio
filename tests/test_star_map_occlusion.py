@@ -29,6 +29,21 @@ class StarMapOcclusionTests(unittest.TestCase):
         self.assertIn('<div id="planets"></div>', self.html)
         self.assertIn('<canvas id="linkFront"></canvas>', self.html)
 
+    def test_bottom_hud_does_not_overlap_in_english(self):
+        # 英文图例更长：HUD 用 grid 把提示放到图例上方，
+        # 控件按实际 HUD 高度抬升；窄屏 guide 换行并让开按钮。
+        self.assertIn('grid-template-areas:"hint hint" "legend stats"',
+                      self.html)
+        self.assertIn("grid-area:hint", self.html)
+        self.assertIn("bottom:calc(var(--hud-h, 58px) + 10px)", self.html)
+        self.assertNotIn("position:absolute;left:50%;bottom:40px", self.html)
+        self.assertIn("flex-wrap:wrap;justify-content:flex-end", self.html)
+        self.assertIn("bottom:calc(100px + 40px)", self.html)
+        self.assertIn("@media (max-width:300px)", self.html)
+        self.assertIn(".ctl{padding:5px 6px;font-size:9px", self.html)
+        self.assertIn("function syncHudHeight()", self.html)
+        self.assertIn("addEventListener('mg-lang'", self.html)
+
 
 if __name__ == "__main__":
     unittest.main()
