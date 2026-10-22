@@ -5812,10 +5812,10 @@ function resizeLinkFront(){
     linkFrontCanvas.width = cw;
     linkFrontCanvas.height = ch;
   }
-  if(lfDpr !== dpr){
-    lfDpr = dpr;
-    lfctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
+  // 改 canvas.width/height 会把 2D 上下文重置成 identity；
+  // 即使 dpr 没变，也必须重新应用缩放，否则窗口缩放后前置连线会错位。
+  lfDpr = dpr;
+  lfctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 function renderStars(){
   const dpr = Math.min(2, devicePixelRatio || 1);

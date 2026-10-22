@@ -44,6 +44,15 @@ class StarMapOcclusionTests(unittest.TestCase):
         self.assertIn("function syncHudHeight()", self.html)
         self.assertIn("addEventListener('mg-lang'", self.html)
 
+    def test_link_front_canvas_reapplies_dpr_after_resize(self):
+        # 设置 canvas.width/height 会把 2D 上下文重置成 identity；
+        # 如果只在 dpr 变化时 setTransform，窗口缩放后前置连线会错位。
+        start = self.html.index("function resizeLinkFront")
+        end = self.html.index("function renderStars", start)
+        block = self.html[start:end]
+        self.assertIn("lfctx.setTransform(dpr, 0, 0, dpr, 0, 0);", block)
+        self.assertNotIn("if(lfDpr !== dpr)", block)
+
 
 if __name__ == "__main__":
     unittest.main()
