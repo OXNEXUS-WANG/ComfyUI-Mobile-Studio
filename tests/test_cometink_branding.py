@@ -74,6 +74,13 @@ class CometInkBrandingTests(unittest.TestCase):
         self.assertIn('"CometInk-v" + $Version', self.build)
         self.assertNotIn('"Nexus-v" + $Version', self.build)
 
+    def test_share_build_excludes_commercial_launcher(self):
+        # 商用分支重命名入口时要移除一次，分享分支也必须移除一次。
+        self.assertEqual(
+            self.build.count('Remove-Staged "安装_商业版.bat"'), 2)
+        share = self.build.split('} else {', 1)[1]
+        self.assertIn('Remove-Staged "安装_商业版.bat"', share)
+
     def test_installer_uses_cometink_shortcut_and_icon(self):
         self.assertIn('"CometInk Studio.lnk"', self.install)
         self.assertIn('"cometink.ico"', self.install)
@@ -81,7 +88,7 @@ class CometInkBrandingTests(unittest.TestCase):
         # 只保留迁移时删除旧品牌快捷方式的引用。
         self.assertIn('$legacy = Join-Path $desktop "Nexus Studio.lnk"', self.install)
         self.assertIn('"CometInk 8800"', self.install)
-        self.assertIn('$AppVersion = "1.3.9"', self.install)
+        self.assertIn('$AppVersion = "1.3.10"', self.install)
         self.assertIn('$DisclaimerVersion = "1.2"', self.install)
 
     def test_offline_bundle_carries_pwa_icons(self):
@@ -89,7 +96,7 @@ class CometInkBrandingTests(unittest.TestCase):
         self.assertIn('".ico"', self.bundle)
 
     def test_version_and_disclaimer_are_updated(self):
-        self.assertEqual(self.version, "1.3.9")
+        self.assertEqual(self.version, "1.3.10")
         self.assertIn("CometInk 彗墨", self.disclaimer)
         self.assertIn("免责声明版本：1.2", self.disclaimer)
 

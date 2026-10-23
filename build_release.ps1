@@ -131,6 +131,8 @@ if ($Edition -eq "commercial") {
     Remove-Staged "安装说明_商业版.txt"
     Remove-Staged "COMMERCIAL_EULA.md"
     Remove-Staged "商用版授权协议.md"
+    # 分享包里不能出现商用版安装入口，避免用户误以为需要商用授权。
+    Remove-Staged "安装_商业版.bat"
     Set-Content -Path (Join-Path $Stage "EDITION") -Value "share" -Encoding ascii
 }
 
