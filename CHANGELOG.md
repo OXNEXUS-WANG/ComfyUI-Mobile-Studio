@@ -1,6 +1,6 @@
 ﻿# 变更日志
 
-## 2026-10-23 · 安全加固（v1.3.6 代码线）
+## 2026-10-23 · v1.3.7 安全加固与发布包
 
 - **本机 GPU 并发写死为 1**：`local` 执行槽严格串行，队列单账号 20 / 全局 60，
   排队期间不提交 ComfyUI；补 `test_local_slot_is_strictly_single`。
@@ -20,6 +20,8 @@
 - 新增 `SECURITY.md`、`docs/手机HTTPS访问.md`、`docs/备份与恢复.md`；
   README / MANUAL 同步更新，明确 HSTS 对 IP 不生效。
 - 完整测试套件 **246 项通过**（5 项在线 HTTP 测试按环境跳过）。
+- 版本升级到 **1.3.7**；重打分享版 ZIP，确保下载包包含本次安全加固；
+  MANUAL / README / INSTALL / GITHUB_INTRO 的下载文件名同步更新。
 
 ## 2026-10-22 · v1.3.6 管理员后台布局与双语展示
 

@@ -38,7 +38,7 @@ if ($ComfyUIDir -and $InstallDir) {
 
 $ErrorActionPreference = "Stop"
 $PkgRoot = Split-Path -Parent $PSScriptRoot
-$AppVersion = "1.3.6"
+$AppVersion = "1.3.7"
 $VersionFile = Join-Path $PkgRoot "VERSION"
 if (Test-Path $VersionFile) {
     $v = (Get-Content $VersionFile -Raw -Encoding ASCII).Trim()

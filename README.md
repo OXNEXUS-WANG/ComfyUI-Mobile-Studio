@@ -54,7 +54,7 @@ Turn ComfyUI into a private, mobile-first image-generation studio.
 
 ### Quick start
 
-1. Download `CometInk-v1.3.6-Share.zip` from **Releases** and extract it.
+1. Download `CometInk-v1.3.7-Share.zip` from **Releases** and extract it.
 2. Run **`install.bat`** (the Chinese-name `安装.bat` opens the same installer).
 3. Choose the install folder, admin password, and model pack.
 4. Launch **CometInk Studio** from the desktop shortcut.
@@ -188,8 +188,8 @@ commit、模型 revision 和 7zr 哈希都已锁定，不会自动追最新版�
 
 ## 2. 安装
 
-1. 分享版从 GitHub Releases 下载 `CometInk-v1.3.6-Share.zip`；
-   商用客户使用 `CometInk-v1.3.6-Commercial.zip`。
+1. 分享版从 GitHub Releases 下载 `CometInk-v1.3.7-Share.zip`；
+   商用客户使用 `CometInk-v1.3.7-Commercial.zip`。
 2. 解压到一个目录（不要在压缩包里直接运行）。
 3. 双击 `安装.bat`（或 `install.bat`）。
 4. **首次安装必须先阅读并同意醒目的免责声明与使用协议**：窗口内可滚动阅读，
@@ -736,9 +736,9 @@ ComfyUI 地址默认是 `http://127.0.0.1:8188`。需要改端口或指向别的
 
 ## 开发说明 / Development note
 
-CometInk 由一名大一学生单人从零完成：需求、架构、后端、前端、星图、测试、文档和发布流程均由一人推进，开发期间使用 AI 编程助手辅助。近 30 天累计 **6,038,125,446 tokens**（约 60.4 亿）、**17,517 次 API 请求**，API 费用 **¥227.20**；当前版本通过 **231 项测试**，并经过人工审查。
+CometInk 由一名大一学生单人从零完成：需求、架构、后端、前端、星图、测试、文档和发布流程均由一人推进，开发期间使用 AI 编程助手辅助。近 30 天累计 **6,038,125,446 tokens**（约 60.4 亿）、**17,517 次 API 请求**，API 费用 **¥227.20**；当前版本通过 **246 项测试**，并经过人工审查。
 
-CometInk was built solo from scratch by a first-year university student: requirements, architecture, backend, frontend, star map, tests, documentation, and releases were all driven by one developer, with AI coding assistants. In the last 30 days: **6,038,125,446 tokens**, **17,517 API requests**, and **¥227.20** in API usage. The current build passes **231 tests** and has been manually reviewed.
+CometInk was built solo from scratch by a first-year university student: requirements, architecture, backend, frontend, star map, tests, documentation, and releases were all driven by one developer, with AI coding assistants. In the last 30 days: **6,038,125,446 tokens**, **17,517 API requests**, and **¥227.20** in API usage. The current build passes **246 tests** and has been manually reviewed.
 
 ---
 
