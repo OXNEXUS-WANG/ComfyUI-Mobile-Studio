@@ -12,13 +12,13 @@ if not defined PY if exist "%~dp0..\python_embeded\python.exe" (
   set "PY=%~dp0..\python_embeded\python.exe"
   set "COMFY=%~dp0.."
 )
-if not defined PY if exist "D:\AI\ComfyUI_windows_portable\python_embeded\python.exe" (
-  set "PY=D:\AI\ComfyUI_windows_portable\python_embeded\python.exe"
-  set "COMFY=D:\AI\ComfyUI_windows_portable"
+if not defined PY if exist "D:\CometInk\python_embeded\python.exe" (
+  set "PY=D:\CometInk\python_embeded\python.exe"
+  set "COMFY=D:\CometInk"
 )
-if not defined PY if exist "C:\AI\ComfyUI_windows_portable\python_embeded\python.exe" (
-  set "PY=C:\AI\ComfyUI_windows_portable\python_embeded\python.exe"
-  set "COMFY=C:\AI\ComfyUI_windows_portable"
+if not defined PY if exist "C:\CometInk\python_embeded\python.exe" (
+  set "PY=C:\CometInk\python_embeded\python.exe"
+  set "COMFY=C:\CometInk"
 )
 if not defined PY (
   echo Could not find ComfyUI Python automatically.

@@ -54,7 +54,7 @@ Turn ComfyUI into a private, mobile-first image-generation studio.
 
 ### Quick start
 
-1. Download `CometInk-v1.3.12-Share.zip` from **Releases** and extract it.
+1. Download `CometInk-v1.3.13-Share.zip` from **Releases** and extract it.
 2. Run **`install.bat`** (the Chinese-name `安装.bat` opens the same installer).
 3. Choose the install folder, admin password, and model pack.
 4. Launch **CometInk Studio** from the desktop shortcut.
@@ -188,8 +188,8 @@ commit、模型 revision 和 7zr 哈希都已锁定，不会自动追最新版�
 
 ## 2. 安装
 
-1. 分享版从 GitHub Releases 下载 `CometInk-v1.3.12-Share.zip`；
-   商用客户使用 `CometInk-v1.3.12-Commercial.zip`。
+1. 分享版从 GitHub Releases 下载 `CometInk-v1.3.13-Share.zip`；
+   商用客户使用 `CometInk-v1.3.13-Commercial.zip`。
 2. 解压到一个目录（不要在压缩包里直接运行）。
 3. 双击 `安装.bat`（或 `install.bat`）。
 4. **首次安装必须先阅读并同意醒目的免责声明与使用协议**：窗口内可滚动阅读，
@@ -198,7 +198,7 @@ commit、模型 revision 和 7zr 哈希都已锁定，不会自动追最新版�
    无人值守安装必须显式加 `-AcceptDisclaimer`，否则安装器拒绝执行。
 5. 按提示操作：
 
-   - 选择安装目录，默认 `D:\AI\ComfyUI_windows_portable`
+   - 选择安装目录，默认 `D:\CometInk`
    - 设置管理员密码（至少 8 位）
    - 选择模型包：直接回车 = Anima 2B + 放大模型
    - 等待下载 ComfyUI、Python 依赖、自定义节点和模型
@@ -244,14 +244,14 @@ commit、模型 revision 和 7zr 哈希都已锁定，不会自动追最新版�
 
 ```powershell
 # 完全禁止安装器下载 ComfyUI，必须使用已有安装
-installer\install.ps1 -CommercialClean -SkipComfyUI -InstallDir D:\AI\ComfyUI_windows_portable
+installer\install.ps1 -CommercialClean -SkipComfyUI -InstallDir D:\CometInk
 
 # 复用已有 ComfyUI
-installer\install.ps1 -CommercialClean -ComfyUIDir D:\AI\ComfyUI_windows_portable
+installer\install.ps1 -CommercialClean -ComfyUIDir D:\CometInk
 
 # 无人值守安装：必须显式接受免责声明
 installer\install.ps1 -CommercialClean -Yes -AcceptDisclaimer `
-  -InstallDir D:\AI\ComfyUI_windows_portable
+  -InstallDir D:\CometInk
 ```
 
 > `-Yes` / `-NoDialog` 只关闭交互，**不等于同意免责声明**。首次安装必须
@@ -661,7 +661,7 @@ ComfyUI 地址默认是 `http://127.0.0.1:8188`。需要改端口或指向别的
   `monitor_alerts.json`、`monitor_trends.json`、`cleanup.json`、`license.json`、
   `cert.pem`、`key.pem`、`_restore_points/`、`_model_trash/`、`_model_uploads/`、
   `generated/.archives/` 都不应该提交。
-- 商用授权私钥只保存在维护者电脑（`D:\AI\_private\`），不在仓库和发布包中；
+- 商用授权私钥只保存在维护者电脑（`D:\CometInk\_private\`），不在仓库和发布包中；
   `license_admin/` 目录也不会进入任何发布包。
 - 本地翻译只允许本机/内网地址；API Key 不会通过前端接口返回。
 - `/metrics` 只在启用并生成 token 后可用；token 不会通过管理接口回显，日志也不记录。
@@ -706,7 +706,7 @@ ComfyUI 地址默认是 `http://127.0.0.1:8188`。需要改端口或指向别的
   - 不提交 `ComfyUI/`、`models/`、`generated/`、`logs/`、`users.json`、
     `workers.json`、`cert.pem`、`key.pem`
   - 安装器 DryRun 通过：
-    `powershell -File installer/install.ps1 -InstallDir D:\AI\test -DryRun -Yes`
+    `powershell -File installer/install.ps1 -InstallDir D:\CometInk\test -DryRun -Yes`
 
 ## 15. 许可与第三方
 
@@ -739,9 +739,9 @@ ComfyUI 地址默认是 `http://127.0.0.1:8188`。需要改端口或指向别的
 
 ## 开发说明 / Development note
 
-CometInk 由一名大一学生单人从零完成：需求、架构、后端、前端、星图、测试、文档和发布流程均由一人推进，开发期间使用 AI 编程助手辅助。近 30 天累计 **6,038,125,446 tokens**（约 60.4 亿）、**17,517 次 API 请求**，API 费用 **¥227.20**；当前版本通过 **256 项测试**，并经过人工审查。
+CometInk 由一名大一学生单人从零完成：需求、架构、后端、前端、星图、测试、文档和发布流程均由一人推进，开发期间使用 AI 编程助手辅助。近 30 天累计 **6,038,125,446 tokens**（约 60.4 亿）、**17,517 次 API 请求**，API 费用 **¥227.20**；当前版本通过 **257 项测试**，并经过人工审查。
 
-CometInk was built solo from scratch by a first-year university student: requirements, architecture, backend, frontend, star map, tests, documentation, and releases were all driven by one developer, with AI coding assistants. In the last 30 days: **6,038,125,446 tokens**, **17,517 API requests**, and **¥227.20** in API usage. The current build passes **256 tests** and has been manually reviewed.
+CometInk was built solo from scratch by a first-year university student: requirements, architecture, backend, frontend, star map, tests, documentation, and releases were all driven by one developer, with AI coding assistants. In the last 30 days: **6,038,125,446 tokens**, **17,517 API requests**, and **¥227.20** in API usage. The current build passes **257 tests** and has been manually reviewed.
 
 ---
 

@@ -50,8 +50,8 @@ def find_comfy(arg=""):
     candidates = [arg, os.environ.get("COMFYUI_DIR", "")]
     candidates += [
         str(HERE), str(HERE.parent),
-        r"D:\AI\ComfyUI_windows_portable",
-        r"C:\AI\ComfyUI_windows_portable",
+        r"D:\CometInk",
+        r"C:\CometInk",
         str(Path.home() / "ComfyUI_windows_portable"),
         str(Path.home() / "Desktop" / "ComfyUI_windows_portable"),
     ]

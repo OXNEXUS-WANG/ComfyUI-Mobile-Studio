@@ -88,6 +88,19 @@ class CometInkBrandingTests(unittest.TestCase):
         self.assertIn('Copy-Item $manual (Join-Path $InstallDir "使用说明.md")',
                       self.install)
 
+    def test_shipped_files_have_no_developer_paths(self):
+        files = [
+            "installer/install.ps1", "README.md", "MANUAL.md",
+            "INSTALL.en.md", "安装说明.txt", "worker/deploy_node.py",
+            "tools/offline_bundle.py", "docs/备份与恢复.md",
+            "docs/手机HTTPS访问.md",
+        ]
+        for rel in files:
+            text = (ROOT / rel).read_text(encoding="utf-8")
+            self.assertNotIn("D:\\AI", text, rel)
+            self.assertNotIn("C:\\Users\\", text, rel)
+        self.assertIn("D:\\CometInk", self.install)
+
     def test_commercial_build_excludes_maintainer_files(self):
         for text in ('Remove-Staged "build_release.ps1"',
                      'Remove-Staged ".gitignore"',
@@ -102,7 +115,7 @@ class CometInkBrandingTests(unittest.TestCase):
         # 只保留迁移时删除旧品牌快捷方式的引用。
         self.assertIn('$legacy = Join-Path $desktop "Nexus Studio.lnk"', self.install)
         self.assertIn('"CometInk 8800"', self.install)
-        self.assertIn('$AppVersion = "1.3.12"', self.install)
+        self.assertIn('$AppVersion = "1.3.13"', self.install)
         self.assertIn('$DisclaimerVersion = "1.2"', self.install)
 
     def test_offline_bundle_carries_pwa_icons(self):
@@ -110,7 +123,7 @@ class CometInkBrandingTests(unittest.TestCase):
         self.assertIn('".ico"', self.bundle)
 
     def test_version_and_disclaimer_are_updated(self):
-        self.assertEqual(self.version, "1.3.12")
+        self.assertEqual(self.version, "1.3.13")
         self.assertIn("CometInk 彗墨", self.disclaimer)
         self.assertIn("免责声明版本：1.2", self.disclaimer)
 

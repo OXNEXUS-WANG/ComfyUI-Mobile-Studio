@@ -248,8 +248,8 @@ echo ============================================
 echo   Migrate offline bundle to this computer
 echo ============================================
 echo.
-set /p TARGET=Target install folder [D:\\AI\\ComfyUI_windows_portable]:
-if "%TARGET%"=="" set TARGET=D:\\AI\\ComfyUI_windows_portable
+set /p TARGET=Target install folder [D:\\CometInk]:
+if "%TARGET%"=="" set TARGET=D:\\CometInk
 if exist "%~dp0payload\\python_embeded\\python.exe" (
   "%~dp0payload\\python_embeded\\python.exe" "%~dp0migrate_offline.py" --bundle "%~dp0" --target "%TARGET%"
   goto done
@@ -276,7 +276,7 @@ pause
         "================================\n\n"
         "1. 把整个文件夹复制到 U 盘。\n"
         "2. 在新电脑上双击「一键迁移到新机器.bat」。\n"
-        "3. 输入安装目录（例如 D:\\AI\\ComfyUI_windows_portable）。\n"
+        "3. 输入安装目录（例如 D:\\CometInk）。\n"
         "4. 迁移完成后双击目标目录的「一键启动.bat」。\n\n"
         "说明：\n"
         "- 只迁移模型、网页程序和自定义节点时，新电脑需要先有 ComfyUI。\n"

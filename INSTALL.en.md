@@ -21,11 +21,11 @@ The installer can download ComfyUI and the default models. If you already have C
 
 ## 2. Install
 
-1. Download `CometInk-v1.3.12-Share.zip` from **Releases** and extract it to a normal folder. Do not run it from inside the ZIP.
+1. Download `CometInk-v1.3.13-Share.zip` from **Releases** and extract it to a normal folder. Do not run it from inside the ZIP.
 2. Run **`install.bat`** (English entry point). `安装.bat` is the same installer under its Chinese name.
 3. Choose the install directory. The default is:
    ```text
-   D:\AI\ComfyUI_windows_portable
+   D:\CometInk
    ```
 4. Read the disclaimer, tick the acceptance checkbox, and continue.
 5. Set an administrator password (at least 8 characters). Write it down.
@@ -64,8 +64,8 @@ Useful switches:
 - `-SkipModels` — do not download models (use when models already exist)
 - `-NoTranslate` — skip the Chinese-to-English translation pack
 - `-NoShortcut` — do not create the desktop shortcut
-- `-ComfyUIDir "D:\AI\ComfyUI_windows_portable"` — reuse an existing ComfyUI
-- `-InstallDir "D:\AI\CometInk"` — choose the install directory
+- `-ComfyUIDir "D:\CometInk"` — reuse an existing ComfyUI
+- `-InstallDir "D:\CometInk"` — choose the install directory
 
 The installer log is still in Chinese, but it runs without questions when `-Yes` and `-AcceptDisclaimer` are supplied.
 

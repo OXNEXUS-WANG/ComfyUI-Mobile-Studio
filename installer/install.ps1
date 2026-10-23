@@ -39,7 +39,7 @@ if ($ComfyUIDir -and $InstallDir) {
 
 $ErrorActionPreference = "Stop"
 $PkgRoot = Split-Path -Parent $PSScriptRoot
-$AppVersion = "1.3.12"
+$AppVersion = "1.3.13"
 $VersionFile = Join-Path $PkgRoot "VERSION"
 if (Test-Path $VersionFile) {
     $v = (Get-Content $VersionFile -Raw -Encoding ASCII).Trim()
@@ -603,7 +603,7 @@ function Get-ProblemAdvice($err) {
         return "1. 检查网络/代理，确认能访问 gh-proxy.com、hf-mirror.com。`n2. 重新运行安装器，已下载的部分会断点续传。`n3. 模型可以稍后双击『模型下载.bat』补装。"
     }
     if ($m -match "拒绝访问|Access|权限|只读|写入") {
-        return "1. 换一个普通目录（如 D:\AI\...），不要装到 Program Files/Windows。`n2. 关闭杀毒软件的文件夹保护，或以管理员身份运行。`n3. 检查目录是否被另一个程序占用。"
+        return "1. 换一个普通目录（如 D:\CometInk\...），不要装到 Program Files/Windows。`n2. 关闭杀毒软件的文件夹保护，或以管理员身份运行。`n3. 检查目录是否被另一个程序占用。"
     }
     if ($m -match "空间") {
         return "1. 清理安装盘，或换到剩余空间至少 20GB 的盘。`n2. 或重新运行并选择不下载模型。"
@@ -1321,8 +1321,26 @@ try {
         Warn "没有检测到 NVIDIA 显卡；可以安装，但 CPU 出图会非常慢。"
     }
     if (-not $InstallDir) {
-        if (Test-Path "D:\") { $InstallDir = "D:\AI\ComfyUI_windows_portable" }
-        else { $InstallDir = Join-Path $env:LOCALAPPDATA "ComfyUI_windows_portable" }
+        # 优先复用 D 盘已有的 ComfyUI（最多看两层），避免升级时又装一份；
+        # 找不到才用中性的默认目录，不再写死开发者本机路径。
+        $existing = $null
+        if (Test-Path "D:\") {
+            foreach ($top in @(Get-ChildItem "D:\" -Directory -Force -ErrorAction SilentlyContinue)) {
+                $candidates = @($top.FullName)
+                $candidates += @(Get-ChildItem $top.FullName -Directory -Force -ErrorAction SilentlyContinue |
+                                 ForEach-Object { $_.FullName })
+                foreach ($c in $candidates) {
+                    if (Test-Path (Join-Path $c "ComfyUI\main.py")) {
+                        $existing = $c
+                        break
+                    }
+                }
+                if ($existing) { break }
+            }
+        }
+        if ($existing) { $InstallDir = $existing }
+        elseif (Test-Path "D:\") { $InstallDir = "D:\CometInk" }
+        else { $InstallDir = Join-Path $env:LOCALAPPDATA "CometInk" }
         if (-not $Yes) {
             $typed = Read-Host ("  安装目录 [" + $InstallDir + "]")
             if ($typed) { $InstallDir = $typed }
@@ -1331,13 +1349,13 @@ try {
     $InstallDir = [IO.Path]::GetFullPath($InstallDir).TrimEnd('\')
     if ($InstallDir -match '^[A-Za-z]:$') {
         Fail ("不能直接安装到盘符根目录：" + $InstallDir +
-              "`n请使用子目录，例如 D:\AI\ComfyUI_windows_portable。")
+              "`n请使用子目录，例如 D:\CometInk。")
     }
 
     # 路径本身也可能和便携 Python / 自定义节点冲突
     if ($InstallDir -match '^\\\\') {
         Fail ("不支持 UNC 网络路径：" + $InstallDir +
-              "`n请安装到本机磁盘（例如 D:\AI\ComfyUI_windows_portable）。")
+              "`n请安装到本机磁盘（例如 D:\CometInk）。")
     }
     if ($InstallDir -match '[^\x00-\x7F]') {
         Warn "安装目录包含中文或其他非 ASCII 字符；少数自定义节点可能无法读取。"
