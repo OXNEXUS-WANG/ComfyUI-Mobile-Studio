@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "模型不随安装包分发，由安装器从 Hugging Face 镜像下载。模型版权/许可请遵守原仓库。 所有模型文件按 revision 锁定。",
+  "note": "模型不随安装包分发，由安装器优先从 ModelScope 国内镜像下载，失败再走 Hugging Face 镜像。所有文件按 revision 和 SHA256 锁定；SHA256 已与 Hugging Face 原仓库逐一比对一致。模型版权/许可请遵守原仓库。",
   "default_packs": [
     "anima",
     "upscale"
@@ -16,28 +16,40 @@
           "path": "split_files/diffusion_models/anima-aesthetic-v1.1.safetensors",
           "dest": "ComfyUI/models/diffusion_models/anima-aesthetic-v1.1.safetensors",
           "size": 4182230656,
-          "revision": "f973fc41ec7545364ac9776c2440285f43ff2a30"
+          "revision": "f973fc41ec7545364ac9776c2440285f43ff2a30",
+          "modelscope_repo": "circlestone-labs/Anima",
+          "modelscope_revision": "b28539e30f7b5a421abb1a17f47dd9408456ce3d",
+          "sha256": "3c1868387a3a1ff504bbb87c33678321965ead381fcf87afbd0264daa600c082"
         },
         {
           "repo": "circlestone-labs/Anima",
           "path": "split_files/text_encoders/qwen_3_06b_base.safetensors",
           "dest": "ComfyUI/models/text_encoders/qwen_3_06b_base.safetensors",
           "size": 1192135096,
-          "revision": "f973fc41ec7545364ac9776c2440285f43ff2a30"
+          "revision": "f973fc41ec7545364ac9776c2440285f43ff2a30",
+          "modelscope_repo": "circlestone-labs/Anima",
+          "modelscope_revision": "ed04460b568d64b84b28c067441b240039923a16",
+          "sha256": "cd2a512003e2f9f3cd3c32a9c3573f820bb28c940f73c57b1ddaa983d9223eba"
         },
         {
           "repo": "circlestone-labs/Anima",
           "path": "split_files/vae/qwen_image_vae.safetensors",
           "dest": "ComfyUI/models/vae/qwen_image_vae.safetensors",
           "size": 253806246,
-          "revision": "f973fc41ec7545364ac9776c2440285f43ff2a30"
+          "revision": "f973fc41ec7545364ac9776c2440285f43ff2a30",
+          "modelscope_repo": "circlestone-labs/Anima",
+          "modelscope_revision": "ed04460b568d64b84b28c067441b240039923a16",
+          "sha256": "a70580f0213e67967ee9c95f05bb400e8fb08307e017a924bf3441223e023d1f"
         },
         {
           "repo": "diffusionmodels1254ani/Anima-Official-LoRAs",
           "path": "anima-turbo-lora-v0.2.safetensors",
           "dest": "ComfyUI/models/loras/anima-turbo-lora-v0.2.safetensors",
           "size": 148902616,
-          "revision": "6ee98b37ad661234e82a05089c8458653dde29dd"
+          "revision": "6ee98b37ad661234e82a05089c8458653dde29dd",
+          "modelscope_repo": "circlestone-labs/Anima-Official-LoRAs",
+          "modelscope_revision": "013b2416ae50695697b924c433951578c80467df",
+          "sha256": "1b55e40bdb1d0e5a78cb498f245fccfdaae97823265db957d2aabdcf4cd3caf1"
         }
       ]
     },
@@ -51,21 +63,30 @@
           "path": "4x-UltraSharp.pth",
           "dest": "ComfyUI/models/upscale_models/4x-UltraSharp.pth",
           "size": 66961958,
-          "revision": "1856559b50de25116a7c07261177dd128f1f5664"
+          "revision": "1856559b50de25116a7c07261177dd128f1f5664",
+          "modelscope_repo": "XiangZL0/4x-UltraSharp",
+          "modelscope_revision": "1a8124b7bfddae583d9f66d852ce88995130c6bb",
+          "sha256": "a5812231fc936b42af08a5edba784195495d303d5b3248c24489ef0c4021fe01"
         },
         {
           "repo": "amd/realesrgan-x4plus-anime-6b",
           "path": "RealESRGAN_x4plus_anime_6B.pth",
           "dest": "ComfyUI/models/upscale_models/RealESRGAN_x4plus_anime_6B.pth",
           "size": 17938799,
-          "revision": "b14ff5f8ecb5a4b56ce4049a58d0bca1f8814690"
+          "revision": "b14ff5f8ecb5a4b56ce4049a58d0bca1f8814690",
+          "modelscope_repo": "amd/realesrgan-x4plus-anime-6b",
+          "modelscope_revision": "8cc9a4a928e5d494d6b0fef5f6e66ed8850e347f",
+          "sha256": "f872d837d3c90ed2e05227bed711af5671a6fd1c9f7d7e91c911a61f155e99da"
         },
         {
           "repo": "amd/realesrgan-x4plus",
           "path": "RealESRGAN_x4plus.pth",
           "dest": "ComfyUI/models/upscale_models/RealESRGAN_x4plus.pth",
           "size": 67040989,
-          "revision": "bda69abcaf525425b371622349e975245ae090c2"
+          "revision": "bda69abcaf525425b371622349e975245ae090c2",
+          "modelscope_repo": "amd/realesrgan-x4plus",
+          "modelscope_revision": "2addd562faa69c3b152882f5337ae6c5e2f0fb75",
+          "sha256": "4fa0d38905f75ac06eb49a7951b426670021be3018265fd191d2125df9d682f1"
         }
       ]
     },
@@ -79,7 +100,10 @@
           "path": "NoobAI-XL-Vpred-v1.0.safetensors",
           "dest": "ComfyUI/models/checkpoints/NoobAI-XL-Vpred-v1.0.safetensors",
           "size": 7105350110,
-          "revision": "66aa55e3469c27c29a89813cd35dd95fb7485fa1"
+          "revision": "66aa55e3469c27c29a89813cd35dd95fb7485fa1",
+          "modelscope_repo": "ModelE/noobai-XL-Vpred-1.0",
+          "modelscope_revision": "647714aee089d7977e2e835142852ff8d3c2c6e0",
+          "sha256": "ea349eeae87ca8d25ba902c93810f7ca83e5c82f920edf12f273af004ae02819"
         }
       ]
     },
@@ -107,7 +131,10 @@
           "path": "Illustrious-XL-v2.0.safetensors",
           "dest": "ComfyUI/models/checkpoints/Illustrious-XL-v2.0.safetensors",
           "size": 6938040674,
-          "revision": "69459c1fe6f46db41ab31e6114f05acc0e06bcaa"
+          "revision": "69459c1fe6f46db41ab31e6114f05acc0e06bcaa",
+          "modelscope_repo": "OnomaAIResearch/Illustrious-XL-v2.0",
+          "modelscope_revision": "b969e652a162bb7f32f783fb0dce1bd44311a085",
+          "sha256": "c2a1a3eaa13d4c107dc7e00c3fe830cab427aa026362740ea094745b3422a331"
         }
       ]
     },
@@ -121,7 +148,10 @@
           "path": "RealVisXL_V5.0_Lightning_fp16.safetensors",
           "dest": "ComfyUI/models/checkpoints/RealVisXL_V5.0_Lightning_fp16.safetensors",
           "size": 6938065512,
-          "revision": "f4454158cedaab9f0688c199561d6c92525f3a85"
+          "revision": "f4454158cedaab9f0688c199561d6c92525f3a85",
+          "modelscope_repo": "ModelsLab/RealVisXL_V5.0_Lightning",
+          "modelscope_revision": "e0abda5c70e43d2ebfe2990d4f8a082e3be56349",
+          "sha256": "fabcadd9330dcc4f9702063428d40b9d4d07168d8acefc819b8d1d9db466b3ec"
         }
       ]
     },
@@ -135,7 +165,10 @@
           "path": "ponyDiffusionV6XL_v6StartWithThisOne.safetensors",
           "dest": "ComfyUI/models/checkpoints/ponyDiffusionV6XL_v6StartWithThisOne.safetensors",
           "size": 6938041050,
-          "revision": "14885f1c01d7723bcbf676773def286c1fd733bc"
+          "revision": "14885f1c01d7723bcbf676773def286c1fd733bc",
+          "modelscope_repo": "ModelE/Pony-Diffusion-V6-XL",
+          "modelscope_revision": "1a7062542a448a1703414e474e617f4c4784bf0b",
+          "sha256": "67ab2fd8ec439a89b3fedb15cc65f54336af163c7eb5e4f2acc98f090a29b0b3"
         }
       ]
     },
@@ -149,7 +182,10 @@
           "path": "animagine-xl-4.0.safetensors",
           "dest": "ComfyUI/models/checkpoints/animagine-xl-4.0.safetensors",
           "size": 6938434056,
-          "revision": "2b7c1b397761bf5bd3cc42e5b39ec99314a75a96"
+          "revision": "2b7c1b397761bf5bd3cc42e5b39ec99314a75a96",
+          "modelscope_repo": "cagliostrolab/animagine-xl-4.0",
+          "modelscope_revision": "b1a14093c95095b81ce2084e2862cef7ece68c34",
+          "sha256": "1d5b43ff75b6ab598502d4c779d2fbfa3dceca51c60c3b609640a60772333916"
         }
       ]
     },
@@ -163,7 +199,10 @@
           "path": "Counterfeit-V2.5_pruned.safetensors",
           "dest": "ComfyUI/models/checkpoints/Counterfeit-V2.5_pruned.safetensors",
           "size": 4265097179,
-          "revision": "93c5412baf37cbfa23a3278f7b33b0328db581fb"
+          "revision": "93c5412baf37cbfa23a3278f7b33b0328db581fb",
+          "modelscope_repo": "AI-ModelScope/Counterfeit-V2.5",
+          "modelscope_revision": "6facbbfe9661ffc3301279ee11993edf02ec0295",
+          "sha256": "a074b8864e31b8681e40db3dfde0005df7b5309fd2a2f592a2caee59e4591cae"
         }
       ]
     },
@@ -177,28 +216,40 @@
           "path": "split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors",
           "dest": "ComfyUI/models/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors",
           "size": 2838303560,
-          "revision": "123acf1cc74bccbb9bfff8ac1ee72edc08c2341d"
+          "revision": "123acf1cc74bccbb9bfff8ac1ee72edc08c2341d",
+          "modelscope_repo": "Comfy-Org/Wan_2.1_ComfyUI_repackaged",
+          "modelscope_revision": "462e77efa4287219475d8910e0ebb7bfb65313da",
+          "sha256": "be531024cd9018cb5b48c40cfbb6a6191645b1c792eb8bf4f8c1c6e10f924dc5"
         },
         {
           "repo": "Comfy-Org/Wan_2.1_ComfyUI_repackaged",
           "path": "split_files/diffusion_models/wan2.1_vace_1.3B_fp16.safetensors",
           "dest": "ComfyUI/models/diffusion_models/wan2.1_vace_1.3B_fp16.safetensors",
           "size": 4309519800,
-          "revision": "123acf1cc74bccbb9bfff8ac1ee72edc08c2341d"
+          "revision": "123acf1cc74bccbb9bfff8ac1ee72edc08c2341d",
+          "modelscope_repo": "Comfy-Org/Wan_2.1_ComfyUI_repackaged",
+          "modelscope_revision": "9ffabffd8268738abb27d8035610da5050b3ec44",
+          "sha256": "640ccc0577e6a5d4bb15cd91b11b699ef914fc55f126c5a1c544e152130784f2"
         },
         {
           "repo": "Comfy-Org/Wan_2.1_ComfyUI_repackaged",
           "path": "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
           "dest": "ComfyUI/models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
           "size": 6735906897,
-          "revision": "123acf1cc74bccbb9bfff8ac1ee72edc08c2341d"
+          "revision": "123acf1cc74bccbb9bfff8ac1ee72edc08c2341d",
+          "modelscope_repo": "Comfy-Org/Wan_2.1_ComfyUI_repackaged",
+          "modelscope_revision": "28eb857b47db293db0455bfba5bdefdcafa4036c",
+          "sha256": "c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68"
         },
         {
           "repo": "Comfy-Org/Wan_2.1_ComfyUI_repackaged",
           "path": "split_files/vae/wan_2.1_vae.safetensors",
           "dest": "ComfyUI/models/vae/wan_2.1_vae.safetensors",
           "size": 253815318,
-          "revision": "123acf1cc74bccbb9bfff8ac1ee72edc08c2341d"
+          "revision": "123acf1cc74bccbb9bfff8ac1ee72edc08c2341d",
+          "modelscope_repo": "Comfy-Org/Wan_2.1_ComfyUI_repackaged",
+          "modelscope_revision": "28eb857b47db293db0455bfba5bdefdcafa4036c",
+          "sha256": "2fc39d31359a4b0a64f55876d8ff7fa8d780956ae2cb13463b0223e15148976b"
         }
       ]
     }

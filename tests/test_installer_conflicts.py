@@ -53,6 +53,15 @@ class InstallerConflictTests(unittest.TestCase):
         self.assertEqual(
             self.ps.count("Get-InstallDirUserItems $InstallDir"), 2)
 
+    def test_local_comfy_zip_and_old_portable_upgrade(self):
+        # 国内镜像的便携包可能较旧：允许用 -ComfyZip 本地包，并在低于
+        # 最低兼容线时自动更新源码，避免装完缺节点。
+        for text in ("[string]$ComfyZip", "ComfyZip 指定的文件不存在",
+                     "$ComfyMin = [string]$Lock.comfyui.compatible_min",
+                     "[version]$ver -lt [version]$ComfyMin",
+                     "Update-ComfyUI $true"):
+            self.assertIn(text, self.ps)
+
     def test_existing_nodes_are_backed_up_not_deleted(self):
         self.assertIn("Backup-ExistingNode", self.ps)
         self.assertIn("Backup-ExistingNode $dest $name", self.ps)

@@ -66,20 +66,20 @@ GitHub Actions 会在 push / pull request 时自动运行 `.github/workflows/tes
 1. 分别构建两个版本：
 
 ```powershell
-.\build_release.ps1 -Version 1.3.8 -Edition share
-.\build_release.ps1 -Version 1.3.8 -Edition commercial
+.\build_release.ps1 -Version 1.3.9 -Edition share
+.\build_release.ps1 -Version 1.3.9 -Edition commercial
 ```
 
 安装包默认不包含 `docs/media/` 和 `GITHUB_INTRO.md`（约 13MB 展示素材），
 所以体积保持在 2.5~3MB；需要把完整图文介绍一起打包时，加 `-IncludeShowcase`。
 
 2. 打开 GitHub 仓库 → **Releases** → **Draft a new release**。
-3. Tag 填 `v1.3.8`，标题填 `v1.3.8`。
+3. Tag 填 `v1.3.9`，标题填 `v1.3.9`。
 4. 上传：
 
 ```text
-dist\CometInk-v1.3.8-Share.zip
-dist\CometInk-v1.3.8-Commercial.zip
+dist\CometInk-v1.3.9-Share.zip
+dist\CometInk-v1.3.9-Commercial.zip
 ```
 
 商用版也可以只私下交付给购买客户，不公开上传到 GitHub Release。

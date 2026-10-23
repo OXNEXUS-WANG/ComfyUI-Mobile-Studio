@@ -17,6 +17,7 @@ from pathlib import Path
 UA = "ComfyUI-Mobile-Studio/1.0"
 HF_MIRROR = "https://hf-mirror.com"
 HF_DIRECT = "https://huggingface.co"
+MODELSCOPE = "https://modelscope.cn/models"
 
 TOOLS_DIR = Path(__file__).resolve().parent.parent / "tools"
 if str(TOOLS_DIR) not in sys.path:
@@ -187,13 +188,51 @@ def backup_mismatched(dest):
         return False
 
 
-def download_one(urls, dest, expected, label):
+def file_sha256(path):
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        while True:
+            chunk = fh.read(1024 * 1024)
+            if not chunk:
+                break
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def build_urls(f, mirror=HF_MIRROR, direct=HF_DIRECT, use_modelscope=True):
+    """按优先级生成下载地址：ModelScope 国内镜像 -> HF 镜像 -> HF 直连。"""
+    urls = []
+    path = f["path"].lstrip("/")
+    if use_modelscope and f.get("modelscope_repo"):
+        ms_rev = str(f.get("modelscope_revision") or "master")
+        urls.append("%s/%s/resolve/%s/%s?download=true" % (
+            MODELSCOPE.rstrip("/"), str(f["modelscope_repo"]).strip("/"),
+            ms_rev, path))
+    revision = str(f.get("revision") or "main")
+    for base in (mirror.rstrip("/"), direct.rstrip("/")):
+        if base:
+            urls.append("%s/%s/resolve/%s/%s?download=true" % (
+                base, f["repo"], revision, path))
+    return urls
+
+
+def download_one(urls, dest, expected, label, sha256=""):
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
     expected = int(expected or 0)
+    sha256 = str(sha256 or "").lower()
     if dest.is_file() and (not expected or dest.stat().st_size == expected):
-        print("  [跳过] %s 已存在 (%s)" % (label, human(dest.stat().st_size)))
-        return True
+        if not sha256:
+            print("  [跳过] %s 已存在 (%s)" % (label, human(dest.stat().st_size)))
+            return True
+        print("  校验 %s ..." % label)
+        if file_sha256(dest) == sha256:
+            print("  [跳过] %s 已存在且校验一致" % label)
+            return True
+        print("  [警告] %s 校验不一致，重新下载" % label)
+        if not backup_mismatched(dest):
+            return False
     part = Path(str(dest) + ".part")
     if dest.is_file() and expected and dest.stat().st_size != expected:
         if not backup_mismatched(dest):
@@ -239,6 +278,16 @@ def download_one(urls, dest, expected, label):
                 size = part.stat().st_size if part.is_file() else 0
                 if expected and size != expected:
                     raise IOError("下载大小不对：%s / %s" % (size, expected))
+                if sha256:
+                    print("  校验 SHA256 ...")
+                    actual = file_sha256(part)
+                    if actual != sha256:
+                        try:
+                            part.unlink()
+                        except OSError:
+                            pass
+                        raise IOError("SHA256 不一致：%s / %s" % (
+                            actual, sha256))
                 os.replace(part, dest)
                 print("  [完成] %s (%s)" % (label, human(size)))
                 return True
@@ -263,6 +312,8 @@ def main(argv=None):
     ap.add_argument("--packs", default="", help="逗号分隔的模型包 key；空=交互选择")
     ap.add_argument("--mirror", default=HF_MIRROR, help="Hugging Face 镜像")
     ap.add_argument("--direct", default=HF_DIRECT, help="镜像失败时的直连地址")
+    ap.add_argument("--no-modelscope", action="store_true",
+                    help="不优先使用 ModelScope 国内镜像")
     ap.add_argument("--list", action="store_true", help="只列出模型包")
     ap.add_argument("--ask-target", action="store_true",
                     help="下载前询问本机安装还是做 U 盘离线包")
@@ -323,13 +374,10 @@ def main(argv=None):
         for f in pack.get("files") or []:
             dest = safe_dest(root, f.get("dest") or "")
             label = "%s/%s" % (f.get("repo"), f.get("path"))
-            urls = []
-            revision = str(f.get("revision") or "main")
-            for base in (args.mirror.rstrip("/"), args.direct.rstrip("/")):
-                if base:
-                    urls.append("%s/%s/resolve/%s/%s?download=true" % (
-                        base, f["repo"], revision, f["path"].lstrip("/")))
-            if not download_one(urls, dest, f.get("size"), label):
+            urls = build_urls(f, args.mirror, args.direct,
+                              not args.no_modelscope)
+            if not download_one(urls, dest, f.get("size"), label,
+                                f.get("sha256")):
                 failed.append(label)
     if failed:
         print("\n以下文件没有下载完成：", file=sys.stderr)

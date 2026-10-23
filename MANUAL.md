@@ -1,12 +1,15 @@
 # CometInk 彗墨 · 使用手册
 
 > 把 ComfyUI 变成一台可以用手机浏览器操作的本地出图工作站。  
-> 版本：**v1.3.8** · 适用：分享版 / 商用版
+> 版本：**v1.3.9** · 适用：分享版 / 商用版
+>
+> v1.3.9 更新：模型优先走 ModelScope 国内镜像并做 SHA256 校验；
+> 支持 `-ComfyZip` 本地便携包；旧便携版自动升级源码。
 >
 > v1.3.8 更新：修复安装失败/中断后重跑时，把安装器自己写的
 > `disclaimer_accepted.json` 误判为“目录非空”的问题。
 >
-> v1.3.8 更新：本机 GPU 串行写死、账号 + IP 登录锁定、写接口 Origin 校验、
+> v1.3.7 更新：本机 GPU 串行写死、账号 + IP 登录锁定、写接口 Origin 校验、
 > 上传解码超时、磁盘安全阈值、会话踢下线、智能让路阈值可配置。
 
 ---
@@ -161,7 +164,7 @@ CometInk 彗墨是一个**本地部署的 ComfyUI 管理台**。
 | 显卡 | NVIDIA，建议 8GB 显存以上；RTX 50 系需要 cu128 以上的 PyTorch |
 | 内存 | 建议 16GB 以上 |
 | 磁盘 | 至少 20GB 空闲；默认安装约 14GB，全部模型包约 66GB（以安装器显示为准） |
-| 网络 | 能访问 `gh-proxy.com`、`hf-mirror.com`、`argos-net.com` |
+| 网络 | 能访问 `gh-proxy.com`、`modelscope.cn`、`hf-mirror.com`、`argos-net.com` |
 | 手机 | 和电脑连同一个 Windows 移动热点 |
 
 安装器会检测系统、显卡、磁盘和下载源。安装路径可以是任意普通目录，但不要放在桌面、下载目录或受保护的系统目录。
@@ -174,7 +177,7 @@ CometInk 彗墨是一个**本地部署的 ComfyUI 管理台**。
 
 ### 5.1 解压
 
-把 `CometInk-v1.3.8-Share.zip` 或 `CometInk-v1.3.8-Commercial.zip` 解压到一个普通文件夹。
+把 `CometInk-v1.3.9-Share.zip` 或 `CometInk-v1.3.9-Commercial.zip` 解压到一个普通文件夹。
 
 不要在压缩包里直接双击运行。
 
@@ -216,6 +219,55 @@ CometInk 彗墨是一个**本地部署的 ComfyUI 管理台**。
 - 中文翻译使用 MIT 兼容层 + CC-BY 4.0 模型；
 - 已有 ComfyUI 直接复用，不自动更新；
 - 没有 ComfyUI 时询问是否下载官方版本。
+
+### 5.3.1 下载慢怎么办
+
+安装器现在会**优先从 ModelScope 国内镜像下载模型**（Anima、NoobAI、Illustrious、
+RealVis、Pony、Animagine、Counterfeit、Wan 视频和放大模型），失败才回退到
+`hf-mirror.com`。每个文件都带 SHA256，且已与 Hugging Face 原仓库逐一比对一致，
+下完会校验；不一致会删除重下，不会把坏文件装进图库。
+
+真正慢的通常只剩 **ComfyUI 便携版（约 2GB）**，因为官方只放在 GitHub Release。
+如果安装器显示几分钟才下几 MB，可以取消安装，手动下好再重跑：
+
+1. 在安装目录里新建 `_downloads` 文件夹；
+2. 用浏览器或下载工具下载下面任意一个 7z；
+3. 保存为：
+
+```text
+<安装目录>\_downloads\ComfyUI_portable.7z
+```
+
+4. 重新运行安装器，它会自动跳过下载并使用这个文件。
+
+**官方包（推荐，已验证）**
+
+```text
+https://github.com/Comfy-Org/ComfyUI/releases/download/v0.42.0/ComfyUI_windows_portable_nvidia.7z
+大小：2,018,436,691 字节
+SHA256：6152424017702a573e3e452cf66720837fed19af9f0688980c4fc1ae783699c8
+```
+
+国内可通过 `https://gh-proxy.com/` 加在前面加速。
+
+**社区镜像（第三方，不如下载官方包稳妥）**
+
+```text
+https://modelscope.cn/models/Aimergent/Comfyui_Portable/resolve/master/ComfyUI_windows_portable_nvidia.7z
+大小：2,133,107,036 字节
+SHA256：4a221588979b96b8244e0e50b2edca03af732acae1deba69d60aa3b4d60b9dba
+```
+
+这个包是 ComfyUI 0.33.1 + PyTorch 2.13.0+cu130（2026-08 构建），ModelScope
+实测约 4–5MB/s。安装器检测到它低于最低兼容版本 `0.40.0` 时，会**自动更新
+ComfyUI 源码到最新 master**，所以不会装完缺节点。它不是 ComfyUI 官方发布，
+请自行判断是否接受；下载后务必核对上面的 SHA256。
+
+也可以把 7z 放在任意位置，运行时指定：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\installer\install.ps1 -ComfyZip "D:\下载\ComfyUI_windows_portable_nvidia.7z"
+```
 
 ### 5.4 第一次启动
 

@@ -54,7 +54,7 @@ Turn ComfyUI into a private, mobile-first image-generation studio.
 
 ### Quick start
 
-1. Download `CometInk-v1.3.8-Share.zip` from **Releases** and extract it.
+1. Download `CometInk-v1.3.9-Share.zip` from **Releases** and extract it.
 2. Run **`install.bat`** (the Chinese-name `安装.bat` opens the same installer).
 3. Choose the install folder, admin password, and model pack.
 4. Launch **CometInk Studio** from the desktop shortcut.
@@ -179,7 +179,7 @@ commit、模型 revision 和 7zr 哈希都已锁定，不会自动追最新版�
 | 系统 | Windows 10 / 11 64 位 |
 | 显卡 | NVIDIA，建议 8GB 显存以上；RTX 50 系可用 cu128 包 |
 | 磁盘 | 至少 20GB 空闲；默认安装约 14GB；全部模型包约 66GB |
-| 网络 | 能访问 `gh-proxy.com`、`hf-mirror.com`、`argos-net.com` |
+| 网络 | 能访问 `gh-proxy.com`、`modelscope.cn`、`hf-mirror.com`、`argos-net.com` |
 | 手机 | 和电脑连同一个 Windows 移动热点（默认 `192.168.137.x`） |
 
 安装器会自动检测系统版本、显卡、磁盘空间和下载源。
@@ -188,8 +188,8 @@ commit、模型 revision 和 7zr 哈希都已锁定，不会自动追最新版�
 
 ## 2. 安装
 
-1. 分享版从 GitHub Releases 下载 `CometInk-v1.3.8-Share.zip`；
-   商用客户使用 `CometInk-v1.3.8-Commercial.zip`。
+1. 分享版从 GitHub Releases 下载 `CometInk-v1.3.9-Share.zip`；
+   商用客户使用 `CometInk-v1.3.9-Commercial.zip`。
 2. 解压到一个目录（不要在压缩包里直接运行）。
 3. 双击 `安装.bat`（或 `install.bat`）。
 4. **首次安装必须先阅读并同意醒目的免责声明与使用协议**：窗口内可滚动阅读，
@@ -310,7 +310,10 @@ https://192.168.137.1:8800
 | `counterfeit` | Counterfeit-V2.5（旧 SD1.5） | 4.3GB |
 | `wan_video` | Wan 2.1 文生/图生视频 | 14.1GB |
 
-默认下载源是 `hf-mirror.com`，失败会尝试 Hugging Face 直连。
+默认优先从 `modelscope.cn` 国内镜像下载，失败再回退 `hf-mirror.com` 和
+Hugging Face 直连；每个文件都按 SHA256 校验，哈希与 HF 原仓库一致。
+ComfyUI 便携版仍来自 GitHub Release，下载慢时可以手动下载后用 `-ComfyZip`
+指定，见 `MANUAL.md` 5.3.1。
 模型版权和许可归各原仓库所有，使用前请阅读对应模型卡。
 
 ### 模型文件管理（上传 / 导入 / 删除）
@@ -736,9 +739,9 @@ ComfyUI 地址默认是 `http://127.0.0.1:8188`。需要改端口或指向别的
 
 ## 开发说明 / Development note
 
-CometInk 由一名大一学生单人从零完成：需求、架构、后端、前端、星图、测试、文档和发布流程均由一人推进，开发期间使用 AI 编程助手辅助。近 30 天累计 **6,038,125,446 tokens**（约 60.4 亿）、**17,517 次 API 请求**，API 费用 **¥227.20**；当前版本通过 **247 项测试**，并经过人工审查。
+CometInk 由一名大一学生单人从零完成：需求、架构、后端、前端、星图、测试、文档和发布流程均由一人推进，开发期间使用 AI 编程助手辅助。近 30 天累计 **6,038,125,446 tokens**（约 60.4 亿）、**17,517 次 API 请求**，API 费用 **¥227.20**；当前版本通过 **253 项测试**，并经过人工审查。
 
-CometInk was built solo from scratch by a first-year university student: requirements, architecture, backend, frontend, star map, tests, documentation, and releases were all driven by one developer, with AI coding assistants. In the last 30 days: **6,038,125,446 tokens**, **17,517 API requests**, and **¥227.20** in API usage. The current build passes **247 tests** and has been manually reviewed.
+CometInk was built solo from scratch by a first-year university student: requirements, architecture, backend, frontend, star map, tests, documentation, and releases were all driven by one developer, with AI coding assistants. In the last 30 days: **6,038,125,446 tokens**, **17,517 API requests**, and **¥227.20** in API usage. The current build passes **253 tests** and has been manually reviewed.
 
 ---
 

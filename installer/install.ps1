@@ -9,6 +9,7 @@
     [switch]$CommercialClean,
     [switch]$SkipComfyUI,
     [string]$ComfyUIDir = "",
+    [string]$ComfyZip = "",
     [switch]$AllowUpdates,
     [switch]$NoShortcut,
     [switch]$NoDialog,
@@ -38,7 +39,7 @@ if ($ComfyUIDir -and $InstallDir) {
 
 $ErrorActionPreference = "Stop"
 $PkgRoot = Split-Path -Parent $PSScriptRoot
-$AppVersion = "1.3.8"
+$AppVersion = "1.3.9"
 $VersionFile = Join-Path $PkgRoot "VERSION"
 if (Test-Path $VersionFile) {
     $v = (Get-Content $VersionFile -Raw -Encoding ASCII).Trim()
@@ -54,6 +55,7 @@ $HfMirror = "https://hf-mirror.com"
 if (-not (Test-Path $LockFile)) { throw ("安装包缺少版本锁定文件：" + $LockFile) }
 $Lock = Get-Content $LockFile -Raw -Encoding UTF8 | ConvertFrom-Json
 $ComfyVersion = [string]$Lock.comfyui.version
+$ComfyMin = [string]$Lock.comfyui.compatible_min
 $ComfyTag = [string]$Lock.comfyui.tag
 $ComfyAssetName = [string]$Lock.comfyui.asset
 $ComfyAsset = ("https://github.com/Comfy-Org/ComfyUI/releases/download/" +
@@ -1003,7 +1005,19 @@ function Ensure-ComfyUI {
     }
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
     $archive = Join-Path $InstallDir "_downloads\ComfyUI_portable.7z"
-    Download-File @($ComfyProxy, $ComfyAsset) $archive 1500000000 "ComfyUI 便携版（约 2GB）"
+    if ($ComfyZip) {
+        if (-not (Test-Path $ComfyZip)) {
+            Fail ("-ComfyZip 指定的文件不存在：" + $ComfyZip)
+        }
+        Say ("  使用本地 ComfyUI 便携版：" + $ComfyZip)
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $archive) | Out-Null
+        Copy-Item -LiteralPath $ComfyZip -Destination $archive -Force
+    } else {
+        Say "  官方下载源在部分网络下可能较慢；"
+        Say "  可以先用浏览器/下载工具下好 7z，再用 -ComfyZip 指定，或放到："
+        Say ("    " + $archive) "DarkGray"
+        Download-File @($ComfyProxy, $ComfyAsset) $archive 1500000000 "ComfyUI 便携版（约 2GB）"
+    }
     if ((Get-Item $archive).Length -ne $ComfySize) {
         Warn ("ComfyUI 包大小和预期不同：" + (Get-Item $archive).Length + " / " + $ComfySize)
     }
@@ -1485,7 +1499,25 @@ try {
         Warn "已启用 -AllowUpdates：可能脱离版本锁定"
         Update-ComfyUI $ComfyWasFresh
     } else {
-        Verify-ComfyUI
+        # 自己解压出来、但版本低于最低兼容线的便携包（例如国内镜像里的旧版）
+        # 直接自动更新源码，避免装完才发现节点缺失。
+        $ver = ""
+        try {
+            $py = Join-Path $InstallDir "python_embeded\python.exe"
+            $comfy = Join-Path $InstallDir "ComfyUI"
+            $ver = (& $py -c "import sys; sys.path.insert(0, r'$comfy'); import comfyui_version; print(comfyui_version.__version__)" 2>$null | Select-Object -First 1)
+            if ($ver) { $ver = $ver.Trim() }
+        } catch { }
+        $tooOld = $false
+        if ($ComfyWasFresh -and $ver) {
+            try { $tooOld = ([version]$ver -lt [version]$ComfyMin) } catch { }
+        }
+        if ($tooOld) {
+            Warn ("便携版 ComfyUI 较旧（" + $ver + " < " + $ComfyMin + "），自动更新源码...")
+            Update-ComfyUI $true
+        } else {
+            Verify-ComfyUI
+        }
     }
 
     Step "5" "安装网页程序与 Python 依赖"

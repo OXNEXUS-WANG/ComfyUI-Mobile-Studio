@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 """模型下载器的重试、断点续传和大小校验测试（本地 mock HTTP，不联网）。"""
+import hashlib
+import json
 import sys
 import tempfile
 import threading
@@ -107,6 +109,59 @@ class DownloadModelsTests(unittest.TestCase):
             [self.url], self.dest, len(_Handler.payload), "skip")
         self.assertTrue(ok)
         self.assertEqual(_Handler.hits, 0)
+
+    def test_sha256_is_verified(self):
+        sha = hashlib.sha256(_Handler.payload).hexdigest()
+        ok = download_models.download_one(
+            [self.url], self.dest, len(_Handler.payload), "sha", sha)
+        self.assertTrue(ok)
+        self.assertEqual(self.dest.read_bytes(), _Handler.payload)
+
+    def test_sha256_mismatch_is_rejected(self):
+        ok = download_models.download_one(
+            [self.url, self.url], self.dest, len(_Handler.payload), "bad",
+            "0" * 64)
+        self.assertFalse(ok)
+        self.assertFalse(self.dest.exists())
+        self.assertFalse(Path(str(self.dest) + ".part").exists())
+
+    def test_existing_file_with_wrong_sha_is_redownloaded(self):
+        self.dest.write_bytes(b"x" * len(_Handler.payload))
+        sha = hashlib.sha256(_Handler.payload).hexdigest()
+        ok = download_models.download_one(
+            [self.url], self.dest, len(_Handler.payload), "fix", sha)
+        self.assertTrue(ok)
+        self.assertEqual(self.dest.read_bytes(), _Handler.payload)
+        backups = list(self.dest.parent.glob("model.bin.bak-*"))
+        self.assertEqual(len(backups), 1)
+
+    def test_build_urls_prefers_modelscope(self):
+        f = {
+            "repo": "org/repo", "path": "a/b.bin", "revision": "abc",
+            "modelscope_repo": "ms/repo", "modelscope_revision": "def",
+        }
+        urls = download_models.build_urls(f)
+        self.assertEqual(
+            urls[0],
+            "https://modelscope.cn/models/ms/repo/resolve/def/a/b.bin"
+            "?download=true")
+        self.assertTrue(urls[1].startswith(download_models.HF_MIRROR))
+        plain = download_models.build_urls(f, use_modelscope=False)
+        self.assertFalse(any("modelscope.cn" in u for u in plain))
+
+    def test_manifest_pins_modelscope_and_sha256(self):
+        manifest = json.loads(
+            (ROOT / "installer" / "models_manifest.json").read_text(
+                encoding="utf-8"))
+        for key in manifest["default_packs"]:
+            for f in manifest["packs"][key]["files"]:
+                self.assertTrue(f.get("modelscope_repo"), f["path"])
+                self.assertEqual(len(f.get("sha256") or ""), 64, f["path"])
+        for pack in manifest["packs"].values():
+            for f in pack["files"]:
+                if f.get("modelscope_repo"):
+                    self.assertEqual(len(f.get("sha256") or ""), 64,
+                                     f["path"])
 
 
 if __name__ == "__main__":

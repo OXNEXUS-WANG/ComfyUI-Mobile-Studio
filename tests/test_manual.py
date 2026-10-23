@@ -34,7 +34,7 @@ class ManualTests(unittest.TestCase):
             self.assertIn(text, self.manual)
 
     def test_manual_matches_current_version_and_brand(self):
-        self.assertIn("v1.3.8", self.manual)
+        self.assertIn("v1.3.9", self.manual)
         self.assertIn("CometInk", self.manual)
         self.assertNotIn("Nexus", self.manual)
         self.assertIn("[MANUAL.md](MANUAL.md)", self.readme)

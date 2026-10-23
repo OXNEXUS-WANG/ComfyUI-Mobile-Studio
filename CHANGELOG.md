@@ -1,5 +1,20 @@
 ﻿# 变更日志
 
+## 2026-10-23 · v1.3.9 国内下载加速
+
+- **模型优先从 ModelScope 下载**：Anima、NoobAI、Illustrious、RealVis、Pony、
+  Animagine、Counterfeit、Wan 视频和放大模型都增加了 ModelScope 源，
+  失败再回退 `hf-mirror.com` / Hugging Face 直连。
+- **SHA256 校验**：每个文件新增 `sha256` 字段，下载完成和已存在文件都会校验；
+  不一致会删除重下。17 个文件的 SHA256 已与 Hugging Face LFS 哈希逐一比对一致。
+- **可关闭 ModelScope**：`download_models.py --no-modelscope`。
+- **便携版支持本地包**：安装器新增 `-ComfyZip`，也可把 7z 放到
+  `_downloads\ComfyUI_portable.7z` 后重跑；空目录检查会忽略 `_downloads`。
+- **旧便携版自动升级源码**：新解压的 ComfyUI 低于 `compatible_min` 时，
+  自动执行 `Update-ComfyUI`，避免国内旧镜像装完缺节点。
+- 新增 6 项回归测试，完整套件 **253 项通过**（5 项在线测试跳过）。
+- 版本升级到 **1.3.9**；手册新增「5.3.1 下载慢怎么办」。
+
 ## 2026-10-23 · v1.3.8 安装器重跑修复
 
 - **修复安装器误判“目录非空”**：首次安装会在目标目录写入
