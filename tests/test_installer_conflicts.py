@@ -45,6 +45,14 @@ class InstallerConflictTests(unittest.TestCase):
         self.assertIn('set "PYTHONHOME="', self.bat)
         self.assertIn("PYTHONNOUSERSITE", self.start)
 
+    def test_installer_markers_do_not_block_retry(self):
+        # 安装器自己写的免责声明/报告/写探针不能把“空目录”误判成非空。
+        for text in ("Get-InstallDirUserItems", "disclaimer_accepted.json",
+                     "install_report.txt", ".mgs_write_*.tmp"):
+            self.assertIn(text, self.ps)
+        self.assertEqual(
+            self.ps.count("Get-InstallDirUserItems $InstallDir"), 2)
+
     def test_existing_nodes_are_backed_up_not_deleted(self):
         self.assertIn("Backup-ExistingNode", self.ps)
         self.assertIn("Backup-ExistingNode $dest $name", self.ps)

@@ -38,7 +38,7 @@ if ($ComfyUIDir -and $InstallDir) {
 
 $ErrorActionPreference = "Stop"
 $PkgRoot = Split-Path -Parent $PSScriptRoot
-$AppVersion = "1.3.7"
+$AppVersion = "1.3.8"
 $VersionFile = Join-Path $PkgRoot "VERSION"
 if (Test-Path $VersionFile) {
     $v = (Get-Content $VersionFile -Raw -Encoding ASCII).Trim()
@@ -483,6 +483,18 @@ function Test-WritableDir($dir) {
             return $true
         } catch { return $false }
     } catch { return $false }
+}
+
+function Get-InstallDirUserItems($dir) {
+    # 安装器自己会写这些文件；判断“目录是否为空”时必须忽略，
+    # 否则一次失败/中断后的重跑会把它们当成外部文件，误报目录非空。
+    $ignored = @(
+        "_downloads", "_bootstrap",
+        "disclaimer_accepted.json", "install_report.txt"
+    )
+    return @(Get-ChildItem $dir -Force | Where-Object {
+        $_.Name -notin $ignored -and $_.Name -notlike ".mgs_write_*.tmp"
+    })
 }
 
 function Resolve-PortConflicts {
@@ -984,8 +996,7 @@ function Ensure-ComfyUI {
         }
     }
     if (Test-Path $InstallDir) {
-        $items = Get-ChildItem $InstallDir -Force |
-            Where-Object { $_.Name -notin @("_downloads", "_bootstrap") }
+        $items = @(Get-InstallDirUserItems $InstallDir)
         if ($items.Count -gt 0) {
             Fail ("安装目录不是空的，而且不像 ComfyUI 安装：" + $InstallDir)
         }
@@ -1355,8 +1366,7 @@ try {
         $hasPy = Test-Path (Join-Path $InstallDir "python_embeded\python.exe")
         if ($hasComfy -and $hasPy) { $Upgrade = $true }
     } elseif (Test-Path $InstallDir) {
-        $items = @(Get-ChildItem $InstallDir -Force |
-            Where-Object { $_.Name -notin @("_downloads", "_bootstrap") })
+        $items = @(Get-InstallDirUserItems $InstallDir)
         if ($items.Count -gt 0) {
             $InstallDir = Resolve-DirectoryConflict (
                 "安装目录不是空的，而且不像本程序的完整安装：`n" + $InstallDir)

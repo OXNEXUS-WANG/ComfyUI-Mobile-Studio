@@ -1,5 +1,19 @@
 ﻿# 变更日志
 
+## 2026-10-23 · v1.3.8 安装器重跑修复
+
+- **修复安装器误判“目录非空”**：首次安装会在目标目录写入
+  `disclaimer_accepted.json`，若安装中途失败/取消，重跑时旧逻辑把这个
+  自己生成的文件当成外部文件，直接报“目标文件夹不是空的”。
+- 新增 `Get-InstallDirUserItems`：判断目录是否为空时忽略安装器自己的
+  `_downloads/`、`_bootstrap/`、`disclaimer_accepted.json`、
+  `install_report.txt` 和写探针 `.mgs_write_*.tmp`。
+- 两处空目录检查（主安装目录、ComfyUI 子目录）统一走该函数；
+  真正由用户放入的文件仍会照常触发目录冲突提示。
+- 新增回归测试 `test_installer_markers_do_not_block_retry`。
+- 完整测试套件 **247 项通过**（5 项在线 HTTP 测试按环境跳过）。
+- 版本升级到 **1.3.8**；分享版 ZIP 与手册同步更新。
+
 ## 2026-10-23 · v1.3.7 安全加固与发布包
 
 - **本机 GPU 并发写死为 1**：`local` 执行槽严格串行，队列单账号 20 / 全局 60，
