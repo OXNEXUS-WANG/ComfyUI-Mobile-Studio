@@ -16,10 +16,10 @@
 构建：
 
 ```powershell
-.\build_release.ps1 -Version 1.3.11 -Edition share
+.\build_release.ps1 -Version 1.3.12 -Edition share
 ```
 
-输出：`dist\CometInk-v1.3.11-Share.zip`
+输出：`dist\CometInk-v1.3.12-Share.zip`
 
 ## 商用版（Commercial）
 
@@ -37,10 +37,10 @@
 构建：
 
 ```powershell
-.\build_release.ps1 -Version 1.3.11 -Edition commercial
+.\build_release.ps1 -Version 1.3.12 -Edition commercial
 ```
 
-输出：`dist\CometInk-v1.3.11-Commercial.zip`
+输出：`dist\CometInk-v1.3.12-Commercial.zip`
 
 ## 账号与多机额度
 

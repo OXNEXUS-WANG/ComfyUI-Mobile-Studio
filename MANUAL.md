@@ -1,7 +1,9 @@
 # CometInk 彗墨 · 使用手册
 
 > 把 ComfyUI 变成一台可以用手机浏览器操作的本地出图工作站。  
-> 版本：**v1.3.11** · 适用：分享版 / 商用版
+> 版本：**v1.3.12** · 适用：分享版 / 商用版
+>
+> v1.3.12 更新：修正第 20 节文档导航，标注分享版/商用版实际包含的文档。
 >
 > v1.3.11 更新：发布包不再附带旧版本机操作说明；商业包移除维护者脚本。
 >
@@ -181,7 +183,7 @@ CometInk 彗墨是一个**本地部署的 ComfyUI 管理台**。
 
 ### 5.1 解压
 
-把 `CometInk-v1.3.11-Share.zip` 或 `CometInk-v1.3.11-Commercial.zip` 解压到一个普通文件夹。
+把 `CometInk-v1.3.12-Share.zip` 或 `CometInk-v1.3.12-Commercial.zip` 解压到一个普通文件夹。
 
 不要在压缩包里直接双击运行。
 
@@ -1210,20 +1212,21 @@ HTTPS、`Secure` Cookie 和手机手动信任。
 
 | 文档 | 内容 |
 |---|---|
-| `README.md` | 项目介绍、快速开始、功能总览 |
-| `安装说明.txt` | 安装器逐步说明 |
-| `安装说明_商业版.txt` | 商用版安装说明 |
+| `README.md` | 项目介绍、快速开始、功能总览（分享版/商用版内容不同） |
+| `安装说明.txt` | 安装器逐步说明；商用包里这份就是商用版说明 |
 | `DISCLAIMER.md` | 免责声明、网络边界、责任限制 |
-| `COMMERCIAL_LICENSE.md` | 商业授权说明 |
-| `COMMERCIAL_EULA.md` / `商用版授权协议.md` | 商用 EULA |
+| `LICENSE` | 分享版是 PolyForm 非商用许可；商用版是商用 EULA |
+| `商用版授权协议.md` | 商用 EULA 中文版（仅商用包） |
+| `COMMERCIAL_LICENSE.md` / `商用授权说明.md` | 商业授权说明（仅分享包） |
 | `THIRD_PARTY_NOTICES.md` | 第三方组件与许可证 |
+| `VERSION_LOCK.md` | ComfyUI / 依赖 / 模型版本锁定 |
 | `docs/训练说明.md` | 训练配置与参数细节 |
 | `docs/插件中心.md` | 插件格式、审批和安全 |
 | `docs/提示词标签速查表.md` | Danbooru 标签速查 |
 | `docs/网页生成提示词.md` | 网页提示词写法 |
-| `EDITIONS.md` | 分享版/商用版构建说明 |
-| `GITHUB_UPLOAD.md` | GitHub 发布流程 |
-| `CHANGELOG.md` | 版本变更记录 |
+| `EDITIONS.md` | 分享版/商用版构建说明（仅分享包/仓库） |
+| `GITHUB_UPLOAD.md` | GitHub 发布流程（仅分享包/仓库） |
+| `CHANGELOG.md` | 版本变更记录（仅分享包/仓库） |
 
 ---
 
