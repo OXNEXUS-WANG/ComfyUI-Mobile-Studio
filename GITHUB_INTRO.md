@@ -369,3 +369,11 @@ If CometInk saved you some time, you can buy me a coffee. Tips are optional and 
   <img src="docs/support-qr.png" alt="CometInk 微信赞赏码 / WeChat tip code" width="220">
 </p>
 <p align="center"><sub>微信赞赏码 · WeChat tip code</sub></p>
+
+---
+
+## 联系 / Contact
+
+问题反馈、安装问题、合作都可以发邮件到 **gong390509996@163.com**。
+
+For questions, installation help, or collaboration: **gong390509996@163.com**.

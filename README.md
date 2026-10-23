@@ -736,3 +736,11 @@ CometInk was built solo from scratch by a first-year university student: require
   <img src="docs/support-qr.png" alt="CometInk 微信赞赏码" width="220">
 </p>
 <p align="center"><sub>微信赞赏码 · WeChat tip code</sub></p>
+
+---
+
+## 联系 / Contact
+
+问题反馈、安装问题或合作，可以发邮件到 **gong390509996@163.com**。
+
+For questions, installation help, or collaboration: **gong390509996@163.com**.

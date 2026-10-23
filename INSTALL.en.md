@@ -246,3 +246,9 @@ Prompt text, image captions, user display names, and plugin pack names are user 
 
 Full bilingual showcase: **[GITHUB_INTRO.md](GITHUB_INTRO.md)**  
 Chinese manual: **[MANUAL.md](MANUAL.md)**
+
+---
+
+## Contact
+
+Questions, installation help, or collaboration: **gong390509996@163.com**
