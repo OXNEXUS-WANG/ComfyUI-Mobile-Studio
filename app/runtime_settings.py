@@ -20,11 +20,32 @@ DEFAULTS = {
     "recovery_running_without_prompt": True,
     "max_restarts_per_hour": 6,
     "check_seconds": 5,
+    # 智能让路：阈值和判定时长都做成配置，不同机器可以调。
+    "guard_enabled": True,
+    "guard_gpu_pct": 88,
+    "guard_cpu_pct": 70,
+    "guard_proc_pct": 150,
+    "guard_enter_seconds": 5,
+    "guard_recover_seconds": 6,
+    "guard_cooldown_seconds": 10,
+    "guard_presence_ttl": 75,
 }
 BOOL_KEYS = (
     "enabled", "auto_restart_comfy", "auto_restart_web",
     "recovery_queued", "recovery_running_without_prompt",
+    "guard_enabled",
 )
+INT_RANGES = {
+    "max_restarts_per_hour": (1, 100, 6),
+    "check_seconds": (2, 60, 5),
+    "guard_gpu_pct": (50, 100, 88),
+    "guard_cpu_pct": (30, 100, 70),
+    "guard_proc_pct": (50, 500, 150),
+    "guard_enter_seconds": (2, 30, 5),
+    "guard_recover_seconds": (2, 30, 6),
+    "guard_cooldown_seconds": (0, 120, 10),
+    "guard_presence_ttl": (10, 600, 75),
+}
 
 
 def normalize(raw):
@@ -33,16 +54,28 @@ def normalize(raw):
         for key in BOOL_KEYS:
             if key in raw:
                 data[key] = bool(raw[key])
-        for key in ("max_restarts_per_hour", "check_seconds"):
+        for key, (lo, hi, default) in INT_RANGES.items():
             try:
                 value = int(raw.get(key))
             except Exception:
                 continue
-            if key == "max_restarts_per_hour":
-                data[key] = max(1, min(100, value))
-            else:
-                data[key] = max(2, min(60, value))
+            data[key] = max(lo, min(hi, value))
     return data
+
+
+def guard_config():
+    """智能让路的有效配置；调用方不需要关心扁平键名。"""
+    data = load()
+    return {
+        "enabled": bool(data.get("guard_enabled")),
+        "gpu_pct": int(data.get("guard_gpu_pct") or 88),
+        "cpu_pct": int(data.get("guard_cpu_pct") or 70),
+        "proc_pct": int(data.get("guard_proc_pct") or 150),
+        "enter_seconds": int(data.get("guard_enter_seconds") or 5),
+        "recover_seconds": int(data.get("guard_recover_seconds") or 6),
+        "cooldown_seconds": int(data.get("guard_cooldown_seconds") or 0),
+        "presence_ttl": int(data.get("guard_presence_ttl") or 75),
+    }
 
 
 def load():

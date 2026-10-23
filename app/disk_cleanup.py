@@ -19,8 +19,10 @@ SETTINGS_FILE = os.path.join(ROOT, "cleanup.json")
 DEFAULT_SETTINGS = {
     "enabled": False,
     "retention_days": 30,
-    "min_free_gb": 10,
-    "target_free_gb": 20,
+    "min_free_gb": 10,          # 低于这个值触发自动清理
+    "target_free_gb": 20,       # 清理到这个值以上
+    "warn_free_gb": 10,         # 低于这个值在健康报告里告警
+    "critical_free_gb": 1,      # 低于这个值直接暂停新任务/上传
     "include_videos": True,
     "include_comfy_output": False,
     "max_files_per_run": 500,
@@ -56,6 +58,14 @@ def _clean(raw):
         src.get("min_free_gb"), 1, 10000, out["min_free_gb"])
     out["target_free_gb"] = _clamp_int(
         src.get("target_free_gb"), 1, 10000, out["target_free_gb"])
+    out["warn_free_gb"] = _clamp_int(
+        src.get("warn_free_gb"), 1, 10000, out["warn_free_gb"])
+    out["critical_free_gb"] = _clamp_int(
+        src.get("critical_free_gb"), 1, 10000, out["critical_free_gb"])
+    if out["critical_free_gb"] > out["warn_free_gb"]:
+        out["critical_free_gb"] = out["warn_free_gb"]
+    if out["min_free_gb"] < out["critical_free_gb"]:
+        out["min_free_gb"] = out["critical_free_gb"]
     if out["target_free_gb"] < out["min_free_gb"]:
         out["target_free_gb"] = out["min_free_gb"]
     out["max_files_per_run"] = _clamp_int(
@@ -113,6 +123,8 @@ def public_settings(cfg=None):
         "retention_days": cfg.get("retention_days"),
         "min_free_gb": cfg.get("min_free_gb"),
         "target_free_gb": cfg.get("target_free_gb"),
+        "warn_free_gb": cfg.get("warn_free_gb"),
+        "critical_free_gb": cfg.get("critical_free_gb"),
         "include_videos": bool(cfg.get("include_videos")),
         "include_comfy_output": bool(cfg.get("include_comfy_output")),
         "max_files_per_run": cfg.get("max_files_per_run"),

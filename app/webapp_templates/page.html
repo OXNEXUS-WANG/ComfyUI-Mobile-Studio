@@ -2631,6 +2631,8 @@ body.scrolled #langBtn, body.scrolled #profileTopBtn {
       <label>保留天数<input id="adminCleanupDays" type="number" min="1" max="3650"></label>
       <label>低于剩余 GB 时触发<input id="adminCleanupMin" type="number" min="1" max="10000"></label>
       <label>清理到剩余 GB<input id="adminCleanupTarget" type="number" min="1" max="10000"></label>
+      <label>告警剩余 GB<input id="adminCleanupWarn" type="number" min="1" max="10000"></label>
+      <label>严重不足 GB（暂停新任务）<input id="adminCleanupCritical" type="number" min="1" max="10000"></label>
       <label>单次最多文件<input id="adminCleanupMax" type="number" min="1" max="5000"></label>
       <label><input type="checkbox" id="adminCleanupVideos"> 包含视频</label>
       <label><input type="checkbox" id="adminCleanupOutput"> 同时清理 ComfyUI/output 原始输出</label>
@@ -2658,6 +2660,14 @@ body.scrolled #langBtn, body.scrolled #profileTopBtn {
       <label><input type="checkbox" id="adminSupRecoveryRunning"> 重试未提交的运行任务</label>
       <label>每小时最多重启<input id="adminSupMax" type="number" min="1" max="100"></label>
       <label>检查间隔秒<input id="adminSupCheck" type="number" min="2" max="60"></label>
+      <label><input type="checkbox" id="adminSupGuard"> 启用智能让路</label>
+      <label>GPU 阈值 %<input id="adminSupGpu" type="number" min="50" max="100"></label>
+      <label>CPU 阈值 %<input id="adminSupCpu" type="number" min="30" max="100"></label>
+      <label>前台进程 CPU %<input id="adminSupProc" type="number" min="50" max="500"></label>
+      <label>连续判定秒<input id="adminSupEnter" type="number" min="2" max="30"></label>
+      <label>恢复判定秒<input id="adminSupRecover" type="number" min="2" max="30"></label>
+      <label>任务后冷却秒<input id="adminSupCooldown" type="number" min="0" max="120"></label>
+      <label>网页心跳 TTL 秒<input id="adminSupTtl" type="number" min="10" max="600"></label>
     </div>
     <div class="admin-worker-settings">
       <button class="reload" id="adminSupSave" type="button">保存守护设置</button>
@@ -7691,6 +7701,8 @@ function adminRenderCleanup() {
       adminCleanupDays: "retention_days",
       adminCleanupMin: "min_free_gb",
       adminCleanupTarget: "target_free_gb",
+      adminCleanupWarn: "warn_free_gb",
+      adminCleanupCritical: "critical_free_gb",
       adminCleanupMax: "max_files_per_run"
     };
     Object.keys(map).forEach(function (id) {
@@ -7740,6 +7752,8 @@ function adminCleanupFields() {
     retention_days: Number(document.getElementById("adminCleanupDays").value || 30),
     min_free_gb: Number(document.getElementById("adminCleanupMin").value || 10),
     target_free_gb: Number(document.getElementById("adminCleanupTarget").value || 20),
+    warn_free_gb: Number(document.getElementById("adminCleanupWarn").value || 10),
+    critical_free_gb: Number(document.getElementById("adminCleanupCritical").value || 1),
     max_files_per_run: Number(document.getElementById("adminCleanupMax").value || 500),
     include_videos: document.getElementById("adminCleanupVideos").checked,
     include_comfy_output: document.getElementById("adminCleanupOutput").checked
@@ -8248,6 +8262,21 @@ function renderSupervisor(j) {
   if (max) { max.value = s.max_restarts_per_hour || 6; }
   const check = document.getElementById("adminSupCheck");
   if (check) { check.value = s.check_seconds || 5; }
+  set("adminSupGuard", s.guard_enabled !== false);
+  const guardFields = {
+    adminSupGpu: ["guard_gpu_pct", 88],
+    adminSupCpu: ["guard_cpu_pct", 70],
+    adminSupProc: ["guard_proc_pct", 150],
+    adminSupEnter: ["guard_enter_seconds", 5],
+    adminSupRecover: ["guard_recover_seconds", 6],
+    adminSupCooldown: ["guard_cooldown_seconds", 10],
+    adminSupTtl: ["guard_presence_ttl", 75]
+  };
+  Object.keys(guardFields).forEach(function (id) {
+    const el = document.getElementById(id);
+    const pair = guardFields[id];
+    if (el) { el.value = s[pair[0]] != null ? s[pair[0]] : pair[1]; }
+  });
 
   const box = document.getElementById("adminSupStatus");
   if (!box) { return; }
@@ -8301,6 +8330,14 @@ async function saveSupervisor() {
     recovery_running_without_prompt: val("adminSupRecoveryRunning", true),
     max_restarts_per_hour: val("adminSupMax", 6),
     check_seconds: val("adminSupCheck", 5),
+    guard_enabled: val("adminSupGuard", true),
+    guard_gpu_pct: val("adminSupGpu", 88),
+    guard_cpu_pct: val("adminSupCpu", 70),
+    guard_proc_pct: val("adminSupProc", 150),
+    guard_enter_seconds: val("adminSupEnter", 5),
+    guard_recover_seconds: val("adminSupRecover", 6),
+    guard_cooldown_seconds: val("adminSupCooldown", 10),
+    guard_presence_ttl: val("adminSupTtl", 75),
   } };
   try {
     const r = await fetch("/api/supervisor", {
@@ -8571,6 +8608,10 @@ function adminRenderUsers() {
       '<span class="au-badge' + (u.role === "admin" ? "" : " user") + '">' +
       esc(role) + '</span>' + guestBadge +
       (enabled ? "" : '<span class="au-badge off">' + esc(adminT("已禁用", "Disabled")) + '</span>') +
+      (u.login_locked ? '<span class="au-badge bad">' + esc(
+        adminT("登录锁定 " + Math.max(1, Math.ceil(u.login_locked / 60)) + " 分钟",
+               "Login locked " + Math.max(1, Math.ceil(u.login_locked / 60)) + "m")) +
+        '</span>' : '') +
       (self ? '<span class="au-badge">' + esc(adminT("当前", "Current")) + '</span>' : '') +
       '</div><div class="au-meta">' +
       esc(adminT("默认主页", "Default home") + ": " + home) + ' · ' +
@@ -8591,6 +8632,10 @@ function adminRenderUsers() {
       '</div></div><div class="au-side">' +
       (u.guest ? '<button type="button" data-guest-renew="' + esc(u.id) + '">' +
         esc(adminT("续期 24h", "Renew 24h")) + '</button>' : '') +
+      (u.login_locked ? '<button type="button" data-admin-unlock="' + esc(u.id) + '">' +
+        esc(adminT("解锁登录", "Unlock")) + '</button>' : '') +
+      (self ? "" : '<button type="button" data-admin-kick="' + esc(u.id) + '">' +
+        esc(adminT("踢下线", "Sign out")) + '</button>') +
       '<button type="button" data-admin-toggle="' + esc(u.id) + '"' +
       (self ? " disabled" : "") + '>' +
       esc(enabled ? adminT("禁用", "Disable") : adminT("启用", "Enable")) + '</button>' +
@@ -8639,6 +8684,52 @@ function adminRenderUsers() {
         body: JSON.stringify({ action: "update", id: uid, enabled: next })
       }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.error) { adminStatus(adminErrText(j.error), true); return; }
+        loadAdmin(false);
+      }).catch(function (e) { adminStatus(adminErrText(e), true); });
+    };
+  });
+  box.querySelectorAll("[data-admin-unlock]").forEach(function (btn) {
+    btn.onclick = function () {
+      btn.disabled = true;
+      fetch("/api/users", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ action: "unlock_login",
+                               id: btn.dataset.adminUnlock })
+      }).then(function (r) { return r.json(); }).then(function (j) {
+        if (j.error) {
+          adminStatus(adminErrText(j.error), true);
+          btn.disabled = false;
+          return;
+        }
+        adminStatus(adminT("已解锁该账号的登录限制", "Login lock cleared"), false);
+        loadAdmin(false);
+      }).catch(function (e) {
+        adminStatus(adminErrText(e), true);
+        btn.disabled = false;
+      });
+    };
+  });
+  box.querySelectorAll("[data-admin-kick]").forEach(function (btn) {
+    btn.onclick = async function () {
+      const u = adminUsersAll.find(function (x) {
+        return x.id === btn.dataset.adminKick;
+      });
+      if (!u) { return; }
+      const ok = await uiConfirm({
+        title: uiT("踢下线", "Sign out"),
+        message: uiT("让「" + u.username + "」的所有登录设备立即退出？",
+                     "Sign out all devices for \"" + u.username + "\"?"),
+        okText: uiT("踢下线", "Sign out")
+      });
+      if (!ok) { return; }
+      fetch("/api/sessions", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ action: "revoke_user", uid: u.id })
+      }).then(function (r) { return r.json(); }).then(function (j) {
+        if (j.error) { adminStatus(adminErrText(j.error), true); return; }
+        adminStatus(adminT("该账号已全部下线", "All sessions signed out"), false);
         loadAdmin(false);
       }).catch(function (e) { adminStatus(adminErrText(e), true); });
     };

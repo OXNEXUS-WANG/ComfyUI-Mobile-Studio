@@ -21,8 +21,10 @@ import sys
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -132,6 +134,92 @@ def is_mobile_ua(ua):
 
 # --------------------------------------------------------------------- HTTP
 
+def same_origin(origin="", referer="", host=""):
+    """校验 Origin/Referer 是否指向本服务；两者都没有时按非浏览器放行。
+
+    跨站浏览器请求一定会带 Origin（fetch/XHR/表单），所以只要带了就必须匹配
+    Host。这样不破坏 curl / worker 这类非浏览器客户端，也能挡住恶意页面。
+    """
+    host = str(host or "").strip().lower()
+    if not host:
+        return False
+
+    def matches(value):
+        value = str(value or "").strip()
+        if not value or value.lower() == "null":
+            return False
+        try:
+            parsed = urllib.parse.urlsplit(value)
+        except Exception:
+            return False
+        if parsed.scheme not in ("https", "http"):
+            return False
+        return parsed.netloc.lower() == host
+
+    origin = str(origin or "").strip()
+    if origin:
+        return matches(origin)
+    referer = str(referer or "").strip()
+    if referer:
+        return matches(referer)
+    return True
+
+
+_DECODE_SEM = threading.BoundedSemaphore(2)
+
+
+def decode_upload_image(blob, max_pixels=UPLOAD_MAX_PIXELS, timeout=10.0):
+    """在独立线程里解码上传图；限制像素、截断图和单次解码超时。
+
+    真正的格式白名单、尺寸检查和 EXIF 清理仍在 _save_data_url 里做；
+    这里只负责把“读头校验 + load()”这段最容易被恶意图卡住的代码隔离出来。
+    """
+    import warnings
+    from PIL import Image, ImageFile
+    Image.MAX_IMAGE_PIXELS = max_pixels
+    ImageFile.LOAD_TRUNCATED_IMAGES = False
+
+    def work():
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", Image.DecompressionBombWarning)
+                im = Image.open(io.BytesIO(blob))
+            with im:
+                fmt = (im.format or "").upper()
+                if fmt not in ("PNG", "JPEG", "WEBP"):
+                    raise ValueError("只接受 PNG / JPEG / WebP")
+                w, h = im.size
+                if w < 1 or h < 1:
+                    raise ValueError("图片尺寸无效")
+                if w * h > max_pixels:
+                    raise ValueError("图片像素太大（最多 %d 万像素）"
+                                     % max(1, max_pixels // 10000))
+                if max(w, h) > UPLOAD_MAX_SIDE:
+                    raise ValueError("图片单边太长（最多 12000 像素）")
+                im.load()
+                return im.copy(), fmt, w, h
+        except Image.DecompressionBombError:
+            raise ValueError("图片像素太大（最多 4000 万像素）")
+        except ValueError:
+            raise
+        except Exception:
+            raise ValueError("图片已损坏或不是真正的图片")
+
+    if not _DECODE_SEM.acquire(timeout=5):
+        raise ValueError("服务器忙，请稍后再试")
+    pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="upload-decode")
+    try:
+        future = pool.submit(work)
+        try:
+            return future.result(timeout=timeout)
+        except FutureTimeout:
+            future.cancel()
+            raise ValueError("图片解码超时")
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+        _DECODE_SEM.release()
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "MobileWeb"
     sys_version = ""            # 不把 Python 版本号广播给任何人
@@ -164,6 +252,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def _json(self, obj, code=200):
         self._send(code, json.dumps(obj, ensure_ascii=False))
+
+    def _origin_ok(self):
+        if (self.headers.get("Sec-Fetch-Site") or "").lower() == "cross-site":
+            return False
+        return same_origin(self.headers.get("Origin") or "",
+                           self.headers.get("Referer") or "",
+                           self.headers.get("Host") or "")
 
     # ------------------------------------------------------------ 登录态
     def _is_mobile(self):
@@ -890,7 +985,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         ip = self.client_address[0]
         attempted = str(data.get("username") or "admin").strip()[:64]
-        wait = login_wait_seconds(ip)
+        wait = login_wait_seconds(attempted, ip)
         if wait:
             set_activity_user({"username": attempted}, ip)
             activity_request("/api/login", "POST", throttle=1.0,
@@ -907,7 +1002,7 @@ class Handler(BaseHTTPRequestHandler):
                   and verify_user_password(user,
                                            str(data.get("password") or "")[:512]))
         if not ok:
-            note_login_failure(ip)
+            note_login_failure(username, ip)
             set_activity_user({"username": username}, ip)
             activity_request("/api/login", "POST", throttle=1.0,
                              ok=False, reason="bad_password")
@@ -917,7 +1012,7 @@ class Handler(BaseHTTPRequestHandler):
             self.log_message("登录失败 %s", ip)
             self._json({"error": "用户名或密码不对"}, 401)
             return
-        note_login_success(ip)
+        note_login_success(username, ip)
         set_activity_user(user, ip)
         activity_request("/api/login", "POST", ok=True,
                          user=user.get("username"))
@@ -2272,6 +2367,16 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_worker_post(route)
             return
 
+        # 写接口统一做 Origin/Referer 校验。SameSite=Strict 是主防线，
+        # 这一层专门挡“同站但跨源”的恶意页面和部分旧浏览器。
+        if not self._origin_ok():
+            audit("security", "csrf_blocked", ip=self.client_address[0],
+                  ok=False, route=route,
+                  origin=(self.headers.get("Origin") or "")[:200],
+                  referer=(self.headers.get("Referer") or "")[:200])
+            self._json({"error": "跨站请求被拒绝"}, 403)
+            return
+
         # 除登录/退出外，没登录的请求连 body 都不读，直接挡掉
         if route not in ("/api/login", "/api/logout") and not self._authed():
             self._deny()
@@ -3212,8 +3317,9 @@ class Handler(BaseHTTPRequestHandler):
                 return
             patch = {}
             for key in ("enabled", "retention_days", "min_free_gb",
-                        "target_free_gb", "include_videos",
-                        "include_comfy_output", "max_files_per_run"):
+                        "target_free_gb", "warn_free_gb", "critical_free_gb",
+                        "include_videos", "include_comfy_output",
+                        "max_files_per_run"):
                 if key in data:
                     patch[key] = data.get(key)
             cfg = disk_cleanup.save(patch)
@@ -3221,7 +3327,9 @@ class Handler(BaseHTTPRequestHandler):
                   ip=self.client_address[0], enabled=bool(cfg.get("enabled")),
                   retention_days=cfg.get("retention_days"),
                   min_free_gb=cfg.get("min_free_gb"),
-                  target_free_gb=cfg.get("target_free_gb"))
+                  target_free_gb=cfg.get("target_free_gb"),
+                  warn_free_gb=cfg.get("warn_free_gb"),
+                  critical_free_gb=cfg.get("critical_free_gb"))
             self._json({"ok": True,
                         "settings": disk_cleanup.public_settings(cfg),
                         "overview": cleanup_overview()})
@@ -3400,7 +3508,8 @@ class Handler(BaseHTTPRequestHandler):
             action = str(data.get("action") or "list")
             target_id = str(data.get("id") or "")
             target_name = str(data.get("username") or "")
-            if action in ("update", "delete", "renew_guest") and target_id:
+            if action in ("update", "delete", "renew_guest",
+                          "unlock_login") and target_id:
                 target_name = (get_user(target_id) or {}).get("username") or target_id
             guest_result = None
             try:
@@ -3433,6 +3542,18 @@ class Handler(BaseHTTPRequestHandler):
                     update_user(uid, patch)
                     if data.get("enabled") is False or data.get("password"):
                         drop_user_sessions(uid)
+                elif action == "unlock_login":
+                    target = str(data.get("id") or data.get("username") or "")
+                    target_user = get_user(target) if target else None
+                    if not target_user and target:
+                        target_user = find_user(target)
+                    if not target_user:
+                        raise ValueError("账号不存在")
+                    removed = unlock_login(
+                        username=target_user.get("username"))
+                    audit("security", "login_unlock", user=user,
+                          ip=self.client_address[0], target=target_name,
+                          removed=removed)
                 elif action == "delete":
                     uid = str(data.get("id") or "")
                     if uid == user.get("id"):
@@ -3625,6 +3746,10 @@ class Handler(BaseHTTPRequestHandler):
             if blocked:
                 self._json({"error": blocked, "guard": guard_snapshot()}, 409)
                 return
+            disk = disk_guard_message()
+            if disk:
+                self._json({"error": disk, "code": "disk_full"}, 507)
+                return
             if training_manager.M.local_gpu_blocked():
                 self._json({"error": training_manager.M.gate_message(user),
                             "code": "training_busy"}, 503)
@@ -3800,42 +3925,33 @@ class Handler(BaseHTTPRequestHandler):
         if len(blob) > max_bytes:
             raise ValueError("图片超过 %dMB" % max(1, max_bytes // 1048576))
 
-        from PIL import Image, ImageOps
+        from PIL import ImageOps
+        im, _fmt, _w, _h = decode_upload_image(blob, max_pixels)
         try:
-            with Image.open(io.BytesIO(blob)) as im:
-                fmt = (im.format or "").upper()
-                if fmt not in ("PNG", "JPEG", "WEBP"):
-                    raise ValueError("只接受 PNG / JPEG / WebP")
-                w, h = im.size
-                if w < 1 or h < 1:
-                    raise ValueError("图片尺寸无效")
-                if w * h > max_pixels:
-                    raise ValueError("图片像素太大（最多 %d 万像素）"
-                                     % max(1, max_pixels // 10000))
-                if max(w, h) > UPLOAD_MAX_SIDE:
-                    raise ValueError("图片单边太长（最多 12000 像素）")
-                im.load()
-                # 按 EXIF 摆正，再统一转成 PNG；EXIF / 文本块 / 伪装内容全部丢掉
-                im = ImageOps.exif_transpose(im)
-                if im.mode == "P" and "transparency" in im.info:
-                    im = im.convert("RGBA")
-                elif im.mode not in ("RGB", "RGBA", "L"):
-                    im = im.convert("RGB")
-                out = io.BytesIO()
-                im.save(out, format="PNG")
-        except Image.DecompressionBombError:
-            raise ValueError("图片像素太大（最多 4000 万像素）")
-        except ValueError:
-            raise
-        except Exception:
-            raise ValueError("图片已损坏或不是真正的图片")
+            # 按 EXIF 摆正，再统一转成 PNG；EXIF / 文本块 / 伪装内容全部丢掉
+            im = ImageOps.exif_transpose(im)
+            if im.mode == "P" and "transparency" in im.info:
+                im = im.convert("RGBA")
+            elif im.mode not in ("RGB", "RGBA", "L"):
+                im = im.convert("RGB")
+            out = io.BytesIO()
+            im.save(out, format="PNG")
+        finally:
+            im.close()
+
+        disk_msg = disk_guard_message()
+        if disk_msg:
+            raise ValueError(disk_msg)
 
         stage_dir = os.path.join(user_upload_root(uid), stage_id)
-        os.makedirs(stage_dir, exist_ok=True)
         fname = "%s_%s.png" % (prefix, uuid.uuid4().hex[:10])
         path = os.path.join(stage_dir, fname)
-        with open(path, "wb") as fh:
-            fh.write(out.getvalue())
+        try:
+            os.makedirs(stage_dir, exist_ok=True)
+            with open(path, "wb") as fh:
+                fh.write(out.getvalue())
+        except OSError:
+            raise ValueError("磁盘写入失败，可能空间不足")
         return path
 
     # ------------------------------------------------------------ LoRA 训练
@@ -4353,6 +4469,10 @@ class Handler(BaseHTTPRequestHandler):
         if blocked:
             self._json({"error": blocked, "guard": guard_snapshot()}, 409)
             return
+        disk = disk_guard_message()
+        if disk:
+            self._json({"error": disk, "code": "disk_full"}, 507)
+            return
         user = self._current_user()
         if training_manager.M.local_gpu_blocked():
             self._json({
@@ -4805,6 +4925,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         user = self._current_user()
         if not self._require_feature(user, "upscale"):
+            return
+        disk = disk_guard_message()
+        if disk:
+            self._json({"error": disk, "code": "disk_full"}, 507)
             return
         if training_manager.M.local_gpu_blocked():
             self._json({"error": training_manager.M.gate_message(user),

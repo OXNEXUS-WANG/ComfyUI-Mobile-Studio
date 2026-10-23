@@ -87,8 +87,11 @@ CERT_FILE = os.path.join(ROOT, "cert.pem")
 KEY_FILE = os.path.join(ROOT, "key.pem")
 COOKIE_NAME = "mg_session"
 SESSION_TTL = 30 * 86400        # 登录一次管 30 天
-LOGIN_MAX_FAILS = 5             # 同一 IP 连续错 5 次
+LOGIN_MAX_FAILS = 5             # 同一账号 + IP 连续错 5 次
 LOGIN_LOCK_SECONDS = 600        # 锁 10 分钟
+LOGIN_IP_MAX_FAILS = 20         # 同一 IP 60 秒内累计错 20 次（防撞库）
+LOGIN_IP_WINDOW = 60
+LOGIN_IP_LOCK_SECONDS = 60      # IP 级只做短期限流，避免 NAT 误伤
 MAX_BODY_BYTES = 40 * 1024 * 1024   # 请求体上限（图生图的 base64 大约 27MB）
 
 THUMB_WIDTH = 420
@@ -1979,7 +1982,7 @@ def ensure_load_sampler():
 GUARD_LOCK = threading.Lock()
 GUARD_STARTED = {"v": False}
 GUARD_PRESENCE = {"t": 0.0}
-GUARD_TTL = 75.0                 # 网页心跳超过这么久没来，就认为页面已关
+GUARD_TTL = 75.0                 # 默认心跳 TTL；实际值可在 supervisor.json 调整
 GUARD = {"enabled": False, "heavy": False, "reason": "", "since": 0.0,
          "gpu": None, "cpu": None, "fg": "", "fg_cpu": None, "cooldown": 0.0}
 GUARD_FG = {"pid": 0, "proc": None, "name": "", "cpu": 0.0}
@@ -2048,11 +2051,13 @@ def _own_job_running():
 
 
 def guard_snapshot():
+    cfg = runtime_settings.guard_config()
     with GUARD_LOCK:
         out = {k: GUARD.get(k) for k in
                ("enabled", "heavy", "reason", "since", "gpu", "cpu", "fg",
                 "fg_cpu")}
-        out["ttl"] = GUARD_TTL
+        out["ttl"] = cfg["presence_ttl"]
+        out["config"] = cfg
     return out
 
 
@@ -2072,7 +2077,16 @@ def _guard_loop():
     while True:
         time.sleep(1.0)
         now = time.time()
-        if (now - GUARD_PRESENCE["t"]) > GUARD_TTL:
+        cfg = runtime_settings.guard_config()
+        if not cfg["enabled"]:
+            hot = cool = 0
+            was_running = False
+            with GUARD_LOCK:
+                GUARD.update(enabled=False, heavy=False, reason="", since=0.0,
+                             gpu=None, cpu=None, fg="", fg_cpu=None,
+                             cooldown=0.0)
+            continue
+        if (now - GUARD_PRESENCE["t"]) > cfg["presence_ttl"]:
             hot = cool = 0
             was_running = False
             with GUARD_LOCK:
@@ -2096,24 +2110,24 @@ def _guard_loop():
             was_running = True
             hot = 0
         elif was_running:
-            # 自己任务刚结束，GPU 还会残留一小段，冷却 10 秒再判断
+            # 自己任务刚结束，GPU 还会残留一小段，冷却后再判断
             was_running = False
             with GUARD_LOCK:
-                GUARD["cooldown"] = now + 10.0
+                GUARD["cooldown"] = now + cfg["cooldown_seconds"]
         with GUARD_LOCK:
             cooldown = now < GUARD.get("cooldown", 0.0)
 
         heavy_now = False
         reason = ""
         if not own and not cooldown:
-            if gpu is not None and gpu >= 88:
+            if gpu is not None and gpu >= cfg["gpu_pct"]:
                 heavy_now = True
                 reason = "GPU 占用 %d%%" % gpu
-            elif cpu is not None and cpu >= 70 and not fg_browser:
+            elif cpu is not None and cpu >= cfg["cpu_pct"] and not fg_browser:
                 # 前台是浏览器时不看整机 CPU：星图自己也吃 CPU，容易误伤
                 heavy_now = True
                 reason = "CPU 占用 %d%%" % cpu
-            elif (not fg_ignored) and fg_cpu >= 150:
+            elif (not fg_ignored) and fg_cpu >= cfg["proc_pct"]:
                 # psutil 的进程 CPU 以单核为 100%，150% ≈ 一个半核
                 heavy_now = True
                 reason = "前台程序 %s 占用 %.0f%% CPU" % (fg, fg_cpu)
@@ -2126,10 +2140,10 @@ def _guard_loop():
             cool += 1
 
         with GUARD_LOCK:
-            if hot >= 5 and not GUARD["heavy"]:
+            if hot >= cfg["enter_seconds"] and not GUARD["heavy"]:
                 GUARD.update(heavy=True, since=now, reason=reason)
             elif GUARD["heavy"]:
-                if not heavy_now and cool >= 6:
+                if not heavy_now and cool >= cfg["recover_seconds"]:
                     GUARD.update(heavy=False, reason="", since=0.0)
                 elif heavy_now:
                     GUARD["reason"] = reason
@@ -2538,15 +2552,18 @@ def is_admin(user):
 
 
 def admin_users_payload():
-    """管理员用户列表：账号信息 + 用量 + 限额。"""
+    """管理员用户列表：账号信息 + 用量 + 限额 + 登录锁定状态。"""
     with USERS_LOCK:
         users = [dict(u) for u in USERS.values()]
+    locked = login_locked_users()
     out = []
     for u in users:
         item = public_user(u)
         usage = user_usage(u.get("id"))
         item["usage"] = usage
         item["usage_mb"] = round(usage.get("bytes", 0) / 1048576, 1)
+        item["login_locked"] = int(
+            locked.get(str(u.get("username") or "").lower(), 0))
         out.append(item)
     out.sort(key=lambda x: (x.get("role") != "admin",
                             str(x.get("username") or "").lower()))
@@ -3099,37 +3116,117 @@ def drop_other_sessions(uid, keep_sid):
     return removed
 
 
-# 登录失败限速：同一 IP 连错 5 次锁 10 分钟，挡掉暴力猜密码。
-LOGIN_FAILS = {}
+# 登录失败限速：账号 + IP 双维度。
+# 热点/NAT 下多人共用一个出口 IP，纯按 IP 锁会让一个人连累所有人，所以：
+# - 同一账号 + 同一 IP 连错 5 次，锁 10 分钟；
+# - 同一 IP 60 秒内累计错 20 次，只限流 60 秒，不长时间锁死；
+# - 管理员可以在用户管理里解锁某个账号。
+LOGIN_FAILS = {}          # (username, ip) -> [count, first_ts, lock_until]
+LOGIN_IP_FAILS = {}       # ip -> [count, first_ts, lock_until]
 LOGIN_FAILS_LOCK = threading.Lock()
 
 
-def login_wait_seconds(ip):
-    now = time.time()
-    with LOGIN_FAILS_LOCK:
-        rec = LOGIN_FAILS.get(ip)
-        if rec and rec[2] > now:
-            return int(rec[2] - now)
+def _login_pair(username, ip):
+    return (str(username or "").strip().lower()[:64],
+            str(ip or "").strip()[:64])
+
+
+def _login_wait_locked(key, now):
+    rec = LOGIN_FAILS.get(key)
+    if rec and rec[2] > now:
+        return int(rec[2] - now)
     return 0
 
 
-def note_login_failure(ip):
+def login_wait_seconds(username, ip=""):
+    """返回该账号+IP 还需等待的秒数；只传一个参数时按 IP 级查询。"""
+    username = str(username or "").strip().lower()
+    ip = str(ip or "").strip()
+    if not ip:
+        ip, username = username, ""
     now = time.time()
+    waits = []
     with LOGIN_FAILS_LOCK:
-        rec = LOGIN_FAILS.get(ip)
+        if username:
+            waits.append(_login_wait_locked(_login_pair(username, ip), now))
+        else:
+            for key in LOGIN_FAILS:
+                if key[1] == ip:
+                    waits.append(_login_wait_locked(key, now))
+        rec = LOGIN_IP_FAILS.get(ip)
+        if rec and rec[2] > now:
+            waits.append(int(rec[2] - now))
+    return max(waits or [0])
+
+
+def note_login_failure(username, ip=""):
+    now = time.time()
+    username = str(username or "").strip().lower()[:64]
+    ip = str(ip or "").strip()[:64]
+    key = _login_pair(username, ip)
+    with LOGIN_FAILS_LOCK:
+        rec = LOGIN_FAILS.get(key)
         if not rec or now - rec[1] > LOGIN_LOCK_SECONDS:
-            LOGIN_FAILS[ip] = [1, now, 0]
-            return
-        rec[0] += 1
-        if rec[0] >= LOGIN_MAX_FAILS:
-            rec[2] = now + LOGIN_LOCK_SECONDS
-            rec[0] = 0
-            rec[1] = now
+            LOGIN_FAILS[key] = [1, now, 0]
+        else:
+            rec[0] += 1
+            if rec[0] >= LOGIN_MAX_FAILS:
+                rec[2] = now + LOGIN_LOCK_SECONDS
+                rec[0] = 0
+                rec[1] = now
+
+        irec = LOGIN_IP_FAILS.get(ip)
+        if not irec or now - irec[1] > LOGIN_IP_WINDOW:
+            LOGIN_IP_FAILS[ip] = [1, now, 0]
+        else:
+            irec[0] += 1
+            if irec[0] >= LOGIN_IP_MAX_FAILS:
+                irec[2] = now + LOGIN_IP_LOCK_SECONDS
+                irec[0] = 0
+                irec[1] = now
 
 
-def note_login_success(ip):
+def note_login_success(username, ip=""):
+    username = str(username or "").strip().lower()[:64]
+    ip = str(ip or "").strip()[:64]
     with LOGIN_FAILS_LOCK:
-        LOGIN_FAILS.pop(ip, None)
+        LOGIN_FAILS.pop(_login_pair(username, ip), None)
+        LOGIN_IP_FAILS.pop(ip, None)
+
+
+def unlock_login(username=None, ip=None):
+    """管理员解锁；返回清掉的账号+IP 记录数。"""
+    username = str(username or "").strip().lower()
+    ip = str(ip or "").strip()
+    removed = 0
+    touched_ips = set()
+    with LOGIN_FAILS_LOCK:
+        for key in list(LOGIN_FAILS):
+            user_part, ip_part = key
+            if username and user_part != username:
+                continue
+            if ip and ip_part != ip:
+                continue
+            LOGIN_FAILS.pop(key, None)
+            touched_ips.add(ip_part)
+            removed += 1
+        if ip:
+            touched_ips.add(ip)
+        for item in touched_ips:
+            LOGIN_IP_FAILS.pop(item, None)
+    return removed
+
+
+def login_locked_users():
+    """账号 -> 最长剩余锁定秒数；管理员列表用来显示“登录锁定”。"""
+    now = time.time()
+    out = {}
+    with LOGIN_FAILS_LOCK:
+        for (name, _ip), rec in LOGIN_FAILS.items():
+            if not rec or rec[2] <= now:
+                continue
+            out[name] = max(out.get(name, 0), int(rec[2] - now))
+    return out
 
 
 ensure_users()
@@ -6592,6 +6689,20 @@ def storage_forecast(force=False):
     return dict(data)
 
 
+def disk_guard_message():
+    """磁盘低于安全线时返回中文提示；正常时返回 None。"""
+    cfg = disk_cleanup.load()
+    critical = float(cfg.get("critical_free_gb") or 1)
+    try:
+        free = shutil.disk_usage(DELIVER_DIR).free / 1073741824.0
+    except OSError:
+        return None
+    if free >= critical:
+        return None
+    return ("磁盘剩余空间不足（%.1f GB，安全线 %.1f GB），新的出图/上传任务已暂停；"
+            "请清理旧图或扩容后再试。" % (free, critical))
+
+
 CLEANUP_LOCK = threading.Lock()
 CLEANUP_AUTO = {"last_check": 0.0}
 
@@ -6997,6 +7108,9 @@ def diagnose_system():
          ", %d running over 20 minutes" % len(stuck) if stuck else ""),
         "Check the job timeline or cancel a stuck job." if stuck else "")
     storage = storage_forecast(force=True)
+    disk_cfg = disk_cleanup.load()
+    warn_gb = float(disk_cfg.get("warn_free_gb") or 10)
+    crit_gb = float(disk_cfg.get("critical_free_gb") or 1)
     free_gb = float(storage.get("free_gb") or 0)
     total_mb = float(storage.get("total_mb") or 0)
     size_text = ("%.0f MB" % total_mb) if total_mb < 1024 \
@@ -7006,15 +7120,20 @@ def diagnose_system():
         else ("还能用 %.1f 天" % days_left)
     days_text_en = "plenty of space" if days_left is None or days_left > 3650 \
         else ("about %.1f days left" % days_left)
-    level = "critical" if free_gb < 5 else "warn" if free_gb < 10 else "ok"
+    level = "critical" if free_gb < crit_gb else \
+        "warn" if free_gb < warn_gb else "ok"
     add("storage", level, "磁盘空间",
         "图库占用 %s，磁盘剩余 %.1f GB，预计%s。" %
         (size_text, free_gb, days_text),
-        "清理旧图或扩容。" if level != "ok" else "",
+        ("清理旧图或扩容（低于 %.1f GB 会暂停新任务）。" % crit_gb)
+        if level == "critical" else
+        ("建议清理旧图或扩容（低于 %.1f GB 会暂停新任务）。" % crit_gb)
+        if level == "warn" else "",
         "Disk space",
         "Gallery uses %s, %.1f GB free, %s." %
         (size_text, free_gb, days_text_en),
-        "Clean old images or add storage." if level != "ok" else "")
+        ("Clean old images or add storage (new jobs pause below %.1f GB)." %
+         crit_gb) if level != "ok" else "")
     days = certificate_days_left()
     level = "critical" if days is not None and days < 7 else \
         "warn" if days is not None and days < 30 else "ok"

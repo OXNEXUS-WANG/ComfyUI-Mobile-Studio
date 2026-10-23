@@ -89,6 +89,30 @@ class SchedulerTests(unittest.TestCase):
             app_core.scheduler_release(first)
             self.assertEqual(app_core.JOBS["j3"]["status"], "running")
 
+    def test_local_slot_is_strictly_single(self):
+        with app_core.SCHED_LOCK:
+            app_core.SCHEDULER["slots"] = {
+                "local": {
+                    "id": "local", "kind": "local", "name": "本机",
+                    "active": "", "available": True, "last_used": 0,
+                    "policy": {},
+                },
+            }
+            app_core.SCHEDULER["queues"].clear()
+            app_core.SCHEDULER["served_cost"] = {}
+            for i, jid in enumerate(("j1", "j2", "j3"), 1):
+                app_core.JOBS[jid]["remote_ok"] = False
+                app_core.SCHEDULER["seq"] += 1
+                app_core.JOBS[jid]["queue_seq"] = app_core.SCHEDULER["seq"]
+                app_core.SCHEDULER["queues"].setdefault(
+                    app_core.JOBS[jid]["user_id"], deque()).append(jid)
+            app_core._sched_dispatch_locked(local_ok=True)
+            running = [j for j, job in app_core.JOBS.items()
+                       if job.get("status") == "running"]
+            self.assertEqual(len(running), 1)
+            self.assertEqual(app_core.SCHEDULER["slots"]["local"]["active"],
+                             running[0])
+
     def test_same_worker_gets_only_one_job(self):
         with app_core.SCHED_LOCK:
             app_core.SCHEDULER["slots"].pop("r2", None)
