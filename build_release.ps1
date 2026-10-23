@@ -95,6 +95,9 @@ foreach ($name in $runtimeDirs) {
 }
 # 授权签发工具只留在维护者仓库，绝不进入客户发布包
 Remove-Staged "license_admin"
+# 这是开发者本机的旧版 ComfyUI 操作说明（含本机路径），不随客户包分发；
+# 安装时改用 MANUAL.md 生成根目录的「使用说明.md」。
+Remove-Staged "docs\使用说明.md"
 
 if ($Edition -eq "commercial") {
     # The commercial edition ships under the commercial EULA, not PolyForm.
@@ -116,12 +119,20 @@ if ($Edition -eq "commercial") {
     Copy-Item (Join-Path $Root "安装_商业版.bat") (Join-Path $Stage "安装.bat") -Force
     # 英文入口也必须进入商业清洁模式，不能复用分享版的 install.bat。
     Copy-Item (Join-Path $Root "安装_商业版.bat") (Join-Path $Stage "install.bat") -Force
-    # Commercial build is installer-only: no test suite or CI files.
+    # Commercial build is installer-only: no test suite, CI or maintainer files.
     Remove-Staged "tests"
     Remove-Staged "运行测试.bat"
     Remove-Staged ".github"
     Remove-Staged "CHANGELOG.md"
     Remove-Staged "EDITIONS.md"
+    Remove-Staged "build_release.ps1"
+    Remove-Staged ".gitignore"
+    Remove-Staged ".gitattributes"
+    Remove-Staged "tools\make_cometink_icon.py"
+    Remove-Staged "docs\安装包测试报告_20261021.md"
+    Remove-Staged "docs\安装包下载测试报告_20261021.md"
+    Remove-Staged "docs\极端测试报告_20261020.md"
+    Remove-Staged "docs\全新安装实测_20261021.md"
     Remove-Staged "安装说明.txt"
     Copy-Item (Join-Path $Stage "安装说明_商业版.txt") (Join-Path $Stage "安装说明.txt") -Force
     Remove-Staged "安装说明_商业版.txt"

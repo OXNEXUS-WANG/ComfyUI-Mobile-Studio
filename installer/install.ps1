@@ -39,7 +39,7 @@ if ($ComfyUIDir -and $InstallDir) {
 
 $ErrorActionPreference = "Stop"
 $PkgRoot = Split-Path -Parent $PSScriptRoot
-$AppVersion = "1.3.10"
+$AppVersion = "1.3.11"
 $VersionFile = Join-Path $PkgRoot "VERSION"
 if (Test-Path $VersionFile) {
     $v = (Get-Content $VersionFile -Raw -Encoding ASCII).Trim()
@@ -779,7 +779,12 @@ function Copy-AppFiles {
     }
     Copy-Tree (Join-Path $PkgRoot "worker") (Join-Path $InstallDir "worker")
     Copy-Tree (Join-Path $PkgRoot "docs") (Join-Path $InstallDir "docs")
-    Copy-Item (Join-Path $PkgRoot "docs\使用说明.md") (Join-Path $InstallDir "使用说明.md") -Force
+    # 用当前手册生成根目录的「使用说明.md」；旧版 docs\使用说明.md 是本机
+    # 开发记录，不随发布包分发。
+    $manual = Join-Path $PkgRoot "MANUAL.md"
+    if (Test-Path $manual) {
+        Copy-Item $manual (Join-Path $InstallDir "使用说明.md") -Force
+    }
     $instDest = Join-Path $InstallDir "installer"
     New-Item -ItemType Directory -Force -Path $instDest | Out-Null
     foreach ($f in @("download_models.py", "bootstrap.py", "models_manifest.json")) {
