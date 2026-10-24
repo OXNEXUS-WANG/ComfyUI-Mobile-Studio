@@ -212,7 +212,7 @@ CometInk 彗墨是一个**本地部署的 ComfyUI 管理台**。
 
 ### 5.1 解压
 
-把 `CometInk-v1.3.21-Share.zip` 或 `CometInk-v1.3.21-Commercial.zip` 解压到一个普通文件夹。
+把 `CometInk-v1.3.22-Share.zip` 或 `CometInk-v1.3.22-Commercial.zip` 解压到一个普通文件夹。
 
 不要在压缩包里直接双击运行。
 
@@ -343,7 +343,7 @@ Install failed. See the log above.
 
 这是 v1.3.19 及更早版本的编码问题：`install.ps1` 没有 UTF-8 BOM，
 中文 Windows 的 Windows PowerShell 5.1 会按 GB2312 解析并破坏语法。
-v1.3.21 已改为 UTF-8 with BOM，请换用新安装包。
+v1.3.20 已改为 UTF-8 with BOM，请换用新安装包。
 
 升级前可以先做只读检查，不下载、不修改任何文件：
 
@@ -355,7 +355,7 @@ install.bat -DryRun -InstallDir D:\CometInk-test -NoDialog
 
 **手机访问必须放行 TCP 8800。** 如果安装器没有管理员权限，它不会自动加
 防火墙规则；安装完成后双击安装目录里的 `修复手机访问.bat`，在弹出的 UAC
-提示里点「是」即可。v1.3.21 起这个脚本会自动请求管理员权限，不再需要右键
+提示里点「是」即可。v1.3.20 起这个脚本会自动请求管理员权限，不再需要右键
 「以管理员身份运行」。
 
 模型下载优先走 **ModelScope**，失败才尝试 hf-mirror / Hugging Face。
