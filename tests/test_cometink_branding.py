@@ -88,6 +88,15 @@ class CometInkBrandingTests(unittest.TestCase):
         self.assertIn('Copy-Item $manual (Join-Path $InstallDir "使用说明.md")',
                       self.install)
 
+    def test_release_build_excludes_runtime_prompt_data(self):
+        # 提示词历史在浏览器 localStorage；服务端运行数据必须永远不进发布包。
+        for name in ("users.json", "sessions.json", "usage.json",
+                     "team_prompts.json", "jobs_state.json",
+                     "jobs_resume.json", "local_llm.json", "monitor.json"):
+            self.assertIn('"%s"' % name, self.build)
+        for name in ("generated", "web_uploads", "logs"):
+            self.assertIn('"%s"' % name, self.build)
+
     def test_package_readme_keeps_title_after_image_trim(self):
         # 发布包会去掉 docs/media 首屏图，但 README 不能因此从空行开始。
         self.assertIn("$pkgHeader", self.build)
