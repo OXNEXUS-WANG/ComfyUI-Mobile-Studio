@@ -123,6 +123,25 @@ def human_mb(n):
         return 0
 
 
+def caps_for_vram(vram_mb):
+    """按显卡总显存给中央调度一个保守的任务上限。"""
+    try:
+        v = float(vram_mb or 0)
+    except Exception:
+        v = 0
+    if v <= 0:
+        return 1_500_000, 4
+    if v < 6144:
+        return 800_000, 2
+    if v < 10240:
+        return 1_500_000, 4
+    if v < 16384:
+        return 2_500_000, 6
+    if v < 24576:
+        return 4_000_000, 8
+    return 6_000_000, 8
+
+
 # --------------------------------------------------------------------- 中央 HTTP
 
 class AuthError(Exception):
@@ -400,6 +419,8 @@ def probe(cfg=None):
         except Exception:
             pass
     telemetry = gpu_telemetry()
+    vram_mb = human_mb(dev.get("vram_total") or 0)
+    max_pixels, max_count = caps_for_vram(vram_mb)
     return {
         "agent_version": AGENT_VERSION,
         "protocol": PROTOCOL,
@@ -408,7 +429,7 @@ def probe(cfg=None):
         "python": platform.python_version(),
         "cpu_count": os.cpu_count() or 0,
         "gpu_name": dev.get("name") or "",
-        "vram_mb": human_mb(dev.get("vram_total") or 0),
+        "vram_mb": vram_mb,
         "gpu_util": telemetry.get("gpu_util"),
         "vram_used_mb": telemetry.get("vram_used_mb"),
         "gpu_temp_c": telemetry.get("gpu_temp_c"),
@@ -422,8 +443,8 @@ def probe(cfg=None):
         "disk_free_mb": disk_free_mb,
         "capabilities": {
             "kinds": ["gen"],
-            "max_pixels": 4000000,
-            "max_count": 4,
+            "max_pixels": max_pixels,
+            "max_count": max_count,
             "max_job_sec": 900,
         },
     }

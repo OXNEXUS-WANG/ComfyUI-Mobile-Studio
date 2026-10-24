@@ -92,7 +92,8 @@ class CometInkBrandingTests(unittest.TestCase):
         # 提示词历史在浏览器 localStorage；服务端运行数据必须永远不进发布包。
         for name in ("users.json", "sessions.json", "usage.json",
                      "team_prompts.json", "jobs_state.json",
-                     "jobs_resume.json", "local_llm.json", "monitor.json"):
+                     "jobs_resume.json", "hardware.json",
+                     "local_llm.json", "monitor.json"):
             self.assertIn('"%s"' % name, self.build)
         for name in ("generated", "web_uploads", "logs"):
             self.assertIn('"%s"' % name, self.build)
@@ -129,7 +130,7 @@ class CometInkBrandingTests(unittest.TestCase):
         # 只保留迁移时删除旧品牌快捷方式的引用。
         self.assertIn('$legacy = Join-Path $desktop "Nexus Studio.lnk"', self.install)
         self.assertIn('"CometInk 8800"', self.install)
-        self.assertIn('$AppVersion = "1.3.15"', self.install)
+        self.assertIn('$AppVersion = "1.3.16"', self.install)
         self.assertIn('$DisclaimerVersion = "1.2"', self.install)
 
     def test_offline_bundle_carries_pwa_icons(self):
@@ -137,7 +138,7 @@ class CometInkBrandingTests(unittest.TestCase):
         self.assertIn('".ico"', self.bundle)
 
     def test_version_and_disclaimer_are_updated(self):
-        self.assertEqual(self.version, "1.3.15")
+        self.assertEqual(self.version, "1.3.16")
         self.assertIn("CometInk 彗墨", self.disclaimer)
         self.assertIn("免责声明版本：1.2", self.disclaimer)
 

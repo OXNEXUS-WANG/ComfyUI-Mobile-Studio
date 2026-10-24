@@ -1624,6 +1624,7 @@ class Handler(BaseHTTPRequestHandler):
                         "video_sizes": list(VIDEO_SIZES),
                         "video_min_seconds": VIDEO_MIN_SECONDS,
                         "video_max_seconds": VIDEO_MAX_SECONDS,
+                        "hardware": hardware_profile.public(),
                         "translate_ready": translation_ready_for(user),
                         "translation": translation_status(user),
                         "auth": auth_enabled(),
@@ -4618,12 +4619,15 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 return default
 
+        hw = hardware_profile.limits()
         # 视频时长按“秒”自由填，内部换算成 8fps 的帧数；必须是偶数，
         # 这样 Wan 的 length=帧数*2+1 才会落在 4n+1 上。
-        frames = num("frames", 16, 4, 48, int)
+        max_frames = max(4, min(48, int(float(hw["video_max_seconds"]) * 8)))
+        frames = num("frames", 16, 4, max_frames, int)
         if frames % 2:
             frames -= 1
-        count = 1 if is_video else num("count", 1, 1, 4, int)
+        count = (1 if is_video else
+                 num("count", 1, 1, min(4, int(hw["max_count"])), int))
         denoise = num("denoise", 0.6, 0.2, 1.0, float)
         if is_video:
             # 视频走 Wan 2.1，采样参数和出图那套完全不一样
@@ -4667,12 +4671,16 @@ class Handler(BaseHTTPRequestHandler):
         # 按具体模型再收一次画幅：16 像素对齐 + 单边 / 总像素上限。
         # 图生图 / 局部重绘的画幅由参考图决定，这里只影响任务记录和预估。
         if is_video:
-            w, h = fit_size(w, h, 256, VIDEO_MAX_SIDE, VIDEO_MAX_PIXELS)
-        else:
             w, h = fit_size(
                 w, h, 256,
-                int(preset.get("max_side") or 1536),
-                int(preset.get("max_pixels") or 1500000))
+                min(VIDEO_MAX_SIDE, int(hw["video_max_side"])),
+                min(VIDEO_MAX_PIXELS, int(hw["video_max_pixels"])))
+        else:
+            caps = hardware_profile.cap_model_caps(preset, hw["tier"])
+            w, h = fit_size(
+                w, h, 256,
+                int(caps["max_side"]),
+                int(caps["max_pixels"]))
 
         # LoRA：只接受 loras 目录里真实存在的文件名，强度限制在 -2 ~ 2
         loras = []

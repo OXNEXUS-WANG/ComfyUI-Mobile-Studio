@@ -321,10 +321,16 @@ def _start_comfy():
                    os.path.join(ROOT, "git", "bin") + ";" +
                    env.get("PATH", ""))
     env["ARGOS_CHUNK_TYPE"] = "MINISBD"
+    reserve = "0.8"
+    try:
+        import hardware_profile
+        reserve = str(hardware_profile.limits().get("reserve_vram") or 0.8)
+    except Exception:
+        pass
     return spawn([
         PY, "-s", os.path.join("ComfyUI", "main.py"),
         "--windows-standalone-build",
-        "--reserve-vram", "0.8",
+        "--reserve-vram", reserve,
         "--preview-method", "auto",
     ], env)
 

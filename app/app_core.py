@@ -39,6 +39,7 @@ except Exception:       # 便携版没装也能跑，负载页只是少几项
 
 import disk_cleanup
 import edition_policy
+import hardware_profile
 import health_report
 import lan_share
 import license_guard
@@ -202,11 +203,14 @@ UNET_DIR = os.path.join(ROOT, "ComfyUI", "models", "diffusion_models")
 TEXT_ENC_DIR = os.path.join(ROOT, "ComfyUI", "models", "text_encoders")
 VAE_DIR = os.path.join(ROOT, "ComfyUI", "models", "vae")
 
+# 当前机器的显存档位（nvidia-smi 检测，可用 hardware.json 或
+# MGS_HARDWARE_TIER 覆盖）。不同显卡自动采用不同的画幅/张数/视频上限。
+HARDWARE = hardware_profile.limits()
+
 # 图生图 / 局部重绘的参考图像素上限（百万像素）。
 # 8GB 显存下超过这个数就会爆显存，表现为浏览器一直转圈、ComfyUI 卡死。
 # 超过的参考图会自动等比缩到这个上限（比例不变，不会被拉变形）。
-# 1.3MP ≈ 1024x1270，和常用的 832x1216(1.01MP) 同一量级，留了点余量。
-MAX_SOURCE_MEGAPIXELS = 1.3
+MAX_SOURCE_MEGAPIXELS = float(HARDWARE["source_megapixels"])
 
 # 提示词处理方式
 #   True  = optimize_prompt：中文先按词表转 danbooru 标签，再补质量词、过滤毁图词
@@ -246,10 +250,10 @@ PONY_PREFIX = "score_9, score_8_up, score_7_up, "
 # 16 倍数画幅；单边/总像素超过上限时后端会等比缩小，防止 8GB 显存爆掉。
 VIDEO_SIZES = ["480x480", "480x832", "832x480",
                "640x480", "480x640", "640x640"]
-VIDEO_MAX_SIDE = 960
-VIDEO_MAX_PIXELS = 480000
+VIDEO_MAX_SIDE = int(HARDWARE["video_max_side"])
+VIDEO_MAX_PIXELS = int(HARDWARE["video_max_pixels"])
 VIDEO_MIN_SECONDS = 0.5
-VIDEO_MAX_SECONDS = 6.0
+VIDEO_MAX_SECONDS = float(HARDWARE["video_max_seconds"])
 
 # 每个底模的显示名和推荐参数。Lightning 类模型步数少、CFG 低，选错会出糊图。
 CKPT_PRESETS = dict(
@@ -3378,9 +3382,13 @@ def list_models():
         names.append(ANIMA_MODEL)
     order = list(CKPT_PRESETS.keys())
     names.sort(key=lambda n: (order.index(n) if n in order else 99, n))
+    hw = hardware_profile.limits()
     out = []
     for n in names:
         p = model_profile(n)
+        raw_sizes = p.get("sizes") or []
+        sizes = (hardware_profile.fit_sizes(raw_sizes, hw["tier"])
+                 if raw_sizes else [])
         out.append({
             "name": n,
             "label": p.get("display") or os.path.splitext(n)[0],
@@ -3398,9 +3406,11 @@ def list_models():
             "tip": p.get("tip", ""),
             "vpred": p.get("vpred", False),
             "recommended_size": p.get("recommended_size", "832x1216"),
-            "sizes": p.get("sizes") or [],
-            "max_side": int(p.get("max_side") or 1536),
-            "max_pixels": int(p.get("max_pixels") or 1500000),
+            "sizes": sizes,
+            "max_side": min(int(p.get("max_side") or 1536),
+                            int(hw["max_side"])),
+            "max_pixels": min(int(p.get("max_pixels") or 1500000),
+                              int(hw["max_pixels"])),
             "beginner": bool(p.get("beginner")),
             "supported": bool(p.get("supported", True)),
             "badges": p.get("badges") or [],

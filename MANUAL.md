@@ -1,7 +1,10 @@
 # CometInk 彗墨 · 使用手册
 
 > 把 ComfyUI 变成一台可以用手机浏览器操作的本地出图工作站。  
-> 版本：**v1.3.15** · 适用：分享版 / 商用版
+> 版本：**v1.3.16** · 适用：分享版 / 商用版
+>
+> v1.3.16 更新：按显存自动分档（4–6GB / 8GB / 12GB / 16GB / 24GB+），
+> 不再只按 RTX 5060 8GB 写死画幅、张数和视频时长。
 >
 > v1.3.15 更新：浏览器报“无法下载 / 网络问题”时，图片和 ZIP 改用
 > blob 下载兜底，失败会打开直链并提示右键另存为。
@@ -191,7 +194,7 @@ CometInk 彗墨是一个**本地部署的 ComfyUI 管理台**。
 
 ### 5.1 解压
 
-把 `CometInk-v1.3.15-Share.zip` 或 `CometInk-v1.3.15-Commercial.zip` 解压到一个普通文件夹。
+把 `CometInk-v1.3.16-Share.zip` 或 `CometInk-v1.3.16-Commercial.zip` 解压到一个普通文件夹。
 
 不要在压缩包里直接双击运行。
 
@@ -282,6 +285,34 @@ ComfyUI 源码到最新 master**，所以不会装完缺节点。它不是 Comfy
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\installer\install.ps1 -ComfyZip "D:\下载\ComfyUI_windows_portable_nvidia.7z"
 ```
+
+### 5.3.2 不同显卡自动适配
+
+启动时通过 `nvidia-smi` 读取本机总显存，自动选择生成上限，不再只按
+RTX 5060 8GB 写死：
+
+| 显存 | 档位 | 单边上限 | 总像素 | 单次张数 | 视频最长 |
+|---|---|---:|---:|---:|---:|
+| 4–6GB | `low` | 1024 | 0.8MP | 2 | 2 秒 |
+| 6–10GB | `8gb` | 1536 | 1.5MP | 4 | 3 秒 |
+| 10–16GB | `12gb` | 2048 | 2.5MP | 6 | 4 秒 |
+| 16–24GB | `16gb` | 2560 | 4MP | 8 | 5 秒 |
+| 24GB+ | `24gb` | 3072 | 6MP | 8 | 6 秒 |
+
+图生图/局部重绘的参考图像素上限、ComfyUI 的 `--reserve-vram` 也会跟着档位变。
+视频画幅仍以 Wan 1.3B 原生的 480p 档为主，只有时长随显存放宽。
+
+需要手工覆盖时，在安装根目录建 `hardware.json`：
+
+```json
+{"tier": "12gb"}
+```
+
+或设置环境变量 `MGS_HARDWARE_TIER=12gb`，然后重启服务。可选值：
+`low`、`8gb`、`12gb`、`16gb`、`24gb`。读不到显卡时保守按 `8gb` 处理。
+
+LoRA 训练另有更严格的总显存/空闲显存检查（例如 SDXL 训练要求 12GB+），
+不满足会直接拒绝，不会排队白等。
 
 ### 5.4 第一次启动
 

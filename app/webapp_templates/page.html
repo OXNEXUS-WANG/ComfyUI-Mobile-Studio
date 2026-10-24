@@ -558,6 +558,7 @@ a.img:active { filter: brightness(.94); }
 .size-custom .chip { flex: 0 0 auto; min-height: 38px; }
 .chip.warn { color: #ffc48a; border-color: rgba(255,160,80,.35); }
 .chip.warn.on { background: rgba(255,150,70,.16); border-color: rgba(255,170,90,.6); }
+.chip.off { opacity: .35; filter: grayscale(1); pointer-events: none; }
 
 /* ---------- 当前配置徽章 ---------- */
 .modebadge {
@@ -3164,9 +3165,38 @@ function fmtSeconds(n) {
   return (Number.isInteger(sec) ? sec : sec.toFixed(1)) + " 秒";
 }
 
+function hwMaxFrames() {
+  const hw = window.__hardware;
+  const sec = hw ? Number(hw.video_max_seconds) : 6;
+  return Math.max(4, Math.min(48, Math.round((sec || 6) * 8)));
+}
+
+function applyHardwareUI() {
+  const hw = window.__hardware;
+  if (!hw) { return; }
+  const maxFrames = hwMaxFrames();
+  const maxSec = Math.max(0.5, maxFrames / 8);
+  document.querySelectorAll("#frames .chip").forEach(function (c) {
+    const f = parseInt(c.dataset.f, 10) || 0;
+    if (f > maxFrames) {
+      c.classList.remove("on");
+      c.classList.add("off");
+      c.title = "本机显存（" + (hw.label || hw.tier) +
+                "）最长 " + maxSec + " 秒";
+      c.onclick = null;
+    }
+  });
+  const fc = document.getElementById("framesCustom");
+  if (fc) {
+    fc.max = String(maxSec);
+    if (parseFloat(fc.value) > maxSec) { fc.value = String(maxSec); }
+  }
+  if (curFrames > maxFrames) { setFrames(maxFrames); }
+}
+
 function setFrames(n) {
   n = Math.round(Number(n) || 16);
-  n = Math.max(4, Math.min(48, n));
+  n = Math.max(4, Math.min(hwMaxFrames(), n));
   if (n % 2) { n -= 1; }
   curFrames = n;
   document.querySelectorAll("#frames .chip").forEach(function (x) {
@@ -3201,7 +3231,8 @@ function applyCustomSize() {
 function applyCustomFrames() {
   const fc = document.getElementById("framesCustom");
   if (!fc) { return; }
-  const sec = Math.max(0.5, Math.min(6, parseFloat(fc.value) || 2));
+  const maxSec = hwMaxFrames() / 8;
+  const sec = Math.max(0.5, Math.min(maxSec, parseFloat(fc.value) || 2));
   setFrames(Math.round(sec * 8));
 }
 
@@ -3662,7 +3693,9 @@ async function loadModels() {
     if (j.video_sizes && j.video_sizes.length) {
       window.__videoSizes = j.video_sizes;
     }
+    window.__hardware = j.hardware || null;
     renderVideoSizes();
+    applyHardwareUI();
     // 启用账号系统就显示「退出登录」
     if (j.auth) {
       const sec = document.getElementById("authSec");
