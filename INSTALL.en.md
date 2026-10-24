@@ -21,7 +21,7 @@ The installer can download ComfyUI and the default models. If you already have C
 
 ## 2. Install
 
-1. Download `CometInk-v1.3.16-Share.zip` from **Releases** and extract it to a normal folder. Do not run it from inside the ZIP.
+1. Download `CometInk-v1.3.17-Share.zip` from **Releases** and extract it to a normal folder. Do not run it from inside the ZIP.
 2. Run **`install.bat`** (English entry point). `安装.bat` is the same installer under its Chinese name.
 3. Choose the install directory. The default is:
    ```text

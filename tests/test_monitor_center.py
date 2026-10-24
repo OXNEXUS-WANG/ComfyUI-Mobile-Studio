@@ -20,6 +20,7 @@ class MonitorCenterTests(unittest.TestCase):
         monitor_center.ALERTS_FILE = str(Path(self.td.name) / "alerts.json")
         monitor_center.TRENDS_FILE = str(Path(self.td.name) / "trends.json")
         monitor_center.SETTINGS_FILE = str(Path(self.td.name) / "monitor.json")
+        monitor_center._COMFY_DOWN_SINCE[0] = 0.0
         with monitor_center._LOCK:
             monitor_center._ALERTS.clear()
             monitor_center._HISTORY.clear()
@@ -34,6 +35,7 @@ class MonitorCenterTests(unittest.TestCase):
     def tearDown(self):
         for key, value in self.old.items():
             setattr(monitor_center, key, value)
+        monitor_center._COMFY_DOWN_SINCE[0] = 0.0
         with monitor_center._LOCK:
             monitor_center._ALERTS.clear()
             monitor_center._HISTORY.clear()
@@ -63,6 +65,45 @@ class MonitorCenterTests(unittest.TestCase):
         self.assertLess(health["score"], 100)
         self.assertTrue(monitor_center.ack_alert(alerts[0]["id"]))
         self.assertTrue(any(a.get("ack") for a in monitor_center.active_alerts()))
+
+    def test_comfy_offline_debounce_and_episode_count(self):
+        base = {
+            "queue_size": 0, "running_count": 0, "workers": [], "jobs": [],
+            "job_count_10m": 0, "error_count_10m": 0,
+            "disk_free_gb": None, "cert_days": None,
+        }
+        def snap(now, ready=False, running=0):
+            return dict(base, now=now, comfy_ready=ready,
+                        running_count=running)
+
+        # 15 秒宽限期内不报；生成中也不报。
+        self.assertFalse(any(a["key"] == "comfy_offline"
+                             for a in monitor_center.evaluate(snap(1000))))
+        self.assertFalse(any(a["key"] == "comfy_offline"
+                             for a in monitor_center.evaluate(
+                                 snap(1010, running=1))))
+        self.assertFalse(any(a["key"] == "comfy_offline"
+                             for a in monitor_center.evaluate(snap(1016))))
+        alerts = monitor_center.evaluate(snap(1032))
+        offline = [a for a in alerts if a["key"] == "comfy_offline"]
+        self.assertEqual(len(offline), 1)
+        self.assertEqual(offline[0]["count"], 1)
+
+        # 同一个告警被反复轮询，count 不能再累加。
+        for now in range(1036, 1100, 5):
+            monitor_center.evaluate(snap(now))
+        offline = [a for a in monitor_center.active_alerts()
+                   if a["key"] == "comfy_offline"]
+        self.assertEqual(offline[0]["count"], 1)
+        self.assertGreater(offline[0]["samples"], 1)
+
+        # 恢复后重新离线，算新的一次告警。
+        monitor_center.evaluate(snap(1100, ready=True))
+        monitor_center.evaluate(snap(2000))
+        alerts = monitor_center.evaluate(snap(2016))
+        offline = [a for a in alerts if a["key"] == "comfy_offline"]
+        self.assertEqual(len(offline), 1)
+        self.assertEqual(offline[0]["count"], 1)
 
     def test_worker_series(self):
         monitor_center.note_worker("w_1", {"gpu_util": 50, "temp_c": 60})

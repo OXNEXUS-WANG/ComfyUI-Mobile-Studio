@@ -26,6 +26,7 @@ DEFAULT_SETTINGS = {
     "gpu_high": 97,
     "gpu_temp_high": 85,
     "queue_warn": 10,
+    "comfy_offline_sec": 15,
     "worker_offline_sec": 30,
     "worker_critical_sec": 120,
     "error_rate_pct": 25,
@@ -56,6 +57,7 @@ _TRENDS = None
 _TRENDS_LOCK = threading.Lock()
 _TRENDS_LAST_SAVE = {"t": 0.0}
 _NOTED_JOBS = set()
+_COMFY_DOWN_SINCE = [0.0]
 _SEVERITY_RANK = {"critical": 0, "warn": 1, "info": 2}
 
 
@@ -84,7 +86,8 @@ def _clean_settings(raw):
                 "job_notify_error"):
         out[key] = bool(src.get(key, out[key]))
     for key, hi in (("gpu_high", 100), ("gpu_temp_high", 120),
-                    ("queue_warn", 500), ("worker_offline_sec", 600),
+                    ("queue_warn", 500), ("comfy_offline_sec", 600),
+                    ("worker_offline_sec", 600),
                     ("worker_critical_sec", 3600), ("error_rate_pct", 100),
                     ("error_min_jobs", 100), ("disk_free_gb", 10000),
                     ("cert_days", 3650), ("job_stuck_min", 1440),
@@ -145,6 +148,7 @@ def public_settings(cfg=None):
         "gpu_high": cfg.get("gpu_high"),
         "gpu_temp_high": cfg.get("gpu_temp_high"),
         "queue_warn": cfg.get("queue_warn"),
+        "comfy_offline_sec": cfg.get("comfy_offline_sec"),
         "worker_offline_sec": cfg.get("worker_offline_sec"),
         "worker_critical_sec": cfg.get("worker_critical_sec"),
         "error_rate_pct": cfg.get("error_rate_pct"),
@@ -322,8 +326,10 @@ def _raise_alert(key, severity, title, detail, source="", now=None,
     with _LOCK:
         cur = _ALERTS.get(key)
         if cur and cur.get("status") == "active":
+            # count 表示“这个告警开了几次”，不是轮询了几次。
+            # 页面/监控每几秒调用一次 evaluate，不能把 count 累加成几千。
             cur["last_seen"] = now
-            cur["count"] = int(cur.get("count") or 1) + 1
+            cur["samples"] = int(cur.get("samples") or 1) + 1
             cur["severity"] = severity
             cur["title"] = title
             cur["detail"] = detail
@@ -337,7 +343,7 @@ def _raise_alert(key, severity, title, detail, source="", now=None,
             "title_en": title_en or title, "detail_en": detail_en or detail,
             "source": source,
             "first_seen": now, "last_seen": now, "count": 1,
-            "status": "active", "ack": False,
+            "samples": 1, "status": "active", "ack": False,
         }
         _ALERTS[key] = item
         _HISTORY.append(dict(item, action="open", time=now))
@@ -396,11 +402,18 @@ def evaluate(snapshot):
         want("queue_backlog", sev, "任务队列积压",
              "当前有 %d 个任务在排队。" % queue, "queue",
              "Job queue backlog", "%d jobs are queued." % queue)
-    if snapshot.get("comfy_ready") is False:
-        want("comfy_offline", "warn", "ComfyUI 不在线",
-             "本机 ComfyUI 没有响应，本机槽位无法接单。", "comfy",
-             "ComfyUI offline",
-             "Local ComfyUI is not responding; the local slot cannot take jobs.")
+    if snapshot.get("comfy_ready") is False and running == 0:
+        if not _COMFY_DOWN_SINCE[0]:
+            _COMFY_DOWN_SINCE[0] = now
+        if now - _COMFY_DOWN_SINCE[0] >= float(cfg["comfy_offline_sec"]):
+            want("comfy_offline", "warn", "ComfyUI 不在线",
+                 "本机 ComfyUI 没有响应，本机槽位无法接单。", "comfy",
+                 "ComfyUI offline",
+                 "Local ComfyUI is not responding; the local slot cannot take jobs.")
+    else:
+        # 生成中 ComfyUI 可能短暂忙不过来；恢复或本机任务在跑就清零，
+        # 避免 /system_stats 的 2 秒超时造成假告警。
+        _COMFY_DOWN_SINCE[0] = 0.0
     for w in snapshot.get("workers") or []:
         if not isinstance(w, dict) or w.get("status") != "approved":
             continue

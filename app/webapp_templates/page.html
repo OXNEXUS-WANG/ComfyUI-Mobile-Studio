@@ -2592,6 +2592,7 @@ body.scrolled #langBtn, body.scrolled #profileTopBtn {
       <label>GPU 告警 %<input id="adminMonGpu" type="number" min="1" max="100"></label>
       <label>GPU 温度 °C<input id="adminMonTemp" type="number" min="1" max="120"></label>
       <label>队列积压<input id="adminMonQueue" type="number" min="1" max="500"></label>
+      <label>ComfyUI 离线判定秒数<input id="adminMonComfyOffline" type="number" min="5" max="600"></label>
       <label>节点离线秒数<input id="adminMonOffline" type="number" min="1" max="600"></label>
       <label>节点严重离线秒数<input id="adminMonCritical" type="number" min="1" max="3600"></label>
       <label>失败率 %<input id="adminMonErrRate" type="number" min="1" max="100"></label>
@@ -7614,6 +7615,7 @@ function adminRenderMonitor() {
     const map = {
       adminMonGpu: "gpu_high", adminMonTemp: "gpu_temp_high",
       adminMonQueue: "queue_warn", adminMonOffline: "worker_offline_sec",
+      adminMonComfyOffline: "comfy_offline_sec",
       adminMonCritical: "worker_critical_sec",
       adminMonErrRate: "error_rate_pct", adminMonErrMin: "error_min_jobs",
       adminMonDisk: "disk_free_gb", adminMonCert: "cert_days",
@@ -7657,6 +7659,7 @@ function adminMonitorFields() {
     gpu_high: num("adminMonGpu"),
     gpu_temp_high: num("adminMonTemp"),
     queue_warn: num("adminMonQueue"),
+    comfy_offline_sec: num("adminMonComfyOffline"),
     worker_offline_sec: num("adminMonOffline"),
     worker_critical_sec: num("adminMonCritical"),
     error_rate_pct: num("adminMonErrRate"),

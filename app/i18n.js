@@ -1232,6 +1232,7 @@
     'GPU 告警 %': 'GPU alert %',
     'GPU 温度 °C': 'GPU temp °C',
     '队列积压': 'Queue backlog',
+    'ComfyUI 离线判定秒数': 'ComfyUI offline grace (s)',
     '节点离线秒数': 'Worker offline seconds',
     '节点严重离线秒数': 'Worker critical offline seconds',
     '失败率 %': 'Error rate %',
