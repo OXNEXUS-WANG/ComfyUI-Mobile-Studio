@@ -19,7 +19,10 @@ class ImageDownloadTests(unittest.TestCase):
 
     def test_desktop_save_button_triggers_download(self):
         self.assertIn("?download=1", self.page)
+        self.assertIn("function saveUrl", self.page)
+        self.assertIn("await saveUrl", self.page)
         self.assertIn("a.download = name", self.page)
+        self.assertIn("图片另存为", self.page)
         self.assertIn("下载 / 保存", self.page)
         self.assertIn("'下载 / 保存': 'Download / Save'", self.i18n)
 

@@ -6094,16 +6094,38 @@ async function doUpscale(factor) {
 document.getElementById("aUp2").onclick = function () { doUpscale(2); };
 document.getElementById("aUp4").onclick = function () { doUpscale(4); };
 
-document.getElementById("aSave").onclick = function () {
+async function saveUrl(url, name) {
+  // 先走 fetch + blob：部分浏览器/下载管理器会拦截带 attachment 的直链，
+  // 报“无法下载 / 网络问题”，blob 方式通常能绕过。
+  try {
+    const r = await fetch(url, { credentials: "same-origin", cache: "no-store" });
+    if (!r.ok) { return false; }
+    const blob = await r.blob();
+    const obj = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = obj;
+    a.download = name || "download";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(obj); }, 60000);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+document.getElementById("aSave").onclick = async function () {
   const it = curItem(); if (!it) { return; }
   const name = String(it.name || "").split("/").pop() || "image.png";
-  const a = document.createElement("a");
-  a.href = "/img/" + encodeURIComponent(it.name) + "?download=1";
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  show("已开始下载：" + name, "done");
+  const url = "/img/" + encodeURIComponent(it.name) + "?download=1";
+  show('<span class="spin"></span>正在准备下载…', "", true);
+  if (await saveUrl(url, name)) {
+    show("已开始下载：" + name, "done");
+  } else {
+    window.open("/img/" + encodeURIComponent(it.name), "_blank");
+    show("浏览器拦截了下载，已打开原图；请右键 → 图片另存为", "err");
+  }
 };
 
 document.getElementById("aDel").onclick = async function () {
@@ -10555,13 +10577,13 @@ document.getElementById("zipSelBtn").onclick = async function () {
     if (!r.ok || j.error) { show(j.error || ("HTTP " + r.status), "err"); return; }
     const a = j.archive || {};
     show("打包完成：" + a.count + " 个文件，" +
-         ((a.size || 0) / 1048576).toFixed(1) + " MB，开始下载", "done");
-    const link = document.createElement("a");
-    link.href = a.url;
-    link.download = a.name || "mobile-studio.zip";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+         ((a.size || 0) / 1048576).toFixed(1) + " MB，正在下载…", "", true);
+    if (await saveUrl(a.url, a.name || "mobile-studio.zip")) {
+      show("已开始下载：" + (a.name || "mobile-studio.zip"), "done");
+    } else {
+      window.open(a.url, "_blank");
+      show("浏览器拦截了下载，已打开直链；如仍失败请右键另存为", "err");
+    }
   } catch (e) { show("打包失败：" + e.message, "err"); }
 };
 document.getElementById("collageBtn").onclick = async function () {
