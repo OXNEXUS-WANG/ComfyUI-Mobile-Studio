@@ -1,46 +1,42 @@
-# CometInk 彗墨 · ComfyUI 手机出图
-
-把 ComfyUI 包装成一个可以用手机浏览器访问的本地出图工作台。  
-Turn ComfyUI into a private, mobile-first image-generation studio.
-
-<p align="center"><a href="#english">English</a> &nbsp;·&nbsp; <a href="#chinese">中文</a></p>
-
-> **完整双语介绍（含管理员后台、UI 与星图截图/GIF）：** [GITHUB_INTRO.md](GITHUB_INTRO.md)  
-> Full bilingual showcase with admin console, UI and star-map screenshots/GIFs: [GITHUB_INTRO.md](GITHUB_INTRO.md)
->
-> **English installation & usage guide:** [INSTALL.en.md](INSTALL.en.md)  
-> 英文安装、启动、手机访问、出图、图库、后台、训练和故障排查。
->
-> **完整使用手册：** [MANUAL.md](MANUAL.md)  
-> 安装、界面、出图、图库、队列、多账号、训练、星图、安全与故障排查，都在这里。
-
 <p align="center">
   <img src="docs/media/hero.png" alt="CometInk 彗墨" width="100%">
 </p>
 
-<p align="center">
-  <img src="docs/media/zh/ui-generator.png" alt="中文出图工作台" width="49%">
-  <img src="docs/media/en/ui-generator.png" alt="English generator" width="49%">
-</p>
-<p align="center"><sub>出图工作台 · Generator（中 / EN）</sub></p>
+<h1 align="center">CometInk 彗墨</h1>
 
 <p align="center">
-  <img src="docs/media/zh/admin-overview.png" alt="中文管理员后台" width="49%">
-  <img src="docs/media/en/admin-overview.png" alt="English admin console" width="49%">
+  <b>把 ComfyUI 变成手机可用的本地出图工作站</b><br>
+  <sub>Turn ComfyUI into a private, mobile-first image-generation studio.</sub>
 </p>
-<p align="center"><sub>管理员后台 · Admin console（中 / EN）</sub></p>
 
 <p align="center">
-  <img src="docs/media/zh/star-map.png" alt="中文 3D 接口星图" width="49%">
-  <img src="docs/media/en/star-map.png" alt="English 3D star map" width="49%">
+  <a href="https://github.com/OXNEXUS-WANG/ComfyUI-Mobile-Studio/releases/latest"><img src="https://img.shields.io/badge/Download-Latest-6f8cff?style=for-the-badge&logo=github" alt="Download"></a>
+  <a href="MANUAL.md"><img src="https://img.shields.io/badge/Manual-%E4%B8%AD%E6%96%87-2ea44f?style=for-the-badge" alt="Manual"></a>
+  <a href="GITHUB_INTRO.md"><img src="https://img.shields.io/badge/Showcase-%E6%88%AA%E5%9B%BE%E4%B8%8E%E5%8A%9F%E8%83%BD-8b7cf6?style=for-the-badge" alt="Showcase"></a>
+  <a href="INSTALL.en.md"><img src="https://img.shields.io/badge/English-Guide-14b8a6?style=for-the-badge" alt="English"></a>
 </p>
-<p align="center"><sub>3D 接口星图 · 3D API star map（中 / EN）</sub></p>
 
 <p align="center">
-  <img src="docs/media/zh/ui-tabs.gif" alt="中文页面切换" width="49%">
-  <img src="docs/media/en/ui-tabs.gif" alt="English page tabs" width="49%">
+  <img alt="version" src="https://img.shields.io/github/v/release/OXNEXUS-WANG/ComfyUI-Mobile-Studio?label=version&color=6f8cff">
+  <img alt="tests" src="https://img.shields.io/badge/tests-257%20passed-14b8a6">
+  <img alt="license" src="https://img.shields.io/badge/license-PolyForm%20NC%201.0-8b5cf6">
+  <img alt="platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078d4">
+  <img alt="ComfyUI" src="https://img.shields.io/badge/ComfyUI-0.42-ff6b6b">
 </p>
-<p align="center"><sub>页面切换 · Page tabs（中 / EN）</sub></p>
+
+<p align="center">
+  <img src="docs/media/showcase-panel.png" alt="出图工作台 / 管理员后台 / 3D 接口星图" width="100%">
+</p>
+<p align="center"><sub>出图工作台 · 管理员后台 · 3D 接口星图（中 / EN）</sub></p>
+
+<p align="center">
+  <img src="docs/media/video/typing.jpg" width="32%" alt="中文提示词直接写">
+  <img src="docs/media/video/result.jpg" width="32%" alt="8GB 显存出图">
+  <img src="docs/media/video/star-map.jpg" width="32%" alt="3D 接口星图">
+</p>
+<p align="center"><sub>宣传片截帧：中文直接写 → 8GB 出图 → 3D 接口星图</sub></p>
+
+<p align="center"><a href="#english">English</a> &nbsp;·&nbsp; <a href="#chinese">中文</a></p>
 
 > 截图为演示数据，作品由 CometInk 调用 Anima 2B / Juggernaut XI 生成。  
 > Screenshots use demo data; artwork was generated through CometInk with Anima 2B / Juggernaut XI.
