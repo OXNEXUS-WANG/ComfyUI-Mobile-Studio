@@ -1,5 +1,21 @@
 ﻿# 变更日志
 
+## 2026-10-24 · v1.3.20 首装编码 blocker 热修
+
+- **修复中文 Windows 上安装器直接语法报错**：`installer\install.ps1` 改为
+  **UTF-8 with BOM**。Windows PowerShell 5.1 在 ACP=936 时会把无 BOM 的
+  UTF-8 当 GB2312 解析，中文字符串破坏语法，首装第一步就报
+  `Unexpected token 'Stop"`。分享版和商用版都受影响。
+- **防火墙修复更容易**：`修复手机访问.bat` 双击会自动请求管理员权限（UAC），
+  不再需要右键「以管理员身份运行」；安装器在非管理员运行时和安装完成时
+  都会醒目提示「手机访问必须放行 TCP 8800」。
+- **DryRun 不再误报模型下载源**：新增 ModelScope 可用性检查，模型包逐个
+  标注实际来源（`[ModelScope]` / `[hf-mirror]`）；hf-mirror 不可用但
+  ModelScope 可用时只提示不影响，不报失败。
+- 新增 `test_installer_encoding.py`，检查两个 `.ps1` 的 UTF-8 BOM 和首装提示；
+  完整套件 **276 项通过**（5 项在线 HTTP 按环境跳过）。
+- 版本升级到 **1.3.20**。
+
 ## 2026-10-24 · v1.3.19 守护进程单实例
 
 - **修复两个 `--watch` 看门狗同时跑**：新增 `supervisor.lock`，第二个

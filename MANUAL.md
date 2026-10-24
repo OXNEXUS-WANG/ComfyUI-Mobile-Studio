@@ -1,11 +1,15 @@
 # CometInk 彗墨 · 使用手册
 
 > 把 ComfyUI 变成一台可以用手机浏览器操作的本地出图工作站。  
-> 版本：**v1.3.19** · 适用：分享版 / 商用版
+> 版本：**v1.3.20** · 适用：分享版 / 商用版
+>
+> v1.3.20 更新：安装器 `install.ps1` 改为 UTF-8 with BOM，修复中文
+> Windows PowerShell 5.1 首装直接语法报错；防火墙修复脚本双击自动提权；
+> DryRun 优先检查 ModelScope 下载源。
 >
 > v1.3.19 更新：守护进程增加单实例锁，避免两个 watcher 同时重启服务。
 >
-> v1.3.19 更新：网页服务启动时自动拉起 ComfyUI；页面顶部增加
+> v1.3.18 更新：网页服务启动时自动拉起 ComfyUI；页面顶部增加
 > 「ComfyUI 未启动 / 一键启动」状态条。
 >
 > v1.3.17 更新：修复监控告警次数被轮询累加到几千的问题；ComfyUI 离线
@@ -202,7 +206,7 @@ CometInk 彗墨是一个**本地部署的 ComfyUI 管理台**。
 
 ### 5.1 解压
 
-把 `CometInk-v1.3.19-Share.zip` 或 `CometInk-v1.3.19-Commercial.zip` 解压到一个普通文件夹。
+把 `CometInk-v1.3.20-Share.zip` 或 `CometInk-v1.3.20-Commercial.zip` 解压到一个普通文件夹。
 
 不要在压缩包里直接双击运行。
 
@@ -321,6 +325,37 @@ RTX 5060 8GB 写死：
 
 LoRA 训练另有更严格的总显存/空闲显存检查（例如 SDXL 训练要求 12GB+），
 不满足会直接拒绝，不会排队白等。
+
+### 5.3.3 中文 Windows 首装报错与防火墙
+
+如果 `install.bat` 一打开就报：
+
+```text
+Unexpected token 'Stop"
+Install failed. See the log above.
+```
+
+这是 v1.3.19 及更早版本的编码问题：`install.ps1` 没有 UTF-8 BOM，
+中文 Windows 的 Windows PowerShell 5.1 会按 GB2312 解析并破坏语法。
+v1.3.20 已改为 UTF-8 with BOM，请换用新安装包。
+
+升级前可以先做只读检查，不下载、不修改任何文件：
+
+```bat
+install.bat -DryRun -InstallDir D:\CometInk-test -NoDialog
+```
+
+看到「DryRun 环境检测完成」即表示脚本能正常解析。
+
+**手机访问必须放行 TCP 8800。** 如果安装器没有管理员权限，它不会自动加
+防火墙规则；安装完成后双击安装目录里的 `修复手机访问.bat`，在弹出的 UAC
+提示里点「是」即可。v1.3.20 起这个脚本会自动请求管理员权限，不再需要右键
+「以管理员身份运行」。
+
+模型下载优先走 **ModelScope**，失败才尝试 hf-mirror / Hugging Face。
+DryRun 会分别检查并在每个模型包后面标出来源；只要看到
+`模型下载源可用（ModelScope，优先）`，即使 hf-mirror 显示不可用也不影响
+国内下载。
 
 ### 5.4 第一次启动
 
@@ -1179,7 +1214,7 @@ python tools\backup.py --images
 1. Windows 移动热点是否打开；
 2. 手机是否连的是这个热点；
 3. 地址是否是 `https://192.168.137.1:8800`；
-4. 防火墙是否放行 TCP 8800（右键「修复手机访问.bat」以管理员运行）；
+4. 防火墙是否放行 TCP 8800（双击「修复手机访问.bat」，在 UAC 提示里点「是」）；
 5. 服务窗口是否还开着。
 
 ### 18.2 浏览器提示证书不安全

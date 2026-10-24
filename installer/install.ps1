@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$InstallDir = "",
     [switch]$DryRun,
     [switch]$Yes,
@@ -39,7 +39,7 @@ if ($ComfyUIDir -and $InstallDir) {
 
 $ErrorActionPreference = "Stop"
 $PkgRoot = Split-Path -Parent $PSScriptRoot
-$AppVersion = "1.3.19"
+$AppVersion = "1.3.20"
 $VersionFile = Join-Path $PkgRoot "VERSION"
 if (Test-Path $VersionFile) {
     $v = (Get-Content $VersionFile -Raw -Encoding ASCII).Trim()
@@ -52,6 +52,7 @@ $SevenZip = Join-Path $PkgRoot "tools\7zr.exe"
 $Manifest = Join-Path $PkgRoot "installer\models_manifest.json"
 $LockFile = Join-Path $PkgRoot "installer\versions.lock.json"
 $HfMirror = "https://hf-mirror.com"
+$MsModel = "https://modelscope.cn/models"
 if (-not (Test-Path $LockFile)) { throw ("安装包缺少版本锁定文件：" + $LockFile) }
 $Lock = Get-Content $LockFile -Raw -Encoding UTF8 | ConvertFrom-Json
 $ComfyVersion = [string]$Lock.comfyui.version
@@ -839,9 +840,9 @@ function Write-FirewallBat {
 chcp 65001 >nul
 net session >nul 2>&1
 if errorlevel 1 (
-  echo Please right-click and Run as administrator.
-  pause
-  exit /b 1
+  echo Requesting administrator privileges...
+  powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+  exit /b
 )
 netsh advfirewall firewall delete rule name="CometInk 8800" >nul 2>&1
 netsh advfirewall firewall delete rule name="Nexus 8800" >nul 2>&1
@@ -1198,7 +1199,8 @@ function Add-FirewallRule {
         if ($LASTEXITCODE -eq 0) { Ok "已放行 TCP 8800（手机访问）" }
         else { Warn "防火墙规则添加失败，可运行「修复手机访问.bat」" }
     } else {
-        Warn "当前不是管理员，未自动添加防火墙规则。若手机打不开，右键「修复手机访问.bat」以管理员运行。"
+        Warn "当前不是管理员，没有添加防火墙规则。手机访问必须放行 TCP 8800："
+        Say "  安装完成后双击「修复手机访问.bat」，在弹出的 UAC 提示里点「是」。" "Yellow"
     }
 }
 
@@ -1447,7 +1449,7 @@ try {
     Say ("  安装目录: " + $InstallDir)
     Say ("  可用空间: " + $freeGB + " GB")
     $admin = Test-Admin
-    Say ("  管理员权限: " + $(if ($admin) { "是" } else { "否（防火墙规则需手动修复）" }))
+    Say ("  管理员权限: " + $(if ($admin) { "是" } else { "否（手机访问需手动放行防火墙）" }))
 
     # 在停止任何旧服务、写文件或下载之前完成首次安装免责协议确认。
     # DryRun 不修改系统，Confirm-Disclaimer 会直接跳过。
@@ -1472,9 +1474,13 @@ try {
     Step "2" "网络与下载源检测"
     $script:StageName = "网络与下载源检测"
     $netComfy = Test-Url $ComfyProxy
+    $netMs = Test-Url ($MsModel + "/circlestone-labs/Anima")
     $netHf = Test-Url ($HfMirror + "/circlestone-labs/Anima")
     if ($netComfy) { Ok "ComfyUI 下载源可用（gh-proxy）" } else { Warn "gh-proxy 不可用，将尝试 GitHub 直连" }
-    if ($netHf) { Ok "模型镜像可用（hf-mirror）" } else { Warn "hf-mirror 不可用，将尝试 Hugging Face 直连" }
+    if ($netMs) { Ok "模型下载源可用（ModelScope，优先）" } else { Warn "ModelScope 不可用，将尝试 hf-mirror / Hugging Face" }
+    if ($netHf) { Ok "模型备用源可用（hf-mirror）" }
+    elseif ($netMs) { Say "  hf-mirror 不可用（不影响：ModelScope 已可用）" "Cyan" }
+    else { Warn "hf-mirror 不可用，模型下载可能失败" }
     if ($DryRun) {
         Say ""
         Say ("  版本锁定: ComfyUI " + $ComfyTag + "；依赖/节点/模型 revision 已锁定") "Cyan"
@@ -1490,10 +1496,17 @@ try {
             foreach ($key in $m.packs.PSObject.Properties.Name) {
                 $pack = $m.packs.$key
                 $f = $pack.files | Select-Object -First 1
-                $rev = if ($f.revision) { $f.revision } else { "main" }
-                $u = $HfMirror + "/" + $f.repo + "/resolve/" + $rev + "/" + $f.path + "?download=true"
+                if ($netMs -and $f.modelscope_repo) {
+                    $rev = if ($f.modelscope_revision) { $f.modelscope_revision } else { "master" }
+                    $u = $MsModel + "/" + $f.modelscope_repo + "/resolve/" + $rev + "/" + $f.path + "?download=true"
+                    $src = "ModelScope"
+                } else {
+                    $rev = if ($f.revision) { $f.revision } else { "main" }
+                    $u = $HfMirror + "/" + $f.repo + "/resolve/" + $rev + "/" + $f.path + "?download=true"
+                    $src = "hf-mirror"
+                }
                 $ok = Test-Url $u
-                Say ("    " + $(if ($ok) { "OK  " } else { "FAIL" }) + " " + $key + "  " + $pack.label) $(if ($ok) { "Green" } else { "Red" })
+                Say ("    " + $(if ($ok) { "OK  " } else { "FAIL" }) + " " + $key + "  " + $pack.label + "  [" + $src + "]") $(if ($ok) { "Green" } else { "Red" })
             }
         }
         if ($NoCustomNodes) {
@@ -1580,6 +1593,11 @@ try {
     }
     Say ("  本机打开：https://127.0.0.1:8800")
     Say ("  手机打开：https://192.168.137.1:8800（先连电脑热点）")
+    if (-not (Test-Admin)) {
+        Say ""
+        Warn "手机访问还需要放行防火墙 TCP 8800："
+        Say "  双击安装目录里的「修复手机访问.bat」，在 UAC 提示里点「是」。" "Yellow"
+    }
     Say "  管理员账号：admin（密码是你刚才设置的）"
     Say ("  免责声明：已阅读并同意（" + $script:DisclaimerMode + "）") "Green"
     Say ""

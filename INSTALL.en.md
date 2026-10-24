@@ -21,7 +21,7 @@ The installer can download ComfyUI and the default models. If you already have C
 
 ## 2. Install
 
-1. Download `CometInk-v1.3.19-Share.zip` from **Releases** and extract it to a normal folder. Do not run it from inside the ZIP.
+1. Download `CometInk-v1.3.20-Share.zip` from **Releases** and extract it to a normal folder. Do not run it from inside the ZIP.
 2. Run **`install.bat`** (English entry point). `安装.bat` is the same installer under its Chinese name.
 3. Choose the install directory. The default is:
    ```text
@@ -106,7 +106,7 @@ If the phone cannot connect:
 - Make sure the phone is on the **PC hotspot**, not campus Wi-Fi or the home router.
 - Use `https://`, not `http://`.
 - Keep the `:8800` port.
-- If the installer created `修复手机访问.bat`, run it as Administrator to add the firewall rule.
+- If the installer created `修复手机访问.bat`, double-click it and approve the UAC prompt to add the firewall rule.
 
 ---
 
