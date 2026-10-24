@@ -81,10 +81,12 @@ class ModelCatalogTests(unittest.TestCase):
         self.assertEqual(
             model_profiles.detect_family("anima-aesthetic-v1.1.safetensors"),
             "anima")
-        self.assertEqual(len(app_core.CKPT_PRESETS), 6)
+        self.assertGreaterEqual(len(app_core.CKPT_PRESETS), 6)
         self.assertEqual(
             app_core.CKPT_PRESETS[
                 "anima-aesthetic-v1.1.safetensors"]["steps"], 30)
+        self.assertIn("SDXL-Lightning-4step.safetensors",
+                      app_core.CKPT_PRESETS)
 
     def test_version_range(self):
         self.assertTrue(app_core.comfy_version_compatible(

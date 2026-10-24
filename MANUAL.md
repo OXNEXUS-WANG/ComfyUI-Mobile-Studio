@@ -1,7 +1,10 @@
 # CometInk 彗墨 · 使用手册
 
 > 把 ComfyUI 变成一台可以用手机浏览器操作的本地出图工作站。  
-> 版本：**v1.3.21** · 适用：分享版 / 商用版
+> 版本：**v1.3.22** · 适用：分享版 / 商用版
+>
+> v1.3.22 更新：新增 SDXL-Lightning、SDXL Base、Juggernaut XL v9、
+> Animagine XL 3.1 四个模型包；文案改为 4GB 起、6–24GB 自动适配。
 >
 > v1.3.21 更新：输入框下新增「角色/作品自动识别」开关；词典扩到
 > 6921 个角色 + 3910 个作品别名，合并别名可单独命中。
@@ -125,7 +128,7 @@ CometInk 彗墨是一个**本地部署的 ComfyUI 管理台**。
 
 - 不是在线 SaaS，不需要注册云账号；
 - 不是模型下载站，模型由用户自行选择并遵守模型许可；
-- 不是“一键破解显存”的工具，8GB 显存仍然有明确的模型和视频长度上限；
+- 不是“一键破解显存”的工具，低显存仍然有明确的模型和视频长度上限；
 - 不是公网服务，**只为局域网/热点内网设计**。
 
 ---
@@ -193,7 +196,7 @@ CometInk 彗墨是一个**本地部署的 ComfyUI 管理台**。
 | 项目 | 建议 |
 |---|---|
 | 系统 | Windows 10 / 11 64 位 |
-| 显卡 | NVIDIA，建议 8GB 显存以上；RTX 50 系需要 cu128 以上的 PyTorch |
+| 显卡 | NVIDIA，4GB 起可运行；6GB+ 更稳，显存越大画幅/视频上限越高；RTX 50 系需要 cu128 以上的 PyTorch |
 | 内存 | 建议 16GB 以上 |
 | 磁盘 | 至少 20GB 空闲；默认安装约 14GB，全部模型包约 66GB（以安装器显示为准） |
 | 网络 | 能访问 `gh-proxy.com`、`modelscope.cn`、`hf-mirror.com`、`argos-net.com` |
@@ -516,8 +519,10 @@ https://192.168.137.1:8800
 |---|---|---|
 | **Anima 2B** | `anima-aesthetic-v1.1` | 默认推荐；速度快；Cosmos 架构；30 步 / CFG 4 |
 | **NoobAI Vpred** | `NoobAI-XL-Vpred-v1.0` | 动漫标签知识全；v-pred；30 步 / CFG 4.5 / Euler |
-| **SDXL 动漫** | Illustrious-XL 等 | LoRA 生态全；20 步 / CFG 6 / Euler a |
-| **SDXL 写实** | Juggernaut XI、RealVisXL 等 | 风景/人像；参数随模型变化 |
+| **SDXL 动漫** | Illustrious-XL、Animagine 3.1/4.0 等 | LoRA 生态全；20~28 步 / CFG 6~7 / Euler a |
+| **SDXL 写实** | Juggernaut XI/v9、RealVisXL 等 | 风景/人像；参数随模型变化 |
+| **SDXL 加速** | SDXL-Lightning 4-step | 4 步 / CFG 1 / Euler；快，但负面提示词基本无效 |
+| **SDXL 通用** | SDXL Base 1.0 | 25 步 / CFG 7 / DPM++ 2M；适合对比和测试 LoRA |
 | **Pony / SDXL** | Pony Diffusion 等 | 需要对应触发词和参数 |
 | **SD1.5** | Counterfeit 等 | 老模型，速度快，分辨率低 |
 
@@ -791,7 +796,7 @@ generated/<账号>/<模型目录>/<文件名>.png
 
 | 训练类型 | 状态 |
 |---|---|
-| **Anima 2B** | 默认推荐，8GB 显存可跑 |
+| **Anima 2B** | 默认推荐，低/中显存可跑；显存越大越稳 |
 | **SDXL** | 实验性；768 可能 OOM，可降到 512/640 |
 | **NoobAI Vpred** | 默认不开放；标注为未验证 |
 

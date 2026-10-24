@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="version" src="https://img.shields.io/github/v/release/OXNEXUS-WANG/ComfyUI-Mobile-Studio?label=version&color=6f8cff">
-  <img alt="tests" src="https://img.shields.io/badge/tests-280%20passed-14b8a6">
+  <img alt="tests" src="https://img.shields.io/badge/tests-282%20passed-14b8a6">
   <img alt="license" src="https://img.shields.io/badge/license-PolyForm%20NC%201.0-8b5cf6">
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078d4">
   <img alt="ComfyUI" src="https://img.shields.io/badge/ComfyUI-0.42-ff6b6b">
@@ -31,10 +31,10 @@
 
 <p align="center">
   <img src="docs/media/video/typing.jpg" width="32%" alt="中文提示词直接写">
-  <img src="docs/media/video/result.jpg" width="32%" alt="8GB 显存出图">
+  <img src="docs/media/video/result.jpg" width="32%" alt="本地出图">
   <img src="docs/media/video/star-map.jpg" width="32%" alt="3D 接口星图">
 </p>
-<p align="center"><sub>宣传片截帧：中文直接写 → 8GB 出图 → 3D 接口星图</sub></p>
+<p align="center"><sub>宣传片截帧：中文直接写 → 本地出图 → 3D 接口星图</sub></p>
 
 <p align="center"><a href="#english">English</a> &nbsp;·&nbsp; <a href="#chinese">中文</a></p>
 
@@ -50,7 +50,7 @@
 
 ### Quick start
 
-1. Download `CometInk-v1.3.21-Share.zip` from **Releases** and extract it.
+1. Download `CometInk-v1.3.22-Share.zip` from **Releases** and extract it.
 2. Run **`install.bat`** (the Chinese-name `安装.bat` opens the same installer).
 3. Choose the install folder, admin password, and model pack.
 4. Launch **CometInk Studio** from the desktop shortcut.
@@ -173,8 +173,8 @@ commit、模型 revision 和 7zr 哈希都已锁定，不会自动追最新版�
 | 项目 | 要求 |
 |---|---|
 | 系统 | Windows 10 / 11 64 位 |
-| 显卡 | NVIDIA，建议 8GB 显存以上；RTX 50 系可用 cu128 包 |
-| 磁盘 | 至少 20GB 空闲；默认安装约 14GB；全部模型包约 66GB |
+| 显卡 | NVIDIA，4GB 起可运行；6GB+ 更稳，显存越大画幅/视频上限越高；RTX 50 系可用 cu128 包 |
+| 磁盘 | 至少 20GB 空闲；默认安装约 14GB；全部模型包约 94GB |
 | 网络 | 能访问 `gh-proxy.com`、`modelscope.cn`、`hf-mirror.com`、`argos-net.com` |
 | 手机 | 和电脑连同一个 Windows 移动热点（默认 `192.168.137.x`） |
 
@@ -184,8 +184,8 @@ commit、模型 revision 和 7zr 哈希都已锁定，不会自动追最新版�
 
 ## 2. 安装
 
-1. 分享版从 GitHub Releases 下载 `CometInk-v1.3.21-Share.zip`；
-   商用客户使用 `CometInk-v1.3.21-Commercial.zip`。
+1. 分享版从 GitHub Releases 下载 `CometInk-v1.3.22-Share.zip`；
+   商用客户使用 `CometInk-v1.3.22-Commercial.zip`。
 2. 解压到一个目录（不要在压缩包里直接运行）。
 3. 双击 `安装.bat`（或 `install.bat`）。
 4. **首次安装必须先阅读并同意醒目的免责声明与使用协议**：窗口内可滚动阅读，
@@ -303,6 +303,10 @@ https://192.168.137.1:8800
 | `realvis` | RealVisXL V5.0 Lightning | 6.9GB |
 | `pony` | Pony Diffusion V6 XL（标签系） | 6.9GB |
 | `animagine` | Animagine XL 4.0（SDXL 动漫） | 6.9GB |
+| `lightning` | SDXL-Lightning 4-step（极速，通用） | 6.9GB |
+| `sdxl_base` | SDXL Base 1.0（通用基线） | 6.9GB |
+| `juggernaut_v9` | Juggernaut XL v9（写实/风景，经典） | 7.1GB |
+| `animagine31` | Animagine XL 3.1（SDXL 动漫，经典） | 6.9GB |
 | `counterfeit` | Counterfeit-V2.5（旧 SD1.5） | 4.3GB |
 | `wan_video` | Wan 2.1 文生/图生视频 | 14.1GB |
 
@@ -350,6 +354,8 @@ ComfyUI 便携版仍来自 GitHub Release，下载慢时可以手动下载后用
 | Anima 2B | Anima aesthetic v1.1 | 30 步 / CFG 4 / Euler | 不能用 SDXL LoRA/PAG；可开 8 步极速 |
 | SDXL 动漫 | Illustrious、Animagine、AnimaPencil 等 | 25~30 步 / CFG 6~6.5 | 832×1216 比较稳 |
 | SDXL 写实 | Juggernaut、RealVis、EpicRealism 等 | 30 步 / DPM++ 2M / 横图 | 写实模型不需要动漫质量词 |
+| SDXL 加速 | SDXL-Lightning 4-step | 4 步 / CFG 1 / Euler | 不要用普通 30 步；负面基本无效 |
+| SDXL 通用 | SDXL Base 1.0 | 25 步 / CFG 7 / DPM++ 2M | 偏写实；适合对比和测试 LoRA |
 | Pony / SDXL | Pony Diffusion V6 XL 等 | 25 步 / CFG 6 | 提示词要带 score_9 / score_8_up |
 | NoobAI v-pred | NoobAI-XL Vpred | 30 步 / CFG 4.5 / Euler | 只能 Euler；中文角色名可能丢 |
 | SD1.5 动漫/通用 | Counterfeit、Anything、Toonify 等 | 28 步 / 512×768 | 原生 512，直接开 1024 容易重复人物 |
@@ -360,8 +366,9 @@ ComfyUI 便携版仍来自 GitHub Release，下载慢时可以手动下载后用
 选中模型后会出现一张建议卡，写明推荐参数和注意事项，点 **按推荐设置** 即可套用。
 没有识别出的模型也会按通用 SDXL 参数给出保守建议，并在文件名里提示如何补全。
 
-**新手怎么选**：动漫先用 Anima 2B 或 Illustrious；写实先用 RealVis；想用 Pony
-系再选 Pony；老显卡/快速草图用 SD1.5。先在推荐画幅和步数上出第一张，再微调。
+**新手怎么选**：动漫先用 Anima 2B、Illustrious 或 Animagine；写实先用
+Juggernaut / RealVis；快速试稿用 SDXL-Lightning；Pony 系再选 Pony；
+老显卡/快速草图用 SD1.5。先在推荐画幅和步数上出第一张，再微调。
 
 ### 本地翻译模型
 
@@ -425,8 +432,8 @@ ComfyUI 便携版仍来自 GitHub Release，下载慢时可以手动下载后用
 网页新增「训练」标签，管理员在后台安装训练组件后可启用。默认**普通账号功能关闭**，
 管理员逐单审核；训练期间本机出图自动让路，远程 worker 不受影响。
 
-- **底模**：**Anima 2B 推荐**，8GB 显存可用（默认 768、block swap 22）；
-  **SDXL 为实验性**，本机 8GB/16GB 实测会在加载 U-Net 时 OOM，低于 11GB 显存
+- **底模**：**Anima 2B 推荐**，低/中显存可用（默认 768、block swap 22）；
+  **SDXL 为实验性**，低显存会在加载 U-Net 时 OOM，低于 11GB 显存
   或 22GB 内存会直接拒绝提交，建议 12GB+ 显存 / 24GB+ 内存。
 - **数据集**：批量上传（分块、重新编码、剥元数据）或从自己的图库选择；
   每个项目 5–100 张，单项目默认 1GB；触发词/默认描述会生成 caption。
@@ -735,9 +742,9 @@ ComfyUI 地址默认是 `http://127.0.0.1:8188`。需要改端口或指向别的
 
 ## 开发说明 / Development note
 
-CometInk 由一名大一学生单人从零完成：需求、架构、后端、前端、星图、测试、文档和发布流程均由一人推进，开发期间使用 AI 编程助手辅助。近 30 天累计 **6,038,125,446 tokens**（约 60.4 亿）、**17,517 次 API 请求**，API 费用 **¥227.20**；当前版本通过 **280 项测试**，并经过人工审查。
+CometInk 由一名大一学生单人从零完成：需求、架构、后端、前端、星图、测试、文档和发布流程均由一人推进，开发期间使用 AI 编程助手辅助。近 30 天累计 **6,038,125,446 tokens**（约 60.4 亿）、**17,517 次 API 请求**，API 费用 **¥227.20**；当前版本通过 **282 项测试**，并经过人工审查。
 
-CometInk was built solo from scratch by a first-year university student: requirements, architecture, backend, frontend, star map, tests, documentation, and releases were all driven by one developer, with AI coding assistants. In the last 30 days: **6,038,125,446 tokens**, **17,517 API requests**, and **¥227.20** in API usage. The current build passes **280 tests** and has been manually reviewed.
+CometInk was built solo from scratch by a first-year university student: requirements, architecture, backend, frontend, star map, tests, documentation, and releases were all driven by one developer, with AI coding assistants. In the last 30 days: **6,038,125,446 tokens**, **17,517 API requests**, and **¥227.20** in API usage. The current build passes **282 tests** and has been manually reviewed.
 
 ---
 

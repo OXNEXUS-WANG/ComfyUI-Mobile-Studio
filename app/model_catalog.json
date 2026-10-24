@@ -496,6 +496,22 @@
   },
   "name_hints": [
     [
+      "sdxl-lightning",
+      "SDXL Lightning 4-step"
+    ],
+    [
+      "sd_xl_base",
+      "SDXL Base 1.0"
+    ],
+    [
+      "juggernaut-xl-v9",
+      "Juggernaut XL v9"
+    ],
+    [
+      "animagine-xl-3.1",
+      "Animagine XL 3.1"
+    ],
+    [
       "animagine",
       "Animagine XL"
     ],
@@ -589,6 +605,49 @@
       "cfg": 6.0,
       "kind": "anime",
       "tip": "很老的 SD1.5 模型，现在基本用不到，可以删掉腾空间。"
+    },
+    "SDXL-Lightning-4step.safetensors": {
+      "label": "通用 · SDXL-Lightning 4-step（极速）",
+      "steps": 4,
+      "cfg": 1.0,
+      "kind": "general",
+      "family": "sdxl_photo",
+      "sampler": "euler",
+      "pag": false,
+      "supports_negative": false,
+      "recommended_size": "1024x1024",
+      "tip": "4 步出图，适合快速试稿；不要用普通 30 步参数，负面提示词基本无效。"
+    },
+    "SDXL-Base-1.0.safetensors": {
+      "label": "通用 · SDXL Base 1.0",
+      "steps": 25,
+      "cfg": 7.0,
+      "kind": "general",
+      "family": "sdxl_photo",
+      "sampler": "dpmpp_2m",
+      "recommended_size": "1024x1024",
+      "tip": "官方 SDXL 基线模型，通用但偏写实；适合对比和测试 LoRA。"
+    },
+    "Juggernaut-XL-v9.safetensors": {
+      "label": "写实 · Juggernaut XL v9",
+      "steps": 30,
+      "cfg": 5.0,
+      "kind": "photo",
+      "family": "sdxl_photo",
+      "orientation": "landscape",
+      "sampler": "dpmpp_2m",
+      "recommended_size": "1216x832",
+      "tip": "经典写实/风景模型，和 Juggernaut XI 风格不同，可对比使用。"
+    },
+    "Animagine-XL-3.1.safetensors": {
+      "label": "动漫 · Animagine XL 3.1",
+      "steps": 28,
+      "cfg": 7.0,
+      "kind": "anime",
+      "family": "sdxl_anime",
+      "sampler": "euler_ancestral",
+      "recommended_size": "832x1216",
+      "tip": "经典 SDXL 动漫模型；和 Animagine 4.0 风格不同，适合对比。"
     }
   }
 }

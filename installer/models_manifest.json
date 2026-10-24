@@ -252,6 +252,74 @@
           "sha256": "2fc39d31359a4b0a64f55876d8ff7fa8d780956ae2cb13463b0223e15148976b"
         }
       ]
+    },
+    "lightning": {
+      "label": "SDXL-Lightning 4-step（极速，通用）",
+      "desc": "SDXL 4 步加速模型；适合低显存/快速试稿，4 步 / CFG 1。",
+      "size_gb": 6.94,
+      "files": [
+        {
+          "repo": "ByteDance/SDXL-Lightning",
+          "path": "sdxl_lightning_4step.safetensors",
+          "dest": "ComfyUI/models/checkpoints/SDXL-Lightning-4step.safetensors",
+          "size": 6938040682,
+          "revision": "c9a24f48e1c025556787b0c58dd67a091ece2e44",
+          "modelscope_repo": "AI-ModelScope/SDXL-Lightning",
+          "modelscope_revision": "65cff712f6b1e046b3a2c9959cd82b3c823ae39c",
+          "sha256": "e0d996ee0013e79d9d3561f50fcafb9a17e3ff07b780358e3b66d67932c4d490"
+        }
+      ]
+    },
+    "sdxl_base": {
+      "label": "SDXL Base 1.0（通用基线）",
+      "desc": "官方 SDXL 1.0 基线模型；通用但偏写实，适合对比和测试 LoRA。",
+      "size_gb": 6.94,
+      "files": [
+        {
+          "repo": "stabilityai/stable-diffusion-xl-base-1.0",
+          "path": "sd_xl_base_1.0.safetensors",
+          "dest": "ComfyUI/models/checkpoints/SDXL-Base-1.0.safetensors",
+          "size": 6938078334,
+          "revision": "462165984030d82259a11f4367a4eed129e94a7b",
+          "modelscope_repo": "stabilityai/stable-diffusion-xl-base-1.0",
+          "modelscope_revision": "430c0c115c292c1ff9d91bb78f9b66a91fc7f77a",
+          "sha256": "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b"
+        }
+      ]
+    },
+    "juggernaut_v9": {
+      "label": "Juggernaut XL v9（写实/风景，经典）",
+      "desc": "经典 Juggernaut XL v9；和 XI v11 风格不同，适合对比。",
+      "size_gb": 7.11,
+      "files": [
+        {
+          "repo": "RunDiffusion/Juggernaut-XL-v9",
+          "path": "Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors",
+          "dest": "ComfyUI/models/checkpoints/Juggernaut-XL-v9.safetensors",
+          "size": 7105348188,
+          "revision": "cf419233522daa0b9ea36c3aff98fa2cab1fb0fb",
+          "modelscope_repo": "RunDiffusion/Juggernaut-XL-v9",
+          "modelscope_revision": "fc90b0263a52467eb2697b28ccb23a09e6ef09cc",
+          "sha256": "c9e3e68f89b8e38689e1097d4be4573cf308de4e3fd044c64ca697bdb4aa8bca"
+        }
+      ]
+    },
+    "animagine31": {
+      "label": "Animagine XL 3.1（SDXL 动漫，经典）",
+      "desc": "Animagine XL 3.1；和 4.0 风格不同，适合对比和老 LoRA。",
+      "size_gb": 6.94,
+      "files": [
+        {
+          "repo": "cagliostrolab/animagine-xl-3.1",
+          "path": "animagine-xl-3.1.safetensors",
+          "dest": "ComfyUI/models/checkpoints/Animagine-XL-3.1.safetensors",
+          "size": 6938325776,
+          "revision": "483f0c322568ed13697ed01dd0be07204746d12b",
+          "modelscope_repo": "cagliostrolab/animagine-xl-3.1",
+          "modelscope_revision": "d6a7ebdc01ed8a0d18a3ba1940eca199538ebf42",
+          "sha256": "e3c47aedb06418c6c331443cd89f2b3b3b34b7ed2102a3d4c4408a8d35aad6b0"
+        }
+      ]
     }
   }
 }
