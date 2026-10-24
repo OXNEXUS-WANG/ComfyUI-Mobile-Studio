@@ -1671,7 +1671,7 @@ const CATEGORIES = [
   {id:'library', name:'素材知识库', short:'素材', color:'#c9a2e0', macro:true,
    desc:'词典搜索、提示词历史、模板和参考素材；角色词典和画风在提示词板块。',
    features:[
-    {id:'dictsearch', name:'词典搜索', desc:'按中文名或英文标签搜索 6734 个角色 + 3878 个作品别名，快速找到正确写法。', api:['ep_dictionary'], params:'GET /api/dictionary?q=\n最多 24 条'},
+    {id:'dictsearch', name:'词典搜索', desc:'按中文名或英文标签搜索 6921 个角色 + 3910 个作品别名，快速找到正确写法。', api:['ep_dictionary'], params:'GET /api/dictionary?q=\n最多 60 条'},
     {id:'history', name:'提示词历史', desc:'记住最近写过的提示词，可收藏置顶；保存在浏览器本地。', api:[], params:'localStorage'},
     {id:'teams', name:'团队 / 项目', desc:'创建团队、邀请成员并设置所有者/编辑者/只读；团队图库聚合成员个人图片，默认账号隔离不变。', api:['ep_teams'], params:'create / add_member\nset_role / remove_member'},
     {id:'team_prompts', name:'共享提示词', desc:'团队共享提示词库，编辑者/所有者可添加，创建者或所有者可删除。', api:['ep_team_prompts'], params:'GET /api/team_prompts?team=\nadd / delete'},
@@ -1717,7 +1717,7 @@ const CATEGORIES = [
    features:[
     {id:'translate', name:'中文翻译', desc:'Argos 离线中→英；翻译前先抽出角色名，避免被译坏。', api:['ep_translate'], params:'{ text }'},
     {id:'preview', name:'看译文', desc:'显示模型实际收到的英文，包括自动加上的角色标签。', api:['ep_translate'], params:'{ text }'},
-    {id:'chardict', name:'角色 / 作品词典', desc:'6734 个角色别名 + 3878 个作品别名，写中文名自动换成 Danbooru 标签。', api:['ep_translate','ep_generate'], params:'char_tags.json\n初音未来 → hatsune_miku'},
+    {id:'chardict', name:'角色 / 作品词典', desc:'6921 个角色别名 + 3910 个作品别名，写中文名自动换成 Danbooru 标签。', api:['ep_translate','ep_generate'], params:'char_tags.json\n初音未来 → hatsune_miku'},
     {id:'styles', name:'画风库', desc:'国漫淡彩、国漫水墨、水彩、油画、像素等 12 种，追加到提示词末尾。', api:['ep_models'], params:'GET /api/models → styles'},
     {id:'builder', name:'提示词生成器', desc:'点选词语拼成一段提示词，纯前端，不调用接口。', api:[], params:'客户端本地'},
     {id:'inspire', name:'随机灵感', desc:'从内置词库随机抽一个完整画面点子，纯前端。', api:[], params:'客户端本地'},
@@ -5423,7 +5423,7 @@ async function loadLivePanel(id){
     }
     if(id === 'dictsearch'){
       box.innerHTML = `<div class="live-head"><b>角色 / 作品词典</b>
-        <span>6734 角色 · 3878 作品</span></div>
+        <span>6921 角色 · 3910 作品</span></div>
         <div class="live-search">
           <input id="dictInput" placeholder="输入中文名或英文标签，例如 初音未来" autocomplete="off">
           <button id="dictGo" type="button">搜索</button>

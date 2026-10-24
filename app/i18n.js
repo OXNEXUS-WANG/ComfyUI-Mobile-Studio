@@ -361,8 +361,11 @@
       'Standalone page: planets are features, links are calls; click a planet for its API and parameters.',
     '生成器：点词拼句子 · 随机灵感：抽一个完整点子 · 看译文：检查模型收到的英文 · 历史：找回以前写过的 · 双模型对比：同一句话画两张 · 更多：步数、CFG、LoRA 等高级设置':
       'Builder: tap words · Random idea: full scene · Preview: model input · History: past prompts · Compare: two models · More: steps, CFG, LoRA and more',
-    '内置 6700+ 角色名 + 3800+ 作品名：写「初音未来」「雷电将军」「芙莉莲」会自动换成模型认识的英文标签，画指定角色时很有用。':
-      'Includes 6,700+ character names and 3,800+ series aliases; Chinese names are replaced with Danbooru tags the model knows.',
+    '角色/作品自动识别': 'Character / series auto-detect',
+    '关闭后按原文翻译；角色名被认错时用这个':
+      'Turn off to translate the raw text when a name is misdetected',
+    '内置 6900+ 角色名 + 3900+ 作品名：写「初音未来」「雷电将军」「芙莉莲」会自动换成模型认识的英文标签，画指定角色时很有用。':
+      'Includes 6,900+ character names and 3,900+ series aliases; Chinese names are replaced with Danbooru tags the model knows.',
     '用户活动：登录、出图、图库操作、挂机、放大；安全日志：登录失败、权限拦截、账号管理。日志存在电脑 logs 目录，默认保留 30 天。':
       'Activity: sign-in, generation, gallery, auto-run and upscale. Security: failed logins, permission blocks and account management. Logs are kept for 30 days.',
     '安全日志': 'Security log',

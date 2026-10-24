@@ -7724,7 +7724,10 @@ def ws_listener():
 
 def auto_loop(params, count, interval, uid="admin"):
     """连续出图，直到轮数用完或被叫停。"""
-    prompt_model, char_tags = extract_char_tags(params["prompt"])
+    char_tags = []
+    prompt_model = params["prompt"]
+    if params.get("char_dict", True):
+        prompt_model, char_tags = extract_char_tags(params["prompt"])
     try:
         for i in range(count):
             with AUTO_LOCK:

@@ -94,6 +94,38 @@ input[type=range] { accent-color: var(--ac); }
   color: #9fe8ff; background: rgba(80,170,255,.10);
   border: 1px solid rgba(127,227,255,.22); font-size: 12px;
 }
+.char-toggle {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin: -1px 3px 10px; padding: 9px 11px; border-radius: 11px;
+  color: var(--tx2); background: rgba(255,255,255,.035);
+  border: 1px solid var(--gline); cursor: pointer; user-select: none;
+}
+.char-toggle input {
+  position: absolute; width: 1px; height: 1px;
+  opacity: 0; pointer-events: none;
+}
+.char-toggle .sw {
+  flex: 0 0 auto; width: 38px; height: 22px; border-radius: 999px;
+  position: relative; margin-top: 1px; background: rgba(255,255,255,.14);
+  transition: background .18s;
+}
+.char-toggle .sw::after {
+  content: ""; position: absolute; top: 3px; left: 3px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35);
+  transition: transform .18s;
+}
+.char-toggle input:checked + .sw { background: var(--ac); }
+.char-toggle input:checked + .sw::after { transform: translateX(16px); }
+.char-toggle input:focus-visible + .sw {
+  outline: 2px solid var(--ac2); outline-offset: 2px;
+}
+.char-toggle .ct-txt {
+  display: flex; flex-direction: column; gap: 2px;
+  font-size: 13px; line-height: 1.45;
+}
+.char-toggle .ct-txt b { color: var(--tx); font-weight: 600; }
+.char-toggle .ct-txt em { font-style: normal; font-size: 11.5px; color: var(--tx3); }
 
 /* ---------- 分组标签 ---------- */
 .seclabel {
@@ -1888,7 +1920,15 @@ body.scrolled #langBtn, body.scrolled #profileTopBtn {
 <div class="seclabel">提示词 <span>中文直接写，自动翻成英文</span></div>
 <textarea id="p" maxlength="2000" placeholder="用中文描述你想画的画面...">杰作，最高画质，一个女孩，独自一人，银色的长头发，红色的眼睛，黑色的哥特连衣裙，微笑，站在夜晚的城堡前，月光，精细的背景</textarea>
 <div class="prompt-count" id="pCount">0 / 2000</div>
-<div class="qhint">内置 6700+ 角色名 + 3800+ 作品名：写「初音未来」「雷电将军」「芙莉莲」会自动换成模型认识的英文标签，画指定角色时很有用。</div>
+<label class="char-toggle" for="charDict">
+  <input type="checkbox" id="charDict" checked>
+  <span class="sw" aria-hidden="true"></span>
+  <span class="ct-txt">
+    <b>角色/作品自动识别</b>
+    <em>关闭后按原文翻译；角色名被认错时用这个</em>
+  </span>
+</label>
+<div class="qhint" id="charDictHint">内置 6900+ 角色名 + 3900+ 作品名：写「初音未来」「雷电将军」「芙莉莲」会自动换成模型认识的英文标签，画指定角色时很有用。</div>
 <div class="input-note" id="inputNotice" style="display:none"></div>
 
 <div class="seclabel">画面比例 <span>画幅跟着底模走，也能自己填</span></div>
@@ -5030,6 +5070,18 @@ function updateLive(j, id) {
   }
 }
 
+let charDictOn = true;
+(function initCharDict() {
+  const el = document.getElementById("charDict");
+  if (!el) { return; }
+  try { charDictOn = localStorage.getItem("mg_char_dict") !== "0"; } catch (e) {}
+  el.checked = charDictOn;
+  el.addEventListener("change", function () {
+    charDictOn = !!el.checked;
+    try { localStorage.setItem("mg_char_dict", charDictOn ? "1" : "0"); } catch (e) {}
+  });
+})();
+
 function collectParams() {
   let prompt = document.getElementById("p").value.trim();
   if (styleSuffix) { prompt = prompt + "，" + styleSuffix; }
@@ -5054,6 +5106,7 @@ function collectParams() {
     sampler: curSampler,
     mode: curMode,
     frames: curFrames,
+    char_dict: charDictOn,
     seed: (seedMode === "lock" && lockedSeed != null) ? lockedSeed : undefined
   };
 }
@@ -10443,7 +10496,7 @@ document.getElementById("transBtn").onclick = async function () {
   try {
     const r = await fetch("/api/translate", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: p })
+      body: JSON.stringify({ text: p, char_dict: charDictOn })
     });
     const j = await r.json();
     el.textContent = j.text || "（译不出来，可能是纯英文提示词）";

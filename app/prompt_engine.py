@@ -44,6 +44,20 @@ CHAR_SERIES = {}
 CHAR_KEYS = []
 
 
+def _expand_aliases(mapping):
+    """把「蔚蓝档案、碧蓝档案、蓝色档案」拆成三个可匹配的别名。
+
+    只拆中文顿号/逗号；不拆斜杠，避免把「精灵宝可梦 剑/盾」拆坏。
+    """
+    for key, tag in list(mapping.items()):
+        if "、" not in key and "，" not in key:
+            continue
+        for part in re.split(r"[、，]", key):
+            part = part.strip()
+            if len(part) >= 2:
+                mapping.setdefault(part, tag)
+
+
 def load_char_tags():
     """读 char_tags.json（约 8000 个角色/作品别名）。缺文件就跳过。"""
     global CHAR_KEYS
@@ -52,6 +66,8 @@ def load_char_tags():
             d = json.load(fh) or {}
         CHAR_ALIASES.update(d.get("aliases") or {})
         CHAR_SERIES.update(d.get("series") or {})
+        _expand_aliases(CHAR_ALIASES)
+        _expand_aliases(CHAR_SERIES)
         CHAR_KEYS = sorted(set(CHAR_ALIASES) | set(CHAR_SERIES),
                            key=len, reverse=True)
     except Exception:

@@ -54,6 +54,15 @@ import worker_bundle
 _OBJECT_INFO_CACHE = {"t": 0.0, "v": None}
 
 
+def _json_flag(value, default=True):
+    """JSON 布尔兼容：缺省用 default，字符串 false/0/off/no 也算关闭。"""
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return value.strip().lower() not in ("", "0", "false", "off", "no")
+    return bool(value)
+
+
 def comfy_object_info_cached(max_age=30):
     """读取 ComfyUI 节点定义；缓存 30 秒，避免体检时反复拉几 MB JSON。"""
     now = time.time()
@@ -1735,7 +1744,7 @@ class Handler(BaseHTTPRequestHandler):
                 "counts": {"characters": len(CHAR_ALIASES),
                            "series": len(CHAR_SERIES)},
                 "matches": [{"zh": h[1], "tag": h[2], "kind": h[3]}
-                            for h in hits[:24]],
+                            for h in hits[:60]],
             })
             return
 
@@ -3696,7 +3705,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"text": optimize_prompt(text), "provider": "tags",
                             "input_cleaned": text_info})
             else:
-                cleaned, tags = extract_char_tags(text)
+                if _json_flag(data.get("char_dict"), True):
+                    cleaned, tags = extract_char_tags(text)
+                else:
+                    cleaned, tags = text, []
                 out, provider, err = translate_text_for_user(cleaned, user)
                 if not out and has_chinese(cleaned):
                     self._json({"error": err or "翻译失败，请检查翻译组件",
@@ -3873,6 +3885,7 @@ class Handler(BaseHTTPRequestHandler):
                 "sampler": sampler,
                 "pag": bool(data.get("pag", True)),
                 "turbo": bool(data.get("turbo")),
+                "char_dict": _json_flag(data.get("char_dict"), True),
             }
             if (params["turbo"] and ckpt == ANIMA_MODEL
                     and anima_turbo_ready()):
@@ -4615,7 +4628,7 @@ class Handler(BaseHTTPRequestHandler):
         # 并从中文里删掉，避免 Argos 把它翻成 first-sounding future。
         prompt_raw = prompt
         char_tags = []
-        if not is_video:
+        if not is_video and _json_flag(data.get("char_dict"), True):
             prompt, char_tags = extract_char_tags(prompt)
         # 用户选了本地小参数大模型：先在中央翻译，ComfyUI 工作流里就不再需要
         # Argos 节点。失败时 translate_text_for_user() 会自动回退 Argos。
