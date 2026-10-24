@@ -1799,6 +1799,18 @@
     '正在拼图…': 'Making collage…',
     '拼图失败：': 'Collage failed: ',
     '启动失败：': 'Start failed: ',
+    'ComfyUI 未启动': 'ComfyUI is not running',
+    'ComfyUI 正在启动…': 'Starting ComfyUI…',
+    '出图前需要先启动本机 ComfyUI。':
+      'Start the local ComfyUI before generating.',
+    '出图前需要先启动本机 ComfyUI，请联系管理员。':
+      'Start the local ComfyUI before generating; ask an administrator.',
+    '一键启动': 'Start now',
+    '启动中…': 'Starting…',
+    '正在加载模型和节点，首次启动可能需要 1–2 分钟。':
+      'Loading models and nodes; the first start may take 1–2 minutes.',
+    '正在拉起 ComfyUI…': 'Starting ComfyUI…',
+    '启动失败：': 'Start failed: ',
     '正在导出带参数的图片…': 'Exporting image with parameters…',
     '导出失败：': 'Export failed: ',
     '这个文件不是图片': 'This file is not an image',

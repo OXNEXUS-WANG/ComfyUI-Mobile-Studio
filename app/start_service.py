@@ -10,6 +10,7 @@ import socket
 import ssl
 import subprocess
 import sys
+import threading
 import time
 import urllib.request
 import webbrowser
@@ -337,6 +338,74 @@ def _start_comfy():
 
 def _start_web():
     return spawn([PY, "-s", "mobile_web.py"])
+
+
+_COMFY_STATUS_CACHE = {"t": 0.0, "data": None}
+_COMFY_STATUS_LOCK = threading.RLock()
+_COMFY_LAST_ERROR = {"msg": ""}
+
+
+def comfy_status(force=False):
+    """本机 ComfyUI 状态：已就绪 / 正在启动 / 没进程。缓存 2 秒。"""
+    now = time.time()
+    with _COMFY_STATUS_LOCK:
+        cached = _COMFY_STATUS_CACHE.get("data")
+        if (not force and cached and
+                now - float(_COMFY_STATUS_CACHE.get("t") or 0) < 2.0):
+            return dict(cached)
+    alive = bool(http_ok(COMFY_CHECK, timeout=1.5))
+    running = bool(port_open(COMFY_PORT) or
+                   proc_running(r"ComfyUI\main.py"))
+    can_start = (os.path.isfile(os.path.join(ROOT, "ComfyUI", "main.py"))
+                 and os.path.isfile(PY) and not alive and not running)
+    data = {
+        "alive": alive,
+        "process_running": running,
+        "starting": bool(running and not alive),
+        "port": COMFY_PORT,
+        "can_start": can_start,
+        "last_error": _COMFY_LAST_ERROR["msg"],
+    }
+    with _COMFY_STATUS_LOCK:
+        _COMFY_STATUS_CACHE["t"] = now
+        _COMFY_STATUS_CACHE["data"] = dict(data)
+    return data
+
+
+def start_comfy_local():
+    """网页/自动启动用：没有 ComfyUI 进程时拉起一个。"""
+    with _COMFY_STATUS_LOCK:
+        st = comfy_status(force=True)
+        if st.get("alive") or st.get("process_running"):
+            st["started"] = False
+            return st
+        if not st.get("can_start"):
+            msg = ("找不到 ComfyUI\\main.py 或 python_embeded\\python.exe，"
+                   "请检查安装目录。")
+            _COMFY_LAST_ERROR["msg"] = msg
+            return {"started": False, "error": msg,
+                    **comfy_status(force=True)}
+        try:
+            child = _start_comfy()
+            _COMFY_LAST_ERROR["msg"] = ""
+            time.sleep(0.4)
+            st = comfy_status(force=True)
+            st["started"] = True
+            st["pid"] = getattr(child, "pid", None)
+            return st
+        except Exception as exc:
+            msg = "启动 ComfyUI 失败：%s" % exc
+            _COMFY_LAST_ERROR["msg"] = msg
+            return {"started": False, "error": msg,
+                    **comfy_status(force=True)}
+
+
+def autostart_comfy(delay=2.0):
+    """网页服务启动后调用：ComfyUI 没起来就主动拉起。"""
+    if os.environ.get("MGS_NO_COMFY_AUTOSTART"):
+        return {"skipped": True}
+    time.sleep(max(0.0, float(delay)))
+    return start_comfy_local()
 
 
 def supervise(comfy_child=None, web_child=None):

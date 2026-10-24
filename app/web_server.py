@@ -1598,6 +1598,21 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_training_get(path, self._query())
             return
 
+        if path == "/api/comfy/status":
+            user = self._current_user()
+            try:
+                import start_service
+                st = start_service.comfy_status()
+            except Exception as exc:
+                st = {"alive": False, "process_running": False,
+                      "starting": False, "can_start": False,
+                      "last_error": "状态检查失败：%s" % exc}
+            st["can_start"] = bool(
+                is_admin(user) and st.get("can_start")
+                and not st.get("alive") and not st.get("process_running"))
+            self._json(st)
+            return
+
         if path == "/api/models":
             activity_request("/api/models", "GET", throttle=6.0, silent=True)
             user = self._current_user()
@@ -2438,6 +2453,31 @@ class Handler(BaseHTTPRequestHandler):
             drop_session(self._cookie(COOKIE_NAME))
             self._send(200, json.dumps({"ok": True}),
                        headers=[self._set_cookie_header("", 0)])
+            return
+
+        if route == "/api/comfy/start":
+            user = self._current_user()
+            if not is_admin(user):
+                self._json({"error": "只有管理员可以启动 ComfyUI"}, 403)
+                return
+            try:
+                import start_service
+                res = start_service.start_comfy_local()
+                status = start_service.comfy_status(force=True)
+            except Exception as exc:
+                self._json({"error": "启动 ComfyUI 失败：%s" % exc}, 500)
+                return
+            ok = bool(res.get("started") or res.get("alive")
+                      or res.get("process_running"))
+            audit("activity", "comfy_start", user=user,
+                  ip=self.client_address[0], ok=ok,
+                  error=str(res.get("error") or "")[:200])
+            self._json({
+                "ok": ok,
+                "started": bool(res.get("started")),
+                "error": res.get("error") or "",
+                "status": status,
+            })
             return
 
         if route == "/api/training":
@@ -5243,6 +5283,25 @@ def monitor_loop():
         time.sleep(10)
 
 
+def _comfy_autostart_worker():
+    """网页服务先起来时，ComfyUI 没运行就主动拉起，不再只显示离线。"""
+    try:
+        if not lan_share.settings().get("local_enabled", True):
+            return
+        import start_service
+        res = start_service.autostart_comfy(2.0)
+        if res.get("started"):
+            print("  [ComfyUI] 检测到未运行，已自动启动。")
+            audit("activity", "comfy_autostart", ok=True,
+                  pid=res.get("pid"))
+        elif res.get("error"):
+            print("  [ComfyUI] 自动启动失败：%s" % res.get("error"))
+            audit("activity", "comfy_autostart", ok=False,
+                  error=str(res.get("error"))[:200])
+    except Exception as exc:
+        print("  [ComfyUI] 自动启动检查失败：%s" % exc)
+
+
 def main():
     set_console_title("CometInk 服务  ·  关闭这个窗口 = 服务停止")
 
@@ -5288,6 +5347,8 @@ def main():
     atexit.register(training_manager.M.shutdown)
 
     threading.Thread(target=ws_listener, daemon=True).start()
+    threading.Thread(target=_comfy_autostart_worker, daemon=True,
+                     name="comfy-autostart").start()
 
     addresses = bind_addresses()
     servers = []

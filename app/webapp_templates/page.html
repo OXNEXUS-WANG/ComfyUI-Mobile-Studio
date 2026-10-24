@@ -890,6 +890,34 @@ h1::after {
   .license-mark { margin: -2px 0 10px; font-size: 10.5px; padding: 3px 9px; }
 }
 
+/* ComfyUI 未启动：首屏醒目提示 + 管理员一键启动 */
+.comfy-banner {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 9px;
+  margin: 0 0 14px; padding: 10px 14px;
+  border: 1px solid rgba(255,170,90,.42); border-radius: 12px;
+  background: linear-gradient(90deg, rgba(255,140,60,.16), rgba(255,140,60,.05));
+  color: #ffd7b0; font-size: 13px; line-height: 1.45;
+}
+.comfy-banner[hidden] { display: none; }
+.comfy-banner b { color: #ffb877; font-size: 14px; }
+.comfy-banner .cb-dot {
+  width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto;
+  background: #ff8f5c; box-shadow: 0 0 0 0 rgba(255,143,92,.55);
+  animation: guardPulse 1.6s ease-out infinite;
+}
+.comfy-banner.starting .cb-dot { background: #ffc46b; }
+.comfy-banner button {
+  margin-left: auto; padding: 6px 14px; border-radius: 8px;
+  border: 1px solid rgba(255,190,120,.55); background: rgba(255,150,70,.18);
+  color: #ffe1c4; font-size: 13px; cursor: pointer;
+}
+.comfy-banner button:disabled { opacity: .55; cursor: default; }
+.comfy-banner .cb-msg { color: rgba(255,220,190,.78); font-size: 12px; }
+@media (max-width: 640px) {
+  .comfy-banner { font-size: 12px; padding: 9px 11px; gap: 7px; }
+  .comfy-banner button { margin-left: 0; }
+}
+
 /* 8) 状态条：左侧色条 */
 .status { border-left-width: 2px; }
 .status.done { border-left-color: rgba(99,217,160,.85); }
@@ -1810,6 +1838,14 @@ body.scrolled #langBtn, body.scrolled #profileTopBtn {
 <div class="license-mark" id="licenseMark" style="display:none">
   <span>商用授权</span><span class="lic-sep">·</span><span>客户</span>
   <b id="licenseCustomer" data-no-i18n></b>
+</div>
+
+<div class="comfy-banner" id="comfyBanner" role="alert" aria-live="polite" hidden>
+  <span class="cb-dot"></span>
+  <b id="comfyBannerTitle">ComfyUI 未启动</b>
+  <span id="comfyBannerText">出图前需要先启动本机 ComfyUI。</span>
+  <button id="comfyStartBtn" type="button">一键启动</button>
+  <span class="cb-msg" id="comfyBannerMsg"></span>
 </div>
 
 <div class="tabs">
@@ -4855,6 +4891,83 @@ function applyGuardState(g) {
   }
   go.disabled = busyNow || guardOn;
 }
+let comfyStarting = false;
+async function pollComfyStatus() {
+  const banner = document.getElementById("comfyBanner");
+  if (!banner) { return; }
+  try {
+    const r = await fetch("/api/comfy/status", {
+      cache: "no-store", credentials: "same-origin"
+    });
+    if (!r.ok) { banner.hidden = true; }
+    else {
+      const d = await r.json();
+      if (d.alive) {
+        banner.hidden = true;
+        comfyStarting = false;
+        setTimeout(pollComfyStatus, 5000);
+        return;
+      }
+      banner.hidden = false;
+      comfyStarting = !!d.starting;
+      banner.classList.toggle("starting", comfyStarting);
+      const title = document.getElementById("comfyBannerTitle");
+      const text = document.getElementById("comfyBannerText");
+      const btn = document.getElementById("comfyStartBtn");
+      const msg = document.getElementById("comfyBannerMsg");
+      if (title) {
+        title.textContent = comfyStarting
+          ? "ComfyUI 正在启动…" : "ComfyUI 未启动";
+      }
+      if (text) {
+        text.textContent = comfyStarting
+          ? "正在加载模型和节点，首次启动可能需要 1–2 分钟。"
+          : (d.can_start
+             ? "出图前需要先启动本机 ComfyUI。"
+             : "出图前需要先启动本机 ComfyUI，请联系管理员。");
+      }
+      if (btn) {
+        btn.hidden = !d.can_start || comfyStarting;
+        btn.disabled = comfyStarting;
+        btn.textContent = comfyStarting ? "启动中…" : "一键启动";
+      }
+      if (msg) {
+        msg.textContent = d.last_error || "";
+      }
+    }
+  } catch (e) {
+    banner.hidden = true;
+  }
+  setTimeout(pollComfyStatus, comfyStarting ? 2000 : 4000);
+}
+document.getElementById("comfyStartBtn").onclick = async function () {
+  const btn = this;
+  const msg = document.getElementById("comfyBannerMsg");
+  const title = document.getElementById("comfyBannerTitle");
+  btn.disabled = true;
+  comfyStarting = true;
+  if (title) { title.textContent = "ComfyUI 正在启动…"; }
+  if (msg) { msg.textContent = "正在拉起 ComfyUI…"; }
+  try {
+    const r = await fetch("/api/comfy/start", {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: "{}"
+    });
+    const j = await r.json().catch(function () { return {}; });
+    if (!r.ok || j.error) {
+      if (msg) { msg.textContent = j.error || ("HTTP " + r.status); }
+      btn.disabled = false;
+      comfyStarting = false;
+    }
+  } catch (e) {
+    if (msg) { msg.textContent = "启动失败：" + e.message; }
+    btn.disabled = false;
+    comfyStarting = false;
+  }
+  setTimeout(pollComfyStatus, 1200);
+};
+
 async function pollGuard() {
   try {
     const r = await fetch("/api/guard", {
@@ -10212,6 +10325,7 @@ loadModels().then(function () {
 });
 loadGallery(true);
 pollGuard();
+pollComfyStatus();
 pollActivityMain();
 document.addEventListener("visibilitychange", function () {
   if (!document.hidden) {
