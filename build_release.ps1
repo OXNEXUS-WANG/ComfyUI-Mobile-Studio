@@ -49,7 +49,31 @@ if (-not $IncludeShowcase) {
             if ($lines[$i] -like '> Screenshots use demo data;*') { $end = $i; break }
         }
         if ($start -ge 0 -and $end -gt $start) {
-            $lines = @($lines[0..($start - 1)]) + @($lines[($end + 1)..($lines.Count - 1)])
+            # 发布包里没有 docs/media，首屏大图会被去掉；
+            # 这里保留一个纯文本标题和入口，避免 README 从空行/分隔线开始。
+            $pkgHeader = @(
+                "# CometInk 彗墨 · ComfyUI 手机出图",
+                "",
+                "把 ComfyUI 包装成一个可以用手机浏览器访问的本地出图工作台。  ",
+                "Turn ComfyUI into a private, mobile-first image-generation studio.",
+                "",
+                "> 下载 / Download：GitHub Releases · 手册 / Manual：``MANUAL.md`` · English：``INSTALL.en.md``",
+                "",
+                "---",
+                ""
+            )
+            if ($end -lt ($lines.Count - 1)) {
+                $tail = @($lines[($end + 1)..($lines.Count - 1)])
+                # 去掉原 README 里紧跟截图的空行和 ---，避免和 pkgHeader 重复。
+                while ($tail.Count -gt 0 -and
+                       ($tail[0].Trim() -eq '' -or $tail[0].Trim() -eq '---')) {
+                    if ($tail.Count -le 1) { $tail = @(); break }
+                    $tail = @($tail[1..($tail.Count - 1)])
+                }
+                $lines = @($pkgHeader) + $tail
+            } else {
+                $lines = @($pkgHeader)
+            }
         }
         $lines = @($lines | Where-Object {
             $_ -ne '>' -and $_ -notmatch 'GITHUB_INTRO\.md' -and

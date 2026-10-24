@@ -18,7 +18,7 @@
 
 <p align="center">
   <img alt="version" src="https://img.shields.io/github/v/release/OXNEXUS-WANG/ComfyUI-Mobile-Studio?label=version&color=6f8cff">
-  <img alt="tests" src="https://img.shields.io/badge/tests-257%20passed-14b8a6">
+  <img alt="tests" src="https://img.shields.io/badge/tests-258%20passed-14b8a6">
   <img alt="license" src="https://img.shields.io/badge/license-PolyForm%20NC%201.0-8b5cf6">
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078d4">
   <img alt="ComfyUI" src="https://img.shields.io/badge/ComfyUI-0.42-ff6b6b">
@@ -735,9 +735,9 @@ ComfyUI 地址默认是 `http://127.0.0.1:8188`。需要改端口或指向别的
 
 ## 开发说明 / Development note
 
-CometInk 由一名大一学生单人从零完成：需求、架构、后端、前端、星图、测试、文档和发布流程均由一人推进，开发期间使用 AI 编程助手辅助。近 30 天累计 **6,038,125,446 tokens**（约 60.4 亿）、**17,517 次 API 请求**，API 费用 **¥227.20**；当前版本通过 **257 项测试**，并经过人工审查。
+CometInk 由一名大一学生单人从零完成：需求、架构、后端、前端、星图、测试、文档和发布流程均由一人推进，开发期间使用 AI 编程助手辅助。近 30 天累计 **6,038,125,446 tokens**（约 60.4 亿）、**17,517 次 API 请求**，API 费用 **¥227.20**；当前版本通过 **258 项测试**，并经过人工审查。
 
-CometInk was built solo from scratch by a first-year university student: requirements, architecture, backend, frontend, star map, tests, documentation, and releases were all driven by one developer, with AI coding assistants. In the last 30 days: **6,038,125,446 tokens**, **17,517 API requests**, and **¥227.20** in API usage. The current build passes **257 tests** and has been manually reviewed.
+CometInk was built solo from scratch by a first-year university student: requirements, architecture, backend, frontend, star map, tests, documentation, and releases were all driven by one developer, with AI coding assistants. In the last 30 days: **6,038,125,446 tokens**, **17,517 API requests**, and **¥227.20** in API usage. The current build passes **258 tests** and has been manually reviewed.
 
 ---
 

@@ -88,6 +88,11 @@ class CometInkBrandingTests(unittest.TestCase):
         self.assertIn('Copy-Item $manual (Join-Path $InstallDir "使用说明.md")',
                       self.install)
 
+    def test_package_readme_keeps_title_after_image_trim(self):
+        # 发布包会去掉 docs/media 首屏图，但 README 不能因此从空行开始。
+        self.assertIn("$pkgHeader", self.build)
+        self.assertIn('"# CometInk 彗墨 · ComfyUI 手机出图"', self.build)
+
     def test_shipped_files_have_no_developer_paths(self):
         files = [
             "installer/install.ps1", "README.md", "MANUAL.md",

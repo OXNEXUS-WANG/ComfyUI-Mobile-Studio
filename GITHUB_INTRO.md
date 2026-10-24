@@ -13,7 +13,7 @@
   <img alt="version" src="https://img.shields.io/badge/version-v1.3.13-6f8cff">
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-3b82f6">
   <img alt="network" src="https://img.shields.io/badge/network-LAN%20%2F%20Hotspot-22c55e">
-  <img alt="tests" src="https://img.shields.io/badge/tests-257%20passed-14b8a6">
+  <img alt="tests" src="https://img.shields.io/badge/tests-258%20passed-14b8a6">
   <img alt="license" src="https://img.shields.io/badge/license-PolyForm%20Noncommercial-8b5cf6">
 </p>
 
@@ -326,8 +326,8 @@ The Share edition is for personal study, research, experimentation, hobbies, and
 
 ## 测试 / Tests
 
-当前版本完整测试套件 **257 项通过**（5 项在线 HTTP 测试按环境跳过）。  
-The current suite passes **257 tests** (5 online HTTP tests are skipped depending on the environment):
+当前版本完整测试套件 **258 项通过**（5 项在线 HTTP 测试按环境跳过）。  
+The current suite passes **258 tests** (5 online HTTP tests are skipped depending on the environment):
 
 ```powershell
 python tests\run_tests.py
@@ -354,9 +354,9 @@ Coverage includes installer layout, account permissions, queueing, gallery isola
 
 ## 开发说明 / Development note
 
-CometInk 由一名大一学生单人从零完成：需求、架构、后端、前端、星图、测试、文档和发布流程均由一人推进，开发期间使用 AI 编程助手辅助。近 30 天累计 **6,038,125,446 tokens**（约 60.4 亿）、**17,517 次 API 请求**，API 费用 **¥227.20**；当前版本通过 **257 项测试**，并经过人工审查。
+CometInk 由一名大一学生单人从零完成：需求、架构、后端、前端、星图、测试、文档和发布流程均由一人推进，开发期间使用 AI 编程助手辅助。近 30 天累计 **6,038,125,446 tokens**（约 60.4 亿）、**17,517 次 API 请求**，API 费用 **¥227.20**；当前版本通过 **258 项测试**，并经过人工审查。
 
-CometInk was built solo from scratch by a first-year university student: requirements, architecture, backend, frontend, star map, tests, documentation, and releases were all driven by one developer, with AI coding assistants. In the last 30 days: **6,038,125,446 tokens**, **17,517 API requests**, and **¥227.20** in API usage. The current build passes **257 tests** and has been manually reviewed.
+CometInk was built solo from scratch by a first-year university student: requirements, architecture, backend, frontend, star map, tests, documentation, and releases were all driven by one developer, with AI coding assistants. In the last 30 days: **6,038,125,446 tokens**, **17,517 API requests**, and **¥227.20** in API usage. The current build passes **258 tests** and has been manually reviewed.
 
 ---
 
