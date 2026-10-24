@@ -2959,7 +2959,7 @@ body.scrolled #langBtn, body.scrolled #profileTopBtn {
     <button id="aRedraw">整图重画</button>
     <button id="aMask">涂抹重绘</button>
     <button id="aExport">刻参数导出</button>
-    <button id="aSave">保存到手机</button>
+    <button id="aSave">下载 / 保存</button>
     <button id="aDel" class="danger">删除这张</button>
   </div>
   <div class="tip">横向没有隐藏按钮，全部在上面 · 删除有二次确认</div>
@@ -5148,11 +5148,11 @@ function renderResult(nameOrList) {
   });
   const a = document.createElement("a");
   a.className = "img";
-  a.href = "/img/" + encodeURIComponent(names[0]);
+  a.href = "/img/" + encodeURIComponent(names[0]) + "?download=1";
   a.setAttribute("download", "");
   a.textContent = names.length > 1
     ? "共 " + names.length + " 张 · 点图可全屏看、左右滑"
-    : "长按或点这里保存到手机";
+    : "点这里下载 · 手机可长按保存";
   out.appendChild(a);
   const h = document.createElement("div");
   h.className = "hint";
@@ -6096,9 +6096,14 @@ document.getElementById("aUp4").onclick = function () { doUpscale(4); };
 
 document.getElementById("aSave").onclick = function () {
   const it = curItem(); if (!it) { return; }
-  window.open("/img/" + encodeURIComponent(it.name), "_blank");
-  show(/\.(mp4|webm)$/i.test(it.name)
-    ? "长按视频即可保存到手机" : "长按图片即可保存到手机", "done");
+  const name = String(it.name || "").split("/").pop() || "image.png";
+  const a = document.createElement("a");
+  a.href = "/img/" + encodeURIComponent(it.name) + "?download=1";
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  show("已开始下载：" + name, "done");
 };
 
 document.getElementById("aDel").onclick = async function () {

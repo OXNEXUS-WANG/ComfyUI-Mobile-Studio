@@ -2344,8 +2344,17 @@ class Handler(BaseHTTPRequestHandler):
             fp = find_image(name, user)
             ctype = MEDIA_CTYPES.get(os.path.splitext(name)[1].lower(),
                                      "application/octet-stream")
-            if fp and self._file(fp, ctype):
-                return
+            if fp:
+                query = urllib.parse.parse_qs(
+                    urllib.parse.urlparse(self.path).query)
+                if str((query.get("download") or ["0"])[0]).lower() in (
+                        "1", "true", "yes"):
+                    # 电脑端“下载”必须带 attachment，否则浏览器只会打开新标签页。
+                    if self._stream_file(
+                            fp, ctype, download_name=os.path.basename(fp)):
+                        return
+                elif self._file(fp, ctype):
+                    return
             self._send(404, "not found", "text/plain; charset=utf-8")
             return
 

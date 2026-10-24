@@ -274,7 +274,10 @@
     '移除参考图': 'Remove reference',
     '或把图片拖进这个框': 'or drag an image into this box',
     '保存到手机': 'Save to phone',
+    '下载 / 保存': 'Download / Save',
     '长按或点这里保存到手机': 'Long-press or tap to save to your phone',
+    '点这里下载 · 手机可长按保存':
+      'Download here; long-press to save on phone',
     '已存入图库，切到上方「图 库」滑动浏览全部历史。':
       'Saved to the gallery. Switch to Gallery to browse everything.',
     '图片存在电脑上，点开可左右滑动浏览，不会存到手机。':
