@@ -88,6 +88,7 @@ if (-not $IncludeShowcase) {
 $runtimeFiles = @(
     "users.json", "users.json.bak", "sessions.json", "workers.json", "usage.json",
     "jobs_state.json", "jobs_resume.json", "supervisor.json", "instance.lock",
+    "supervisor.lock",
     "supervisor_status.json", "time_state.json", "trusted_time.key",
     "hardware.json", "local_llm.json", "monitor.json",
     "monitor_alerts.json", "monitor_trends.json", "cleanup.json",

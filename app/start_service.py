@@ -4,6 +4,7 @@
 桌面快捷方式指向同目录的 一键启动.bat。
 已经在运行的服务会跳过，不会重复开窗口。
 """
+import atexit
 import json
 import os
 import socket
@@ -38,10 +39,78 @@ WEB_SCHEME = "https" if (os.path.isfile(CERT_FILE) and
 WEB_BASE = "%s://127.0.0.1:%d" % (WEB_SCHEME, WEB_PORT)
 WEB_URL = WEB_BASE + "/"
 COMFY_CHECK = COMFY_BASE + "/system_stats"
+SUPERVISOR_LOCK = os.path.join(ROOT, "supervisor.lock")
 
 
 def log(msg):
     print(msg, flush=True)
+
+
+def _pid_alive(pid):
+    try:
+        import psutil
+        return psutil.pid_exists(int(pid))
+    except Exception:
+        try:
+            os.kill(int(pid), 0)
+            return True
+        except Exception:
+            return False
+
+
+def _watcher_pid_alive(pid):
+    """PID 存在还不够，确认它确实是 start_service.py。"""
+    try:
+        import psutil
+        p = psutil.Process(int(pid))
+        cmd = " ".join(p.cmdline() or []).lower().replace("/", "\\")
+        if not cmd:
+            return _pid_alive(pid)
+        return "start_service.py" in cmd
+    except Exception:
+        return _pid_alive(pid)
+
+
+def acquire_supervisor_lock():
+    """只允许一个 --watch 守护进程。返回 True 表示拿到锁。"""
+    me = os.getpid()
+    for _ in range(2):
+        try:
+            fd = os.open(SUPERVISOR_LOCK,
+                         os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, json.dumps({
+                "pid": me, "started": time.time(),
+            }).encode("utf-8"))
+            os.close(fd)
+            atexit.register(release_supervisor_lock)
+            return True
+        except FileExistsError:
+            try:
+                with open(SUPERVISOR_LOCK, "r", encoding="utf-8") as fh:
+                    data = json.load(fh) or {}
+                pid = int(data.get("pid") or 0)
+            except Exception:
+                pid = 0
+            if pid and pid != me and _watcher_pid_alive(pid):
+                log("  [守护] 已有守护进程在运行（PID %d），本进程退出。" % pid)
+                return False
+            try:
+                os.remove(SUPERVISOR_LOCK)
+            except OSError:
+                return False
+        except OSError:
+            return False
+    return False
+
+
+def release_supervisor_lock():
+    try:
+        with open(SUPERVISOR_LOCK, "r", encoding="utf-8") as fh:
+            data = json.load(fh) or {}
+        if int(data.get("pid") or 0) == os.getpid():
+            os.remove(SUPERVISOR_LOCK)
+    except Exception:
+        pass
 
 
 def port_open(port):
@@ -512,6 +581,9 @@ def supervise(comfy_child=None, web_child=None):
 def main():
     os.chdir(ROOT)
     no_browser = "--no-browser" in sys.argv
+    watch = "--watch" in sys.argv
+    if watch and not acquire_supervisor_lock():
+        return 0
     log("=" * 48)
     log("  CometInk · 一键启动")
     log("=" * 48)
@@ -578,7 +650,7 @@ def main():
             log("打开浏览器失败：%s" % exc)
             log("请手动打开 %s" % WEB_URL)
     time.sleep(0.8)
-    if "--watch" in sys.argv:
+    if watch:
         supervise(comfy_child, web_child)
     return 0
 
